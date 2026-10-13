@@ -13,6 +13,16 @@ def make_store(tmp_path):
     return Store(database_url='', sqlite_path=str(tmp_path/'minifish.sqlite3'), secret='x'*64)
 
 
+def test_owner_domains_survive_store_reopen(tmp_path):
+    first = make_store(tmp_path)
+    first.save_domain('example.com')
+    assert make_store(tmp_path).list_domains() == ['example.com']
+    with pytest.raises(ValueError):
+        first.save_domain('exampleXcom')
+    with pytest.raises(ValueError):
+        first.save_domain('127.0.0.1')
+
+
 def test_profile_encrypted_and_restored(tmp_path):
     store=make_store(tmp_path)
     state={'cookies':[{'name':'session','value':'private-cookie-123','domain':'example.com',
