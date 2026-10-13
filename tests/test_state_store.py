@@ -45,6 +45,35 @@ def test_jobs_are_encrypted_and_recover_safely(tmp_path):
     assert job['id'] not in restarted.due_ids()
 
 
+def test_job_result_encrypted(tmp_path):
+    store=make_store(tmp_path)
+    job=store.enqueue(profile=None,site='https://example.com',
+                      steps=[{'action':'snapshot'}],run_at=time.time())
+    store.save_job_result(job['id'], {'title':'Result', 'text':'private-page-text'})
+    raw=(tmp_path/'minifish.sqlite3').read_bytes()
+    assert b'private-page-text' not in raw
+    data=make_store(tmp_path).get_job_result(job['id'])
+    assert data['result']['text']=='private-page-text'
+
+
+@pytest.mark.asyncio
+async def test_background_job_executes_without_open_chat(tmp_path):
+    class BrowserStub:
+        def __init__(self):self.closed=False
+        async def open(self,url,**kwargs):return {'session_id':'test-session'}
+        async def snapshot(self,sid):
+            return {'url':'https://example.com/','title':'Example','text':'Completed'}
+        async def close(self,sid):self.closed=True
+    store=make_store(tmp_path)
+    job=store.enqueue(profile=None,site='https://example.com',
+                      steps=[{'action':'snapshot'}],run_at=time.time())
+    engine=BrowserStub()
+    await JobRunner(engine,store).execute(job['id'])
+    assert engine.closed
+    assert store.get_job(job['id'])['status']=='done'
+    assert store.get_job_result(job['id'])['result']['text']=='Completed'
+
+
 def test_queue_cancel(tmp_path):
     store=make_store(tmp_path)
     job=store.enqueue(profile=None,site='https://example.com',
