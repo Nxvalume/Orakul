@@ -59,6 +59,13 @@ async function refreshJobs(){
   let row=el('div');row.className='line';row.style.marginTop='9px';
   let desc=el('span',j.site+' · '+j.status+' · '+j.progress+'/'+j.total+' шагов · '+(j.summary||''));
   desc.style.flex='1';row.append(desc);
+  if(j.status==='done'){let show=el('button','Результат');show.onclick=()=>act(async()=>{
+   let data=await api('job-result',{id:j.id});
+   let result=data.result;
+   let output=el('div',result?(result.title+' · '+result.site+'\n'+result.text):'Для этой задачи нет снимка страницы. Добавь шаг snapshot.');
+   output.style.whiteSpace='pre-wrap';output.style.maxHeight='260px';output.style.overflow='auto';
+   output.style.width='100%';output.style.overflowWrap='anywhere';row.append(output)
+  });row.append(show)}
   if(j.status==='queued'){let cancel=el('button','Отменить');cancel.onclick=()=>act(async()=>{
    await api('cancel-job',{id:j.id});await refreshJobs()
   });row.append(cancel)}
