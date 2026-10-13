@@ -159,13 +159,13 @@ class BrowserEngine:
         async with s.lock:
             await s.page.goto(url, timeout=TIMEOUT_MS, wait_until='domcontentloaded')
             s.last_action = 'Переход на сайт'
-            s.last_action = 'Переход на сайт'
             return {'url': s.page.url, 'title': await s.page.title()}
 
     async def back(self, sid: str) -> dict:
         s = self.get(sid)
         async with s.lock:
             await s.page.go_back(timeout=TIMEOUT_MS, wait_until='domcontentloaded')
+            s.last_action = 'Возврат на предыдущую страницу'
             return {'url': s.page.url, 'title': await s.page.title()}
 
     async def snapshot(self, sid: str) -> dict:
