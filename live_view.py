@@ -20,6 +20,8 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <div class="panel"><div class="screen"><p id="placeholder">Пока нет активных страниц. Запусти задачу через ChatGPT и MiniFish.</p><img id="live" alt="Прямая трансляция экрана браузера MiniFish"></div><p class="hint">Это защищённый поток кадров браузера с частотой до 1 кадра в секунду, без звука и записи. Экран обновляется во время переходов, прокрутки и нажатий. Сессии исчезают после закрытия или перезапуска сервера.</p></div>
 <div class="panel"><h2>Управление браузером с телефона</h2><p class="hint">Для входа в сторонний аккаунт открой сайт через MiniFish. Включи клики и нажимай прямо на изображение. Пароль или код вводи здесь — данные передаются в браузер, но не в чат ChatGPT и не отображаются в истории MiniFish.</p>
 <div class="row"><button type="button" id="touch">Включить клики по экрану</button><span id="manualStatus" class="status muted small">Управление выключено</span></div>
+<div class="row" style="margin-top:12px"><input id="profileName" placeholder="Имя профиля, например telegram" maxlength="40" autocapitalize="off" spellcheck="false"><button id="saveProfile" type="button">Сохранить вход</button></div>
+<p id="storageHint" class="hint">Статус постоянного хранения уточняется…</p>
 <div class="row" style="margin-top:12px"><input type="password" id="entry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Текст, пароль или одноразовый код"><button type="button" id="type">Ввести в браузер</button></div>
 <div class="keys"><button data-key="Tab">Tab</button><button data-key="Enter">Enter</button><button data-key="Backspace">⌫</button><button data-key="Escape">Esc</button><button data-key="ControlOrMeta+A">Выделить всё</button></div>
 <p class="hint">Нажимай на нужное поле на изображении, затем вводи текст. Действия производятся от имени владельца; подтверждай только то, что сам намерен отправить. Сеанс браузера пока временный и не переживает перезапуск сервера.</p></div>
@@ -50,6 +52,26 @@ $('live').addEventListener('click', e=>{
  const y=(e.clientY-r.top)*($('live').naturalHeight||900)/r.height;
  ownerAction('click',{x,y});
 });
+async function showStorage(){
+ try{const r=await fetch('/api/storage',{method:'POST',credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},body:'{}'});
+ if(r.ok){const o=await r.json();$('storageHint').textContent=o.durable?
+ 'Постоянное хранилище подключено. Профиль зашифрован.':
+ 'Внимание: сервер пока использует временное хранилище. После перезапуска сохранённые входы могут исчезнуть.';}
+ }catch(e){$('storageHint').textContent='Не удалось проверить постоянство хранения';}
+}
+showStorage();
+$('saveProfile').onclick=async()=>{
+ if(!current){$('manualStatus').textContent='Нет активной сессии';return;}
+ const name=$('profileName').value.trim();
+ if(!/^[A-Za-z0-9_-]{1,40}$/.test(name)){$('manualStatus').textContent='Имя: латиница, цифры, _ и -';return;}
+ try{
+ const r=await fetch('/api/save-profile',{method:'POST',credentials:'same-origin',
+ headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:current,name})});
+ const d=await r.json();if(!r.ok)throw Error(d.error||'Не удалось сохранить');
+ $('manualStatus').textContent='Профиль '+name+' сохранён'+(d.durable?' в постоянной базе':' временно');
+ }catch(e){$('manualStatus').textContent='Ошибка: '+e.message;}
+};
 $('type').onclick=()=>{
  const input=$('entry');const text=input.value;input.value='';
  if(text)ownerAction('type',{text});
