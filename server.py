@@ -11,6 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
+from live_view import live_page, session_api, stream_api
 from engine import BrowserEngine, allowed_domains, add_allowed_domain
 from dashboard import PAGE
 from web_auth import authorized, make_cookie, verify_password, allowed_attempt
@@ -180,6 +181,9 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 app=mcp.streamable_http_app()
 app.add_route('/',homepage,methods=['GET'])
 app.add_route('/healthz',health,methods=['GET'])
+app.add_route('/live',live_page,methods=['GET'])
+app.add_route('/live/sessions',session_api(engine),methods=['GET'])
+app.add_route('/live/stream',stream_api(engine),methods=['GET'])
 app.add_route('/api/me',me,methods=['GET'])
 app.add_route('/api/{action}',api,methods=['POST'])
 app.add_route('/.well-known/oauth-protected-resource', protected_resource, methods=['GET'])
