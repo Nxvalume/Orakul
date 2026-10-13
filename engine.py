@@ -95,6 +95,7 @@ class Session:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     touched: float = field(default_factory=time.monotonic)
     last_action: str = 'Открыта страница'
+    profile_name: str | None = None
 
 
 class BrowserEngine:
@@ -118,7 +119,8 @@ class BrowserEngine:
             return
         await route.continue_()
 
-    async def open(self, url: str) -> dict:
+    async def open(self, url: str, *, storage_state: dict | None = None,
+                   profile_name: str | None = None) -> dict:
         validate_url(url)
         async with self._lock:
             await self._cleanup_expired()
@@ -126,14 +128,17 @@ class BrowserEngine:
                 raise RuntimeError('Лимит одновременных браузерных сессий; закройте одну из них')
             await self._launch()
             assert self._browser is not None
-            context = await self._browser.new_context(accept_downloads=False, service_workers='block', viewport={'width': 1280, 'height': 900})
+            context = await self._browser.new_context(accept_downloads=False, service_workers='block',
+                    viewport={'width': 1280, 'height': 900},
+                    **({'storage_state': storage_state} if storage_state is not None else {}))
             await context.route('**/*', self._route)
             page = await context.new_page()
             sid = str(uuid4())
-            self._sessions[sid] = Session(context=context, page=page)
+            self._sessions[sid] = Session(context=context, page=page, profile_name=profile_name)
         try:
             await page.goto(url, timeout=TIMEOUT_MS, wait_until='domcontentloaded')
-            return {'session_id': sid, 'url': page.url, 'title': await page.title()}
+            return {'session_id': sid, 'url': page.url, 'title': await page.title(),
+                    'profile': profile_name}
         except Exception:
             await self.close(sid)
             raise
@@ -242,6 +247,15 @@ class BrowserEngine:
             raise ValueError('Сессия недоступна')
         async with s.lock:
             return await s.page.screenshot(type='jpeg', quality=55, full_page=False, timeout=TIMEOUT_MS)
+
+    async def export_state(self, sid: str) -> dict:
+        """Get browser cookies/localStorage to save encrypted; never expose via MCP result."""
+        s = self.get(sid)
+        async with s.lock:
+            return await s.context.storage_state(indexed_db=True)
+
+    def set_profile_name(self, sid: str, name: str) -> None:
+        self.get(sid).profile_name = name
 
     async def screenshot(self, sid: str) -> bytes:
         s = self.get(sid)
