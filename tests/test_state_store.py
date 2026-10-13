@@ -57,6 +57,7 @@ def test_queue_cancel(tmp_path):
 
 def test_validate_background_workflow(monkeypatch):
     monkeypatch.setenv('BROWSER_ALLOWED_DOMAINS','example.com')
+    monkeypatch.setattr('engine.socket.getaddrinfo', lambda *a, **kw: [(None,None,None,None,('93.184.215.14',443))])
     assert check_steps('https://example.com',[{'action':'snapshot'}])==[{'action':'snapshot'}]
     for spec in ([{'action':'execute_js','value':'alert(1)'}],
                  [{'action':'goto','url':'http://example.com'}],
@@ -69,7 +70,8 @@ def test_validate_background_workflow(monkeypatch):
 
 
 def test_unavailable_profile_or_mismatched_domain(tmp_path,monkeypatch):
-    monkeypatch.setenv('BROWSER_ALLOWED_DOMAINS','example.com;github.com')
+    monkeypatch.setenv('BROWSER_ALLOWED_DOMAINS','example.com,github.com')
+    monkeypatch.setattr('engine.socket.getaddrinfo', lambda *a, **kw: [(None,None,None,None,('93.184.215.14',443))])
     store=make_store(tmp_path)
     runner=JobRunner(object(),store)
     with pytest.raises(ValueError):
