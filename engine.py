@@ -104,6 +104,7 @@ class BrowserEngine:
         self._browser: Browser | None = None
         self._sessions: dict[str, Session] = {}
         self._lock = asyncio.Lock()
+        self.profile_save_callback = None
 
     async def _launch(self) -> None:
         if self._browser is None:
@@ -147,7 +148,7 @@ class BrowserEngine:
         stale = [k for k, s in self._sessions.items() if time.monotonic() - s.touched > TTL_SECONDS]
         for sid in stale:
             s = self._sessions.pop(sid)
-            await s.context.close()
+            await self._close_session_context(s)
 
     def get(self, sid: str) -> Session:
         s = self._sessions.get(sid)
@@ -306,13 +307,27 @@ class BrowserEngine:
             s.last_action = 'Прокрутка страницы'
             return {'scroll_pixels': pixels, 'url': s.page.url}
 
+    async def _close_session_context(self, session: Session) -> dict:
+        updated = False
+        failed = False
+        try:
+            if session.profile_name and self.profile_save_callback is not None:
+                state = await session.context.storage_state(indexed_db=True)
+                await self.profile_save_callback(session.profile_name, state)
+                updated = True
+        except Exception:
+            # Do not leak cookies or credentials into errors or logs.
+            failed = True
+        finally:
+            await session.context.close()
+        return {'closed': True, 'profile_updated': updated, 'profile_save_failed': failed}
+
     async def close(self, sid: str) -> dict:
         async with self._lock:
             s = self._sessions.pop(sid, None)
         if s is None:
             return {'closed': False}
-        await s.context.close()
-        return {'closed': True}
+        return await self._close_session_context(s)
 
     async def shutdown(self) -> None:
         for sid in list(self._sessions):
