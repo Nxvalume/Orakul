@@ -17,7 +17,10 @@ PAGE = r'''<!doctype html>
 <p class="hint">Для сохранения авторизации открой прямой эфир, войди на сайте и нажми «Сохранить вход». Профиль можно открыть из этой панели или через ChatGPT.</p></section>
 <section class="card"><h2>Фоновые задачи</h2>
 <p class="hint">Задачи выполняются автоматически по заранее заданным шагам. Для создания задачи опиши действия MiniFish в чате ChatGPT. На бесплатном Render сервер может засыпать — выполнение по расписанию не гарантируется.</p>
-<button id="jobsRefresh" type="button">Обновить задачи</button><div id="jobsList" class="hint">Загрузка…</div></section>
+<div class="line"><input id="taskUrl" placeholder="https://example.com" autocapitalize="none" spellcheck="false"><input id="taskTime" type="datetime-local" aria-label="Время запуска, необязательно"></div>
+<div class="line" style="margin-top:9px"><button id="taskCreate" class="primary" type="button">Считать страницу в фоне</button><button id="jobsRefresh" type="button">Обновить задачи</button></div>
+<p class="hint">Оставь время пустым для немедленного запуска. Домен должен быть добавлен в разрешённые. Сложные последовательности действий можно задать через MiniFish в ChatGPT.</p>
+<div id="jobsList" class="hint">Загрузка…</div></section>
 <section class="card"><h2>2. Открыть сайт</h2><div class="line"><input id="url" placeholder="https://example.com" value="https://example.com" autocapitalize="none" spellcheck="false"><button class="primary" id="open">Открыть</button></div><div class="line" style="margin-top:10px"><button id="back">Назад</button><button id="refresh">Обновить</button><button id="scroll">Ниже ↓</button><button id="screenButton">Скриншот</button><button id="close">Закрыть</button></div><p class="status" id="state">Сессия не открыта</p><p id="notice"></p></section>
 <section class="card"><h2>3. Содержимое страницы</h2><div id="pageText" class="muted">Откройте сайт, чтобы прочитать страницу и получить элементы управления.</div><img id="screen" alt="Скриншот браузера"></section>
 <section class="card"><h2>4. Кнопки и поля сайта</h2><div id="controls" class="muted">Появятся после открытия сайта.</div></section>
@@ -74,6 +77,15 @@ async function refreshJobs(){
 }
 by('profileRefresh').onclick=()=>act(refreshProfiles);
 by('jobsRefresh').onclick=()=>act(refreshJobs);
+by('taskCreate').onclick=()=>act(async()=>{
+  let url=by('taskUrl').value.trim();
+  let value=by('taskTime').value;
+  let run_at=value?new Date(value).getTime()/1000:undefined;
+  if(value&&!Number.isFinite(run_at))throw Error('Укажи правильное время');
+  let job=await api('submit-job',{url,steps:[{action:'snapshot'}],run_at});
+  by('notice').textContent='Задача добавлена: '+job.id;
+  await refreshJobs();
+});
 by('open').onclick=()=>act(async()=>{if(sid)await api('close',{session_id:sid});sid=(await api('open',{url:by('url').value})).session_id;by('screen').style.display='none';await snapshot()});
 by('refresh').onclick=()=>act(snapshot);by('back').onclick=()=>act(async()=>{if(!sid)return;await api('back',{session_id:sid});await snapshot()});by('scroll').onclick=()=>act(async()=>{if(!sid)return;await api('scroll',{session_id:sid,pixels:650});await snapshot()});
 by('close').onclick=()=>act(async()=>{if(sid)await api('close',{session_id:sid});sid=null;by('state').textContent='Сессия закрыта';by('controls').replaceChildren();by('pageText').textContent='Сессия закрыта';by('screen').style.display='none'});
