@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import ipaddress
 import json
 import os
 import re
@@ -102,6 +103,12 @@ class Store:
         if not isinstance(domain,str) or not re.fullmatch(
                 r'[a-z0-9-]+(?:\.[a-z0-9-]+)+',domain) or len(domain)>253:
             raise ValueError('Некорректное имя домена')
+        try:
+            ipaddress.ip_address(domain)
+        except ValueError:
+            pass
+        else:
+            raise ValueError('Числовой IP нельзя сохранять как домен')
         self.execute('''INSERT INTO mf_allowed_domains (domain,added) VALUES (?,?)
                         ON CONFLICT(domain) DO NOTHING''',(domain,time.time()))
 
