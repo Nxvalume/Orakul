@@ -94,6 +94,7 @@ class Session:
     page: Page
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     touched: float = field(default_factory=time.monotonic)
+    last_action: str = 'Открыта страница'
 
 
 class BrowserEngine:
@@ -157,6 +158,8 @@ class BrowserEngine:
         s = self.get(sid)
         async with s.lock:
             await s.page.goto(url, timeout=TIMEOUT_MS, wait_until='domcontentloaded')
+            s.last_action = 'Переход на сайт'
+            s.last_action = 'Переход на сайт'
             return {'url': s.page.url, 'title': await s.page.title()}
 
     async def back(self, sid: str) -> dict:
@@ -197,6 +200,7 @@ class BrowserEngine:
             await el.click(timeout=TIMEOUT_MS)
             if len(s.context.pages) > 1:
                 s.page = s.context.pages[-1]
+            s.last_action = 'Нажатие: ' + (label.strip()[:80] or selector[:80])
             return {'clicked': selector, 'url': s.page.url, 'label': label}
 
     async def fill(self, sid: str, selector: str, value: str) -> dict:
@@ -210,13 +214,34 @@ class BrowserEngine:
                 raise PermissionError('Ввод паролей, кодов и платёжных данных не поддерживается')
             await el.fill(value, timeout=TIMEOUT_MS)
             # Deliberately do not echo sensitive field values.
+            s.last_action = 'Заполнение поля'
             return {'filled': selector, 'length': len(value)}
 
     async def select(self, sid: str, selector: str, value: str) -> dict:
         s = self.get(sid)
         async with s.lock:
             await s.page.locator(selector).first.select_option(value, timeout=TIMEOUT_MS)
+            s.last_action = 'Выбор значения'
             return {'selected': selector, 'value': value}
+
+    def live_sessions(self) -> list[dict]:
+        """Owner-visible session summary without revealing page path or query."""
+        now = time.monotonic()
+        result = []
+        for sid, s in list(self._sessions.items()):
+            if now - s.touched >= TTL_SECONDS or s.page.is_closed():
+                continue
+            site = urlsplit(s.page.url).hostname or 'Загрузка страницы'
+            result.append({'session_id': sid, 'site': site, 'action': s.last_action})
+        return result
+
+    async def live_jpeg(self, sid: str) -> bytes:
+        """Read-only low-bandwidth frame that does not keep a session alive."""
+        s = self._sessions.get(sid)
+        if not s or time.monotonic()-s.touched >= TTL_SECONDS or s.page.is_closed():
+            raise ValueError('Сессия недоступна')
+        async with s.lock:
+            return await s.page.screenshot(type='jpeg', quality=55, full_page=False, timeout=TIMEOUT_MS)
 
     async def screenshot(self, sid: str) -> bytes:
         s = self.get(sid)
@@ -228,6 +253,7 @@ class BrowserEngine:
         pixels = max(-1500, min(1500, int(pixels)))
         async with s.lock:
             await s.page.mouse.wheel(0, pixels)
+            s.last_action = 'Прокрутка страницы'
             return {'scroll_pixels': pixels, 'url': s.page.url}
 
     async def close(self, sid: str) -> dict:
