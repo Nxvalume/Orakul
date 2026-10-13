@@ -59,3 +59,34 @@ async def test_owner_control_requires_known_session():
     engine, _ = mock_browser()
     with pytest.raises(ValueError):
         await engine.owner_control('missing', 'click', x=1, y=1)
+
+
+@pytest.mark.asyncio
+async def test_saved_profile_is_checkpointed_when_closed():
+    engine, _ = mock_browser()
+    session = engine._sessions['session']
+    session.profile_name = 'my_profile'
+    session.context.storage_state = AsyncMock(return_value={'cookies':[], 'origins':[]})
+    session.context.close = AsyncMock()
+    callback = AsyncMock()
+    engine.profile_save_callback = callback
+    result = await engine.close('session')
+    assert result == {'closed': True, 'profile_updated': True, 'profile_save_failed': False}
+    callback.assert_awaited_once_with('my_profile', {'cookies':[], 'origins':[]})
+    session.context.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_storage_error_does_not_leave_browser_open():
+    engine, _ = mock_browser()
+    session = engine._sessions['session']
+    session.profile_name = 'my_profile'
+    session.context.storage_state = AsyncMock(return_value={'cookies':[], 'origins':[]})
+    session.context.close = AsyncMock()
+    engine.profile_save_callback = AsyncMock(side_effect=RuntimeError('secret must not be logged'))
+    result = await engine.close('session')
+    assert result['closed'] is True
+    assert result['profile_updated'] is False
+    assert result['profile_save_failed'] is True
+    assert 'secret' not in str(result)
+    session.context.close.assert_awaited_once()
