@@ -6,4 +6,4 @@ COPY engine.py server.py web_auth.py dashboard.py smoke.py oauth_server.py ./
 ENV PYTHONUNBUFFERED=1
 USER pwuser
 EXPOSE 8000
-CMD ["sh", "-c", "if [ "${MINIFISH_STARTUP_SMOKE:-0}" = "1" ]; then python smoke.py; fi; exec uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
+CMD ["sh", "-c", "exec uvicorn server:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]
