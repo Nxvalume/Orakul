@@ -149,7 +149,12 @@ class SecurityMiddleware(BaseHTTPMiddleware):
                     authorized_access(header[7:]))):
                 return JSONResponse({'error':'MCP requires OAuth authorization'}, status_code=401,
                                     headers={'WWW-Authenticate': CHALLENGE})
-        if req.method not in ('GET','HEAD','OPTIONS') and not path.startswith('/mcp'):
+        # OAuth form approval has its own signed short-lived ticket, owner
+        # password or SameSite=Strict owner session and PKCE binding. Mobile
+        # browsers may send a different Origin from the forwarded Host.
+        # Exempt ONLY the OAuth form POST, never the owner API endpoints.
+        oauth_approval = path == '/oauth/authorize' and req.method == 'POST'
+        if req.method not in ('GET','HEAD','OPTIONS') and not path.startswith('/mcp') and not oauth_approval:
             origin=req.headers.get('origin','')
             if origin:
                 parsed=urlsplit(origin)
