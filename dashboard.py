@@ -17,7 +17,7 @@ PAGE = r'''<!doctype html>
 <p class="hint">Для сохранения авторизации открой прямой эфир, войди на сайте и нажми «Сохранить вход». Профиль можно открыть из этой панели или через ChatGPT.</p></section>
 <section class="card"><h2>Фоновые задачи</h2>
 <p class="hint">Задачи выполняются автоматически по заранее заданным шагам. Для создания задачи опиши действия MiniFish в чате ChatGPT. На бесплатном Render сервер может засыпать — выполнение по расписанию не гарантируется.</p>
-<div class="line"><input id="taskUrl" placeholder="https://example.com" autocapitalize="none" spellcheck="false"><input id="taskTime" type="datetime-local" aria-label="Время запуска, необязательно"></div>
+<div class="line"><input id="taskUrl" placeholder="https://example.com" autocapitalize="none" spellcheck="false"><input id="taskTime" type="datetime-local" aria-label="Время запуска, необязательно"></div><div class="line" style="margin-top:8px"><label for="taskProfile">Профиль входа:</label><select id="taskProfile" style="background:#101721;color:#eaf3f5;border:1px solid #304051;border-radius:10px;padding:9px;min-height:43px;flex:1"><option value="">Без авторизации</option></select></div>
 <div class="line" style="margin-top:9px"><button id="taskCreate" class="primary" type="button">Считать страницу в фоне</button><button id="jobsRefresh" type="button">Обновить задачи</button></div>
 <p class="hint">Оставь время пустым для немедленного запуска. Домен должен быть добавлен в разрешённые. Сложные последовательности действий можно задать через MiniFish в ChatGPT.</p>
 <div id="jobsList" class="hint">Загрузка…</div></section>
@@ -39,6 +39,9 @@ async function refreshProfiles(){
  let v=await api('profiles');by('persistenceStatus').textContent=v.durable?
  'Постоянное хранилище подключено; данные профилей зашифрованы.':
  'Внимание: на бесплатном Render хранилище временное, данные могут пропасть после перезапуска.';
+ let choice=by('taskProfile');choice.replaceChildren();
+ let defaultOption=el('option','Без авторизации');defaultOption.value='';choice.append(defaultOption);
+ for(const p of v.profiles){let option=el('option',p.name+' — '+p.site);option.value=p.name;choice.append(option)}
  let box=by('profilesList');box.replaceChildren();
  if(!v.profiles.length){box.textContent='Профилей пока нет.';return}
  for(const p of v.profiles){
@@ -82,7 +85,7 @@ by('taskCreate').onclick=()=>act(async()=>{
   let value=by('taskTime').value;
   let run_at=value?new Date(value).getTime()/1000:undefined;
   if(value&&!Number.isFinite(run_at))throw Error('Укажи правильное время');
-  let job=await api('submit-job',{url,steps:[{action:'snapshot'}],run_at});
+  let job=await api('submit-job',{url,profile:by('taskProfile').value||undefined,steps:[{action:'snapshot'}],run_at});
   by('notice').textContent='Задача добавлена: '+job.id;
   await refreshJobs();
 });
