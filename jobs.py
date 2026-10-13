@@ -137,8 +137,12 @@ class JobRunner:
                         await s.page.locator(step['selector']).first.wait_for(
                             state='visible',timeout=step['timeout_ms'])
                 elif action == 'snapshot':
-                    # Never store page text in job history.
-                    await self.engine.snapshot(sid)
+                    # A requested final snapshot is encrypted separately from the status.
+                    snap = await self.engine.snapshot(sid)
+                    await asyncio.to_thread(self.store.save_job_result, job_id, {
+                        'title': str(snap.get('title',''))[:200],
+                        'site': urlsplit(str(snap.get('url',''))).hostname or '',
+                        'text': str(snap.get('text',''))[:4000]})
                 progress += 1
                 await asyncio.to_thread(self.store.set_job, job_id,'running',
                                         progress=progress,summary='Шаги выполняются')
