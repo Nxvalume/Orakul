@@ -75,6 +75,8 @@ class Store:
         self.execute(f'''CREATE TABLE IF NOT EXISTS mf_job_results (
             id TEXT PRIMARY KEY, encrypted_result {blob} NOT NULL,
             updated DOUBLE PRECISION NOT NULL)''')
+        self.execute('''CREATE TABLE IF NOT EXISTS mf_allowed_domains (
+            domain TEXT PRIMARY KEY, added DOUBLE PRECISION NOT NULL)''')
         # Interrupted runs are not automatically retried; clicks might not be idempotent.
         self.execute("UPDATE mf_jobs SET status='interrupted', summary='Сервер перезапущен; повторный запуск только вручную' WHERE status='running'")
 
@@ -95,6 +97,17 @@ class Store:
             return json.loads(self.cipher.decrypt(bytes(data)))
         except (InvalidToken, ValueError, TypeError) as exc:
             raise ValueError('Не удалось расшифровать данные. Проверьте MINIFISH_SECRET.') from exc
+
+    def save_domain(self, domain: str) -> None:
+        if not isinstance(domain,str) or not re.fullmatch(
+                r'[a-z0-9-]+(?:\\.[a-z0-9-]+)+',domain) or len(domain)>253:
+            raise ValueError('Некорректное имя домена')
+        self.execute('''INSERT INTO mf_allowed_domains (domain,added) VALUES (?,?)
+                        ON CONFLICT(domain) DO NOTHING''',(domain,time.time()))
+
+    def list_domains(self) -> list[str]:
+        return [r[0] for r in self.execute(
+            'SELECT domain FROM mf_allowed_domains ORDER BY added',fetch=True)]
 
     def save_profile(self, name: str, site: str, state: dict):
         self.profile_name(name)
