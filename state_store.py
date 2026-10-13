@@ -50,9 +50,13 @@ class Store:
                 yield con
         else:
             Path(self.sqlite_path).parent.mkdir(parents=True, exist_ok=True)
-            with sqlite3.connect(self.sqlite_path, timeout=10) as con:
-                con.execute('PRAGMA busy_timeout=10000')
-                yield con
+            con = sqlite3.connect(self.sqlite_path, timeout=10)
+            try:
+                with con:
+                    con.execute('PRAGMA busy_timeout=10000')
+                    yield con
+            finally:
+                con.close()
 
     def sql(self, statement: str) -> str:
         return statement.replace('?', '%s') if self.is_postgres else statement
