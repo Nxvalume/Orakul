@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import os
 import secrets
+import asyncio
+from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
 
 from mcp.server.fastmcp import FastMCP, Image
@@ -12,12 +14,16 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 from live_view import live_page, session_api, stream_api, control_api
-from engine import BrowserEngine, allowed_domains, add_allowed_domain
+from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url
+from state_store import Store
+from jobs import JobRunner
 from dashboard import PAGE
 from web_auth import authorized, make_cookie, verify_password, allowed_attempt
 from oauth_server import (protected_resource, oauth_metadata, register, authorize_get, authorize_post, token, authorized_access, CHALLENGE)
 
 engine = BrowserEngine()
+store = Store()
+runner = JobRunner(engine, store)
 # TLS terminates at the hosting provider. Only requests bearing a valid login
 # cookie or MCP token may use the browser; never deploy with empty passwords.
 mcp = FastMCP(
@@ -83,11 +89,69 @@ async def browser_close(session_id: str) -> dict:
     """Close the temporary browser session."""
     return await engine.close(session_id)
 
+@mcp.tool()
+async def browser_profiles() -> dict:
+    """List encrypted browser profiles, without exposing cookies or tokens."""
+    return {'profiles': await asyncio.to_thread(store.list_profiles),
+            'durable': store.durable}
+
+
+@mcp.tool()
+async def browser_save_profile(session_id: str, name: str) -> dict:
+    """Explicitly save the logged-in browser context encrypted, by profile name."""
+    site = urlsplit(engine.get(session_id).page.url).hostname
+    validate_url('https://' + site)
+    state = await engine.export_state(session_id)
+    result = await asyncio.to_thread(store.save_profile, name, site, state)
+    engine.set_profile_name(session_id, name)
+    return result
+
+
+@mcp.tool()
+async def browser_open_profile(name: str, url: str = '') -> dict:
+    """Resume a previously saved profile; stored cookies are never returned."""
+    record = await asyncio.to_thread(store.get_profile, name)
+    url = url or 'https://' + record['site'] + '/'
+    validate_url(url)
+    if urlsplit(url).hostname != record['site']:
+        raise ValueError('Профиль закреплён за другим доменом')
+    return await engine.open(url, storage_state=record['state'], profile_name=name)
+
+
+@mcp.tool()
+async def browser_delete_profile(name: str) -> dict:
+    """Delete an encrypted profile only when the owner explicitly requests deletion."""
+    return await asyncio.to_thread(store.delete_profile, name)
+
+
+@mcp.tool()
+async def background_submit(url: str, steps: list[dict],
+                            profile: str = '', run_at: float = 0) -> dict:
+    """Queue a bounded background browser task. Steps: goto/click/fill/select/scroll/wait/snapshot.
+    No payments, account deletion, arbitrary JavaScript, password entry, or autonomous AI planner.
+    To run immediately, omit run_at. Timed tasks require a continuously running server.
+    """
+    return await asyncio.to_thread(runner.submit, url, steps, profile or None,
+                                   run_at or None)
+
+
+@mcp.tool()
+async def background_jobs() -> dict:
+    """List background task states and progress without secrets or page content."""
+    return {'jobs': await asyncio.to_thread(store.list_jobs), 'durable': store.durable}
+
+
+@mcp.tool()
+async def background_cancel(job_id: str) -> dict:
+    """Cancel a not-yet-running background task explicitly requested by the owner."""
+    return await asyncio.to_thread(store.cancel, job_id)
+
+
 async def homepage(req: Request):
     return HTMLResponse(PAGE, headers={'Cache-Control': 'no-store'})
 
 async def health(req: Request):
-    return JSONResponse({'service':'minifish','status':'ok'})
+    return JSONResponse({'service':'minifish','status':'ok','durable_storage':store.durable})
 
 async def me(req: Request):
     if not authorized(req.headers.get('cookie',''),req.headers.get('authorization','')):
@@ -117,6 +181,17 @@ async def api(req: Request):
         data=await req.json()
         if not isinstance(data,dict): raise ValueError('Ожидается объект JSON')
         sid=data.get('session_id','')
+        if action == 'storage':return JSONResponse({'durable':store.durable,
+            'note': 'Подключена постоянная БД' if store.durable else 'Локальное хранилище временное'})
+        if action == 'profiles':return JSONResponse({'profiles':await asyncio.to_thread(store.list_profiles),'durable':store.durable})
+        if action == 'save-profile':return JSONResponse(await browser_save_profile(sid,str(data.get('name',''))))
+        if action == 'open-profile':return JSONResponse(await browser_open_profile(str(data.get('name','')),str(data.get('url',''))))
+        if action == 'delete-profile':return JSONResponse(await browser_delete_profile(str(data.get('name',''))))
+        if action == 'jobs':return JSONResponse({'jobs':await asyncio.to_thread(store.list_jobs),'durable':store.durable})
+        if action == 'submit-job':return JSONResponse(await asyncio.to_thread(runner.submit,
+            str(data.get('url','')),data.get('steps'),data.get('profile') or None,
+            data.get('run_at') or None))
+        if action == 'cancel-job':return JSONResponse(await asyncio.to_thread(store.cancel,str(data.get('id',''))))
         if action == 'domains': return JSONResponse({'domains':allowed_domains()})
         if action == 'allow-domain':return JSONResponse({'domains':add_allowed_domain(str(data.get('domain','')))})
         if action == 'open': return JSONResponse(await engine.open(str(data.get('url',''))))
@@ -195,3 +270,16 @@ app.add_route('/oauth/authorize', authorize_get, methods=['GET'])
 app.add_route('/oauth/authorize', authorize_post, methods=['POST'])
 app.add_route('/oauth/token', token, methods=['POST'])
 app.add_middleware(SecurityMiddleware)
+
+_base_lifespan = app.router.lifespan_context
+
+@asynccontextmanager
+async def _minifish_lifespan(application):
+    async with _base_lifespan(application):
+        await runner.start()
+        try:
+            yield
+        finally:
+            await runner.stop()
+
+app.router.lifespan_context = _minifish_lifespan
