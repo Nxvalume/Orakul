@@ -142,6 +142,12 @@ async def background_jobs() -> dict:
 
 
 @mcp.tool()
+async def background_result(job_id: str) -> dict:
+    """Read the encrypted result of a finished background snapshot, if any."""
+    return await asyncio.to_thread(store.get_job_result, job_id)
+
+
+@mcp.tool()
 async def background_cancel(job_id: str) -> dict:
     """Cancel a not-yet-running background task explicitly requested by the owner."""
     return await asyncio.to_thread(store.cancel, job_id)
@@ -188,6 +194,7 @@ async def api(req: Request):
         if action == 'open-profile':return JSONResponse(await browser_open_profile(str(data.get('name','')),str(data.get('url',''))))
         if action == 'delete-profile':return JSONResponse(await browser_delete_profile(str(data.get('name',''))))
         if action == 'jobs':return JSONResponse({'jobs':await asyncio.to_thread(store.list_jobs),'durable':store.durable})
+        if action == 'job-result':return JSONResponse(await asyncio.to_thread(store.get_job_result,str(data.get('id',''))))
         if action == 'submit-job':return JSONResponse(await asyncio.to_thread(runner.submit,
             str(data.get('url','')),data.get('steps'),data.get('profile') or None,
             data.get('run_at') or None))
