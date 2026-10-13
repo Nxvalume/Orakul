@@ -72,6 +72,9 @@ class Store:
             run_at DOUBLE PRECISION NOT NULL, created DOUBLE PRECISION NOT NULL,
             updated DOUBLE PRECISION NOT NULL, progress INTEGER NOT NULL DEFAULT 0,
             total INTEGER NOT NULL, summary TEXT NOT NULL DEFAULT '')''')
+        self.execute(f'''CREATE TABLE IF NOT EXISTS mf_job_results (
+            id TEXT PRIMARY KEY, encrypted_result {blob} NOT NULL,
+            updated DOUBLE PRECISION NOT NULL)''')
         # Interrupted runs are not automatically retried; clicks might not be idempotent.
         self.execute("UPDATE mf_jobs SET status='interrupted', summary='Сервер перезапущен; повторный запуск только вручную' WHERE status='running'")
 
@@ -172,6 +175,20 @@ class Store:
         else:
             self.execute('UPDATE mf_jobs SET status=?,updated=?,progress=?,summary=? WHERE id=?',
                          (status,time.time(),int(progress),summary[:200],job_id))
+
+    def save_job_result(self, job_id: str, result: dict):
+        self.get_job(job_id)
+        blob = self._encrypt(result, 12_000)
+        self.execute('''INSERT INTO mf_job_results (id,encrypted_result,updated)
+            VALUES (?,?,?) ON CONFLICT (id) DO UPDATE SET
+            encrypted_result=excluded.encrypted_result,updated=excluded.updated''',
+            (job_id, blob, time.time()))
+
+    def get_job_result(self, job_id: str):
+        info = self.get_job(job_id)
+        rows = self.execute('SELECT encrypted_result FROM mf_job_results WHERE id=?',
+                            (job_id,), fetch=True)
+        return {'job': info, 'result': self._decrypt(rows[0][0]) if rows else None}
 
     def cancel(self, job_id: str):
         self.get_job(job_id)
