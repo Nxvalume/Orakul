@@ -248,6 +248,42 @@ class BrowserEngine:
         async with s.lock:
             return await s.page.screenshot(type='png', full_page=False, timeout=TIMEOUT_MS)
 
+    async def owner_control(self, sid: str, action: str, *, x=None, y=None, text=None, key=None) -> dict:
+        """Owner-only manual handoff. Do not expose as an MCP tool.
+
+        Owner may type into the browser directly (including login forms) without
+        passing account credentials to ChatGPT. Never log or return typed data.
+        """
+        s = self.get(sid)
+        if action not in ('click', 'type', 'key'):
+            raise ValueError('Неизвестное действие управления')
+        async with s.lock:
+            if action == 'click':
+                if (isinstance(x, bool) or isinstance(y, bool)
+                        or not isinstance(x, (int, float)) or not isinstance(y, (int, float))):
+                    raise ValueError('Некорректные координаты')
+                viewport = s.page.viewport_size or {'width': 1280, 'height': 900}
+                if not (0 <= x < viewport['width'] and 0 <= y < viewport['height']):
+                    raise ValueError('Нажатие вне экрана')
+                await s.page.mouse.click(float(x), float(y), timeout=TIMEOUT_MS)
+                s.last_action = 'Владелец нажал на экране'
+            elif action == 'type':
+                if not isinstance(text, str) or not 0 < len(text) <= 1000:
+                    raise ValueError('Текст должен содержать от 1 до 1000 символов')
+                await s.page.keyboard.insert_text(text)
+                s.last_action = 'Владелец ввёл текст'
+            else:
+                allowed = {'Tab', 'Enter', 'Escape', 'Backspace', 'Delete',
+                           'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+                           'ControlOrMeta+A'}
+                if key not in allowed:
+                    raise ValueError('Клавиша не разрешена')
+                await s.page.keyboard.press(key)
+                s.last_action = 'Владелец нажал клавишу'
+            if len(s.context.pages) > 1:
+                s.page = s.context.pages[-1]
+            return {'ok': True, 'site': urlsplit(s.page.url).hostname or ''}
+
     async def scroll(self, sid: str, pixels: int = 650) -> dict:
         s = self.get(sid)
         pixels = max(-1500, min(1500, int(pixels)))
