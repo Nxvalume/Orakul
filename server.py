@@ -23,6 +23,12 @@ from oauth_server import (protected_resource, oauth_metadata, register, authoriz
 
 engine = BrowserEngine()
 store = Store()
+
+async def _checkpoint_browser_profile(name: str, state: dict):
+    record = await asyncio.to_thread(store.get_profile,name)
+    await asyncio.to_thread(store.save_profile,name,record['site'],state)
+
+engine.profile_save_callback = _checkpoint_browser_profile
 runner = JobRunner(engine, store)
 # TLS terminates at the hosting provider. Only requests bearing a valid login
 # cookie or MCP token may use the browser; never deploy with empty passwords.
