@@ -165,7 +165,16 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         result.headers['Referrer-Policy']='no-referrer'
         result.headers['X-Frame-Options']='DENY'
         result.headers['Cache-Control']='no-store'
-        result.headers['Content-Security-Policy']="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+        # The authorization form posts to this server, then redirects to
+        # the allowlisted ChatGPT OAuth callback. CSP form-action is checked
+        # across redirects in browsers, so allow that one destination only
+        # for the approval page (not the owner API or other endpoints).
+        form_targets = "'self' https://chatgpt.com" if path == '/oauth/authorize' else "'self'"
+        result.headers['Content-Security-Policy']=(
+            "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+            "img-src 'self' blob:; connect-src 'self'; base-uri 'none'; "
+            "frame-ancestors 'none'; form-action " + form_targets
+        )
         return result
 
 app=mcp.streamable_http_app()
