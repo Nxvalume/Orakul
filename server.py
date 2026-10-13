@@ -14,6 +14,7 @@ from starlette.routing import Route
 from engine import BrowserEngine, allowed_domains, add_allowed_domain
 from dashboard import PAGE
 from web_auth import authorized, make_cookie, verify_password, allowed_attempt
+from oauth_server import (protected_resource, oauth_metadata, register, authorize_get, authorize_post, token, authorized_access, CHALLENGE)
 
 engine = BrowserEngine()
 # TLS terminates at the hosting provider. Only requests bearing a valid login
@@ -143,8 +144,11 @@ class SecurityMiddleware(BaseHTTPMiddleware):
             header=req.headers.get('authorization','')
             # Do not allow cookie sessions as authorization to remotely-invoked MCP.
             from web_auth import MCP_TOKEN
-            if not MCP_TOKEN or not (header.startswith('Bearer ') and secrets.compare_digest(header[7:],MCP_TOKEN)):
-                return JSONResponse({'error':'MCP requires a valid bearer token'},status_code=401)
+            if not (header.startswith('Bearer ') and (
+                    (MCP_TOKEN and secrets.compare_digest(header[7:], MCP_TOKEN)) or
+                    authorized_access(header[7:]))):
+                return JSONResponse({'error':'MCP requires OAuth authorization'}, status_code=401,
+                                    headers={'WWW-Authenticate': CHALLENGE})
         if req.method not in ('GET','HEAD','OPTIONS') and not path.startswith('/mcp'):
             origin=req.headers.get('origin','')
             if origin:
@@ -164,4 +168,11 @@ app.add_route('/',homepage,methods=['GET'])
 app.add_route('/healthz',health,methods=['GET'])
 app.add_route('/api/me',me,methods=['GET'])
 app.add_route('/api/{action}',api,methods=['POST'])
+app.add_route('/.well-known/oauth-protected-resource', protected_resource, methods=['GET'])
+app.add_route('/.well-known/oauth-protected-resource/mcp', protected_resource, methods=['GET'])
+app.add_route('/.well-known/oauth-authorization-server', oauth_metadata, methods=['GET'])
+app.add_route('/oauth/register', register, methods=['POST'])
+app.add_route('/oauth/authorize', authorize_get, methods=['GET'])
+app.add_route('/oauth/authorize', authorize_post, methods=['POST'])
+app.add_route('/oauth/token', token, methods=['POST'])
 app.add_middleware(SecurityMiddleware)
