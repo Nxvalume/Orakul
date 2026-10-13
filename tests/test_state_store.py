@@ -84,6 +84,31 @@ async def test_background_job_executes_without_open_chat(tmp_path):
     assert store.get_job_result(job['id'])['result']['text']=='Completed'
 
 
+@pytest.mark.asyncio
+async def test_worker_consumes_job_independently_of_client(tmp_path):
+    import asyncio
+    class BrowserStub:
+        async def open(self, url, **kwargs):
+            return {'session_id':'background-worker-session'}
+        async def snapshot(self, sid):
+            return {'url':'https://example.com','title':'Example','text':'Worker finished'}
+        async def close(self, sid):
+            return {'closed':True}
+    store=make_store(tmp_path)
+    job=store.enqueue(profile=None, site='https://example.com',
+                      steps=[{'action':'snapshot'}],run_at=time.time())
+    runner=JobRunner(BrowserStub(),store)
+    await runner.start()
+    try:
+        for _ in range(40):
+            if store.get_job(job['id'])['status']=='done':
+                break
+            await asyncio.sleep(0.05)
+    finally:
+        await runner.stop()
+    assert store.get_job(job['id'])['status']=='done'
+
+
 def test_queue_cancel(tmp_path):
     store=make_store(tmp_path)
     job=store.enqueue(profile=None,site='https://example.com',
