@@ -200,7 +200,11 @@ async def api(req: Request):
             data.get('run_at') or None))
         if action == 'cancel-job':return JSONResponse(await asyncio.to_thread(store.cancel,str(data.get('id',''))))
         if action == 'domains': return JSONResponse({'domains':allowed_domains()})
-        if action == 'allow-domain':return JSONResponse({'domains':add_allowed_domain(str(data.get('domain','')))})
+        if action == 'allow-domain':
+            domain = str(data.get('domain','')).strip().lower().rstrip('.')
+            result = add_allowed_domain(domain)
+            await asyncio.to_thread(store.save_domain,domain)
+            return JSONResponse({'domains':result,'durable':store.durable})
         if action == 'open': return JSONResponse(await engine.open(str(data.get('url',''))))
         if action == 'close': return JSONResponse(await engine.close(sid))
         if action == 'back': return JSONResponse(await engine.back(sid))
@@ -283,6 +287,12 @@ _base_lifespan = app.router.lifespan_context
 @asynccontextmanager
 async def _minifish_lifespan(application):
     async with _base_lifespan(application):
+        for domain in await asyncio.to_thread(store.list_domains):
+            try:
+                add_allowed_domain(domain)
+            except ValueError:
+                # Revalidate DNS on restart; reject domains that ceased to be public.
+                pass
         await runner.start()
         try:
             yield
