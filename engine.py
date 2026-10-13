@@ -265,7 +265,7 @@ class BrowserEngine:
                 viewport = s.page.viewport_size or {'width': 1280, 'height': 900}
                 if not (0 <= x < viewport['width'] and 0 <= y < viewport['height']):
                     raise ValueError('Нажатие вне экрана')
-                await s.page.mouse.click(float(x), float(y), timeout=TIMEOUT_MS)
+                await s.page.mouse.click(float(x), float(y))
                 s.last_action = 'Владелец нажал на экране'
             elif action == 'type':
                 if not isinstance(text, str) or not 0 < len(text) <= 1000:
