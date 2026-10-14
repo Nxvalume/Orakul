@@ -36,6 +36,7 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <div class="panel"><div class="row"><span id="led" class="indicator"></span><strong id="state">Ожидаем сессию</strong><select id="sessions" aria-label="Сессия браузера"></select></div><p id="details" class="status muted">Ищу активный браузер…</p></div>
 <div class="panel quickpanel"><h2>Ввод в Telegram с телефона</h2><p class="hint">Печатай здесь, а MiniFish вставит данные в поле настоящего Telegram Web. Нажимать на мелкие поля видеотрансляции не нужно.</p>
 <div class="row"><button type="button" id="openTelegram">Открыть Telegram</button><button type="button" id="fieldRefresh">Обновить поля</button></div>
+<p id="telegramSavedStatus" class="hint" role="status">После первого входа Telegram сохранится автоматически. Повторно вводить номер и код обычно не потребуется.</p>
 <label for="targetField">Поле на странице Telegram</label><select id="targetField" aria-label="Поле Telegram"><option value="">Поиск полей…</option></select>
 <label for="quickValue">Что ввести</label><input id="quickValue" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер телефона или код">
 <div class="row" style="margin-top:12px"><button class="primary" id="quickApply" type="button">Вставить в Telegram</button><button id="quickNext" type="button">Продолжить (Enter)</button></div>
@@ -47,7 +48,7 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <p id="storageHint" class="hint">Статус постоянного хранения уточняется…</p>
 <div class="row" style="margin-top:12px"><input type="password" id="entry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Текст, пароль или одноразовый код"><button type="button" id="type">Ввести в браузер</button></div>
 <div class="keys"><button data-key="Tab">Tab</button><button data-key="Enter">Enter</button><button data-key="Backspace">⌫</button><button data-key="Escape">Esc</button><button data-key="ControlOrMeta+A">Выделить всё</button></div>
-<p class="hint">Нажимай на нужное поле на изображении, затем вводи текст. Действия производятся от имени владельца; подтверждай только то, что сам намерен отправить. Сеанс браузера пока временный и не переживает перезапуск сервера.</p></div>
+<p class="hint">Telegram после успешного входа сохраняется автоматически в зашифрованной базе. Для других сайтов кнопку «Сохранить вход» можно использовать вручную. Активный браузер закрывается при перезапуске сервера, но сохранённый профиль можно восстановить.</p></div>
 </main><script>
 const $=id=>document.getElementById(id);let current='',streaming=false;
 function setState(text,live){$('state').textContent=text;$('led').className='indicator'+(live?' live':'');}
@@ -91,9 +92,27 @@ $('openTelegram').onclick=async()=>{
   const r=await fetch('/api/open',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:'https://web.telegram.org/k/'})});
   const d=await r.json();if(!r.ok)throw Error(d.error||'Не удалось открыть Telegram');
   current='';selectSession(d.session_id);await update();
-  $('quickFeedback').textContent='Telegram открыт. Выбери поле и введи номер.';
+  $('quickFeedback').textContent=d.profile==='telegram'?
+      'Восстановлена сохранённая сессия Telegram.':
+      'Telegram открыт. Если вход ещё нужен, выполни его один раз.';
+  await checkTelegramStatus();
  }catch(e){$('quickFeedback').textContent='Ошибка: '+e.message;}
 };
+async function checkTelegramStatus(){
+ if(!current)return;
+ try{
+  const response=await fetch('/api/telegram-status',{method:'POST',
+    credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'});
+  if(!response.ok)return;
+  const data=await response.json();
+  $('telegramSavedStatus').textContent = data.saved && data.durable?
+    (data.logged_in?'Telegram подключён. Вход сохранён в зашифрованной базе.':
+                    'Вход Telegram сохранён. Открой Telegram для восстановления.') :
+    (data.logged_in?'Вход выполнен. MiniFish автоматически сохраняет сессию.':
+                    'Войди в Telegram один раз. После входа MiniFish сохранит сессию автоматически.');
+ }catch(e){}
+}
+setInterval(checkTelegramStatus,18000);
 $('quickApply').onclick=async()=>{
  const field=$('targetField').value, entry=$('quickValue');
  if(field===''||!current){$('quickFeedback').textContent='Сначала выбери открытую сессию и поле.';return;}
