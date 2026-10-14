@@ -20,6 +20,8 @@ def test_gateway_durable_and_encrypted(monkeypatch):
     monkeypatch.setattr('httpx.post', fake_post)
     store=RemoteStore()
     assert store.durable
+    assert ';' not in requests[0]['json']['sql']
+    assert ';' in requests[0]['json']['params'][0]
     assert store.sql("SELECT site FROM mf_profiles WHERE name=?") == (
         "SELECT site FROM minifish.mf_profiles WHERE name=" + chr(36) + "1")
     state={'cookies':[{'name':'session','value':'example-private-cookie'}],
