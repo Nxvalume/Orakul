@@ -99,7 +99,7 @@ class JobRunner:
                 # The worker must not dump private job payloads or credentials.
                 pass
             try:
-                await asyncio.wait_for(self._stop.wait(), timeout=4)
+                await asyncio.wait_for(self._stop.wait(), timeout=45)
             except asyncio.TimeoutError:
                 pass
 
