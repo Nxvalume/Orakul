@@ -15,7 +15,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from live_view import live_page, session_api, stream_api, control_api, fields_api, owner
 from live_video import screencast_socket
-from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url
+from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url, unrestricted_public_https
 from state_store import Store
 from remote_store import RemoteStore
 from jobs import JobRunner
@@ -277,7 +277,7 @@ async def api(req: Request):
             str(data.get('url','')),data.get('steps'),data.get('profile') or None,
             data.get('run_at') or None))
         if action == 'cancel-job':return JSONResponse(await asyncio.to_thread(store.cancel,str(data.get('id',''))))
-        if action == 'domains': return JSONResponse({'domains':allowed_domains()})
+        if action == 'domains': return JSONResponse({'domains':allowed_domains(), 'all_public_https':unrestricted_public_https()})
         if action == 'allow-domain':
             domain = str(data.get('domain','')).strip().lower().rstrip('.')
             result = add_allowed_domain(domain)
