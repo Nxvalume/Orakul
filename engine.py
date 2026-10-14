@@ -156,9 +156,11 @@ class BrowserEngine:
 
     async def _route(self, route):
         # Check every subresource and redirect, not only top-level navigations.
+        # DNS can block for seconds. Never stall the single event loop while a
+        # live video stream, owner input and MCP commands are also active.
         try:
-            validate_url(route.request.url)
-        except (ValueError, TypeError):
+            await asyncio.wait_for(asyncio.to_thread(validate_url, route.request.url), timeout=5)
+        except (ValueError, TypeError, asyncio.TimeoutError):
             await route.abort('blockedbyclient')
             return
         await route.continue_()
@@ -361,7 +363,7 @@ class BrowserEngine:
     async def telegram_logged_in(self, sid: str) -> bool:
         """Only persist Telegram after the chat UI has replaced its login page."""
         session = self._sessions.get(sid)
-        if (session is None or session.page.is_closed()
+        if (session is None or session.page.is_closed() or session.private_mode
                 or time.monotonic()-session.touched >= TTL_SECONDS):
             return False
         async with session.lock:
