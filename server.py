@@ -12,7 +12,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
-from starlette.routing import Route
+from starlette.routing import Route, WebSocketRoute
 from live_view import live_page, session_api, stream_api, control_api, fields_api, owner
 from live_video import screencast_socket
 from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url
@@ -338,7 +338,7 @@ app.add_route('/live',live_page,methods=['GET'])
 app.add_route('/live/sessions',session_api(engine),methods=['GET'])
 app.add_route('/live/fields',fields_api(engine),methods=['GET'])
 app.add_route('/live/stream',stream_api(engine),methods=['GET'])
-app.add_websocket_route('/live/video',screencast_socket(engine, owner))
+app.router.routes.append(WebSocketRoute('/live/video',screencast_socket(engine, owner)))
 app.add_route('/live/control',control_api(engine),methods=['POST'])
 app.add_route('/api/me',me,methods=['GET'])
 app.add_route('/api/{action}',api,methods=['POST'])
