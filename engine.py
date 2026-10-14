@@ -323,7 +323,11 @@ class BrowserEngine:
             return await s.context.storage_state(indexed_db=True)
 
     def set_profile_name(self, sid: str, name: str) -> None:
-        self.get(sid).profile_name = name
+        session = self._sessions.get(sid)
+        if session is None or session.page.is_closed():
+            raise ValueError('Браузерная сессия не найдена')
+        # Background autosave should not keep an abandoned session alive.
+        session.profile_name = name
 
     async def screenshot(self, sid: str) -> bytes:
         s = self.get(sid)
