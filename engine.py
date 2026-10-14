@@ -123,7 +123,7 @@ def trim(value: str, limit: int = MAX_TEXT) -> str:
 
 
 def sensitive_action(label: str) -> bool:
-    pattern = r'\b(pay|purchase|checkout|buy now|delete|remove account|transfer|submit payment|оплатить|купить|удалить|перевести деньги|списать)\b'
+    pattern = r'\b(pay|purchase|checkout|buy now|delete|remove account|transfer|submit payment|send|publish|post now|approve|confirm|authorize|accept|оплатить|купить|удалить|перевести деньги|списать|отправить|опубликовать|подтвердить|подтверждаю|разрешить|согласиться)\b'
     return bool(re.search(pattern, label.lower()))
 
 
