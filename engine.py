@@ -259,6 +259,30 @@ class BrowserEngine:
             result.append({'session_id': sid, 'site': site, 'action': s.last_action})
         return result
 
+    def telegram_session_id(self) -> str | None:
+        """Existing live Telegram session, regardless of its saved profile."""
+        now = time.monotonic()
+        for sid, session in reversed(list(self._sessions.items())):
+            if (now-session.touched < TTL_SECONDS and not session.page.is_closed()
+                    and urlsplit(session.page.url).hostname == 'web.telegram.org'):
+                return sid
+        return None
+
+    async def telegram_logged_in(self, sid: str) -> bool:
+        """Only persist Telegram after the chat UI has replaced its login page."""
+        session = self.get(sid)
+        async with session.lock:
+            if urlsplit(session.page.url).hostname != 'web.telegram.org':
+                return False
+            # Telegram Web K: the left chat sidebar is visible after login.
+            # An auth form or a loading screen is never treated as logged in.
+            try:
+                chat_list = await session.page.locator('#column-left').is_visible()
+                auth_form = await session.page.locator('#auth-pages').is_visible()
+                return bool(chat_list and not auth_form)
+            except Exception:
+                return False
+
     async def live_jpeg(self, sid: str) -> bytes:
         """Read-only low-bandwidth frame that does not keep a session alive."""
         s = self._sessions.get(sid)
@@ -370,9 +394,22 @@ class BrowserEngine:
         failed = False
         try:
             if session.profile_name and self.profile_save_callback is not None:
-                state = await session.context.storage_state(indexed_db=True)
-                await self.profile_save_callback(session.profile_name, state)
-                updated = True
+                # Never overwrite a saved Telegram login with a logged-out
+                # browser context or an in-progress reauthentication screen.
+                can_checkpoint = True
+                if session.profile_name == 'telegram':
+                    try:
+                        can_checkpoint = (
+                            urlsplit(session.page.url).hostname == 'web.telegram.org'
+                            and await session.page.locator('#column-left').is_visible()
+                            and not await session.page.locator('#auth-pages').is_visible()
+                        )
+                    except Exception:
+                        can_checkpoint = False
+                if can_checkpoint:
+                    state = await session.context.storage_state(indexed_db=True)
+                    await self.profile_save_callback(session.profile_name, state)
+                    updated = True
         except Exception:
             # Do not leak cookies or credentials into errors or logs.
             failed = True
