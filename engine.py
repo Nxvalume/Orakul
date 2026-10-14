@@ -270,7 +270,10 @@ class BrowserEngine:
 
     async def telegram_logged_in(self, sid: str) -> bool:
         """Only persist Telegram after the chat UI has replaced its login page."""
-        session = self.get(sid)
+        session = self._sessions.get(sid)
+        if (session is None or session.page.is_closed()
+                or time.monotonic()-session.touched >= TTL_SECONDS):
+            return False
         async with session.lock:
             if urlsplit(session.page.url).hostname != 'web.telegram.org':
                 return False
@@ -282,6 +285,20 @@ class BrowserEngine:
                 return bool(chat_list and not auth_form)
             except Exception:
                 return False
+
+    async def telegram_authenticated_state(self, sid: str) -> dict | None:
+        """Secret browser state for server-side encryption only; no idle-TTL renewal."""
+        session = self._sessions.get(sid)
+        if (session is None or session.page.is_closed()
+                or time.monotonic()-session.touched >= TTL_SECONDS
+                or urlsplit(session.page.url).hostname != 'web.telegram.org'):
+            return None
+        async with session.lock:
+            if not (await session.page.locator('#column-left').is_visible()):
+                return None
+            if await session.page.locator('#auth-pages').is_visible():
+                return None
+            return await session.context.storage_state(indexed_db=True)
 
     async def live_jpeg(self, sid: str) -> bytes:
         """Read-only low-bandwidth frame that does not keep a session alive."""
