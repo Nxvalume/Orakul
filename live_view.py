@@ -34,6 +34,14 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 :root{color-scheme:dark}*{box-sizing:border-box}body{background:#0d121a;color:#eaf3f5;font:15px system-ui,sans-serif;margin:0}main{max-width:1050px;margin:auto;padding:16px 12px 36px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}h1{font-size:21px;margin:12px 0}a{color:#5dd6ba;text-decoration:none}.panel{border:1px solid #304051;background:#151f2b;border-radius:15px;padding:14px;margin-top:12px}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.muted{color:#9daec0}.indicator{height:9px;width:9px;border-radius:50%;background:#667788;display:inline-block;margin-right:7px}.indicator.live{background:#5dd6ba;box-shadow:0 0 12px #5dd6ba}select,button{background:#213240;border:1px solid #405568;color:#eef;border-radius:9px;padding:11px;min-height:44px}select{flex:1;min-width:120px}.screen{background:#060a11;border-radius:12px;border:1px solid #304051;overflow:hidden;min-height:200px;display:flex;align-items:center;justify-content:center;position:relative}.screen img{width:100%;height:auto;display:none;object-fit:contain}.screen p{padding:40px 10px;text-align:center;color:#99adbe}.status{overflow-wrap:anywhere;font-size:13px}.hint{font-size:13px;color:#9daec0;line-height:1.5}input{background:#101721;border:1px solid #405568;color:#eef;border-radius:9px;padding:11px;min-height:44px;flex:1;min-width:120px}.small{font-size:13px}.keys{margin-top:9px;display:flex;flex-wrap:wrap;gap:7px}.screen.interactive img{cursor:crosshair;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.quickpanel{border-color:#5dd6ba}.quickpanel h2{margin:0 0 8px}.quickpanel label{display:block;margin:12px 0 6px;font-weight:600}.quickpanel input,.quickpanel select{width:100%;min-width:0;font-size:17px;min-height:52px}.quickpanel button{font-weight:600}.quickpanel .primary{background:#5dd6ba;border-color:#5dd6ba;color:#0b211b}.quickpanel .row{align-items:stretch}.quickpanel .row button{flex:1}.quickpanel #quickFeedback{min-height:21px}.quickpanel .security{color:#bed1de}.stream-input{margin:12px 0;padding:12px;border:1px solid #5dd6ba;border-radius:12px;background:#18303a}.stream-input label{display:block;font-weight:700;margin-bottom:8px}.stream-input .row{flex-wrap:nowrap}.stream-input input{min-width:0;flex:1;font-size:17px;min-height:52px}.stream-input button{background:#5dd6ba;color:#0b211b;font-weight:700;min-width:104px}.stream-input .hint{margin:8px 0 0}
 </style></head><body><main><div class="top"><h1>MiniFish · Прямой эфир</h1><a href="/">Панель ↗</a></div>
 <div class="panel"><div class="row"><span id="led" class="indicator"></span><strong id="state">Ожидаем сессию</strong><select id="sessions" aria-label="Сессия браузера"></select></div><p id="details" class="status muted">Ищу активный браузер…</p></div>
+<div class="panel" style="border-color:#e8bf79"><h2 style="margin-top:0">Безопасное управление</h2>
+<p id="privateState" role="status">Режим доступа ассистента: проверяю…</p>
+<div class="row"><button type="button" id="privateStart">Начать личный вход</button><button type="button" id="privateFinish" disabled>Вернуть управление ассистенту</button></div>
+<p class="hint">Пока включён личный вход, MCP не может читать страницу, делать скриншоты, нажимать кнопки или закрывать сессию. После авторизации нажми «Вернуть управление».</p>
+<div id="approvalPanel" style="display:none;border-top:1px solid #405568;padding-top:12px;margin-top:12px">
+<strong>Подтверждение опасного действия</strong><p id="approvalLabel" class="hint"></p>
+<div class="row"><button id="approveAction" type="button">Разрешить один раз</button><button id="rejectAction" type="button">Отклонить</button></div>
+</div></div>
 <div class="panel quickpanel"><h2>Ввод в Telegram с телефона</h2><p class="hint">Печатай здесь, а MiniFish вставит данные в поле настоящего Telegram Web. Нажимать на мелкие поля видеотрансляции не нужно.</p>
 <div class="row"><button type="button" id="openTelegram">Открыть Telegram</button><button type="button" id="fieldRefresh">Обновить поля</button></div>
 <p id="telegramSavedStatus" class="hint" role="status">После первого входа Telegram сохранится автоматически. Повторно вводить номер и код обычно не потребуется.</p>
@@ -52,6 +60,7 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 const $=id=>document.getElementById(id);
 let current='',streaming=false,videoSocket=null,frameUrl=null,videoFallback=false;
 let currentViewport={width:1280,height:900};
+let privateMode=false,pendingClick=null;
 function setState(text,live){$('state').textContent=text;$('led').className='indicator'+(live?' live':'');}
 function stop(){
  if(videoSocket){const sock=videoSocket;videoSocket=null;sock.onclose=null;sock.onerror=null;sock.close();}
@@ -96,7 +105,13 @@ function selectSession(id){
 }
 $('sessions').onchange=()=>{stop();current='';selectSession($('sessions').value)};
 $('live').onerror=()=>{if(!videoFallback)setState('Ожидаю следующий кадр…',false)};
-async function update(){try{let res=await fetch('/live/sessions',{cache:'no-store',credentials:'same-origin'});if(res.status===401){stop();setState('Требуется вход',false);$('details').textContent='Войди через главную панель MiniFish.';return}if(!res.ok)throw Error('Ошибка сервера '+res.status);let list=(await res.json()).sessions||[];let wanted=current&&list.some(x=>x.session_id===current)?current:(list[0]?.session_id||'');let choice=$('sessions');if(choice.options.length!==list.length||Array.from(choice.options).some((o,i)=>o.value!==list[i].session_id)){choice.replaceChildren();for(let s of list){let o=document.createElement('option');o.value=s.session_id;o.textContent=s.site||'Страница';choice.append(o)}}choice.value=wanted; if(!wanted){selectSession('');$('details').textContent='Нет активных браузерных сессий.';return}if(wanted!==current||!streaming)selectSession(wanted);let item=list.find(s=>s.session_id===wanted);if(item?.viewport?.width>0&&item?.viewport?.height>0)currentViewport=item.viewport;$('details').textContent=(item?.site||'Сайт')+' · Последнее действие: '+(item?.action||'Открыта страница');}catch(e){setState('Нет связи',false);$('details').textContent=e.message}}
+async function update(){try{let res=await fetch('/live/sessions',{cache:'no-store',credentials:'same-origin'});if(res.status===401){stop();setState('Требуется вход',false);$('details').textContent='Войди через главную панель MiniFish.';return}if(!res.ok)throw Error('Ошибка сервера '+res.status);let list=(await res.json()).sessions||[];let wanted=current&&list.some(x=>x.session_id===current)?current:(list[0]?.session_id||'');let choice=$('sessions');if(choice.options.length!==list.length||Array.from(choice.options).some((o,i)=>o.value!==list[i].session_id)){choice.replaceChildren();for(let s of list){let o=document.createElement('option');o.value=s.session_id;o.textContent=s.site||'Страница';choice.append(o)}}choice.value=wanted; if(!wanted){selectSession('');$('details').textContent='Нет активных браузерных сессий.';return}if(wanted!==current||!streaming)selectSession(wanted);let item=list.find(s=>s.session_id===wanted);if(item?.viewport?.width>0&&item?.viewport?.height>0)currentViewport=item.viewport;
+ privateMode=!!item?.private_mode;pendingClick=item?.pending_click||null;
+ $('privateState').textContent=privateMode?'Личный вход: ассистент заблокирован':'Личный вход выключен: управление ассистента доступно';
+ $('privateStart').disabled=privateMode;$('privateFinish').disabled=!privateMode;
+ $('approvalPanel').style.display=pendingClick&&!privateMode?'block':'none';
+ if(pendingClick&&!privateMode)$('approvalLabel').textContent='Сайт: '+new URL(pendingClick.url).hostname+'; действие: '+pendingClick.label;
+ $('details').textContent=(item?.site||'Сайт')+' · Последнее действие: '+(item?.action||'Открыта страница');}catch(e){setState('Нет связи',false);$('details').textContent=e.message}}
 async function refreshFields(){
  const select=$('targetField'), prior=select.value;
  select.replaceChildren();
@@ -181,15 +196,26 @@ $('streamInsert').onclick=async()=>{
  if(ok)await refreshFields();
 };
 $('streamEntry').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('streamInsert').click();}});
+$('privateStart').onclick=async()=>{if(!current)return;await ownerAction('private_mode',{enabled:true})};
+$('privateFinish').onclick=async()=>{if(!current)return;await ownerAction('private_mode',{enabled:false})};
+$('approveAction').onclick=async()=>{if(!pendingClick)return;await ownerAction('approve_click',{request_id:pendingClick.id});$('approvalPanel').style.display='none';pendingClick=null;};
+$('rejectAction').onclick=async()=>{await ownerAction('reject_click');$('approvalPanel').style.display='none';pendingClick=null;};
 let clickEnabled=true;
 $('touch').onclick=()=>{clickEnabled=!clickEnabled;$('touch').textContent=clickEnabled?'Нажатия включены · Выключить':'Нажатия выключены · Включить';$('touch').setAttribute('aria-pressed',String(clickEnabled));document.querySelector('.screen').classList.toggle('interactive',clickEnabled);$('manualStatus').textContent=clickEnabled?'Нажимай прямо на изображение браузера':'Управление выключено'};
 async function ownerAction(action,payload={}) {
+ if(['type','fill_field'].includes(action) && !privateMode){
+   const started=await ownerAction('private_mode',{enabled:true});
+   if(!started){$('manualStatus').textContent='Сначала включи личный режим';return false;}
+   privateMode=true;
+ }
+
  if(!current||!streaming){$('manualStatus').textContent='Нет активной сессии';return false}
  try {
   const response=await fetch('/live/control',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:current,action,...payload})});
   const data=await response.json();
   if(!response.ok)throw Error(data.error||'Ошибка управления');
   $('manualStatus').textContent='Действие выполнено';
+  if(action==='private_mode'){privateMode=!!payload.enabled;$('privateState').textContent=privateMode?'Личный вход: ассистент заблокирован':'Личный вход выключен: управление ассистента доступно';$('privateStart').disabled=privateMode;$('privateFinish').disabled=!privateMode;}
   return true;
  }catch(e){$('manualStatus').textContent='Ошибка: '+e.message;return false}
 }
@@ -324,10 +350,20 @@ def control_api(engine):
             sid = data.get('session_id')
             if not isinstance(sid, str) or not re.fullmatch(r'[0-9a-f-]{36}', sid):
                 raise ValueError('Некорректная сессия')
-            result = await engine.owner_control(sid, data.get('action'),
-                                                x=data.get('x'), y=data.get('y'),
-                                                text=data.get('text'), key=data.get('key'),
-                                                field_index=data.get('field_index'))
+            action = data.get('action')
+            if action == 'private_mode':
+                if type(data.get('enabled')) is not bool:
+                    raise ValueError('Не указан режим')
+                result = await engine.owner_set_private(sid, data['enabled'])
+            elif action == 'approve_click':
+                result = await engine.owner_approve_click(sid, str(data.get('request_id', '')))
+            elif action == 'reject_click':
+                result = await engine.owner_reject_click(sid)
+            else:
+                result = await engine.owner_control(sid, action,
+                                                    x=data.get('x'), y=data.get('y'),
+                                                    text=data.get('text'), key=data.get('key'),
+                                                    field_index=data.get('field_index'))
             return JSONResponse(result, headers={'Cache-Control': 'no-store'})
         except (ValueError, RuntimeError) as exc:
             return JSONResponse({'error': str(exc)}, status_code=400)
