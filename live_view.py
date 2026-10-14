@@ -41,7 +41,7 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <label for="quickValue">Что ввести</label><input id="quickValue" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер телефона или код">
 <div class="row" style="margin-top:12px"><button class="primary" id="quickApply" type="button">Вставить в Telegram</button><button id="quickNext" type="button">Продолжить (Enter)</button></div>
 <p id="quickFeedback" class="status" role="status">Выбери поле и введи данные.</p><p class="hint security">Номер, коды и пароль не отправляются в ChatGPT. Не пересылай их в чат.</p></div>
-<div class="panel"><div class="screen"><p id="placeholder">Пока нет активных страниц. Запусти задачу через ChatGPT и MiniFish.</p><img id="live" alt="Прямая трансляция экрана браузера MiniFish"></div><p class="hint">Это защищённый поток кадров браузера с частотой до 1 кадра в секунду, без звука и записи. Экран обновляется во время переходов, прокрутки и нажатий. Сессии исчезают после закрытия или перезапуска сервера.</p></div>
+<div class="panel"><div class="screen"><p id="placeholder">Пока нет активных страниц. Запусти задачу через ChatGPT и MiniFish.</p><img id="live" alt="Прямая трансляция экрана браузера MiniFish"></div><p class="hint">Непрерывная трансляция Chromium до 12 кадров/с, без звука и записи. Если WebSocket недоступен, включится резервный режим с редкими кадрами. Экран обновляется во время переходов, прокрутки и нажатий. Сессии исчезают после закрытия или перезапуска сервера.</p></div>
 <div class="panel"><h2>Управление браузером с телефона</h2><p class="hint">Для входа в сторонний аккаунт открой сайт через MiniFish. Включи клики и нажимай прямо на изображение. Пароль или код вводи здесь — данные передаются в браузер, но не в чат ChatGPT и не отображаются в истории MiniFish.</p>
 <div class="row"><button type="button" id="touch">Включить клики по экрану</button><span id="manualStatus" class="status muted small">Управление выключено</span></div>
 <div class="row" style="margin-top:12px"><input id="profileName" placeholder="Имя профиля, например telegram" maxlength="40" autocapitalize="off" spellcheck="false"><button id="saveProfile" type="button">Сохранить вход</button></div>
@@ -50,12 +50,52 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <div class="keys"><button data-key="Tab">Tab</button><button data-key="Enter">Enter</button><button data-key="Backspace">⌫</button><button data-key="Escape">Esc</button><button data-key="ControlOrMeta+A">Выделить всё</button></div>
 <p class="hint">Telegram после успешного входа сохраняется автоматически в зашифрованной базе. Для других сайтов кнопку «Сохранить вход» можно использовать вручную. Активный браузер закрывается при перезапуске сервера, но сохранённый профиль можно восстановить.</p></div>
 </main><script>
-const $=id=>document.getElementById(id);let current='',streaming=false;
+const $=id=>document.getElementById(id);
+let current='',streaming=false,videoSocket=null,frameUrl=null,videoFallback=false;
 function setState(text,live){$('state').textContent=text;$('led').className='indicator'+(live?' live':'');}
-function stop(){if(streaming){$('live').removeAttribute('src');streaming=false;}$('live').style.display='none';$('placeholder').style.display='block';}
-function selectSession(id){if(!id){current='';stop();setState('Ожидаем сессию',false);return}if(id===current&&streaming)return;current=id;stop();$('placeholder').style.display='none';$('live').style.display='block';$('live').src='/live/stream?session_id='+encodeURIComponent(id);streaming=true;setState('В эфире',true);refreshFields()}
-$('sessions').onchange=()=>{current='';selectSession($('sessions').value)};
-$('live').onerror=()=>{stop();setState('Переподключение…',false);};
+function stop(){
+ if(videoSocket){const sock=videoSocket;videoSocket=null;sock.onclose=null;sock.onerror=null;sock.close();}
+ $('live').onload=null;$('live').removeAttribute('src');
+ if(frameUrl){URL.revokeObjectURL(frameUrl);frameUrl=null;}
+ streaming=false;videoFallback=false;$('live').style.display='none';$('placeholder').style.display='block';
+}
+function fallbackStream(id){
+ if(id!==current||!streaming||videoFallback)return;
+ videoFallback=true;$('live').onload=null;
+ if(frameUrl){URL.revokeObjectURL(frameUrl);frameUrl=null;}
+ $('live').src='/live/stream?session_id='+encodeURIComponent(id);
+ setState('Резервная трансляция',true);
+}
+function startVideo(id){
+ let opened=false,frames=0;
+ try {
+  const url=(location.protocol==='https:'?'wss://':'ws://')+location.host+
+           '/live/video?session_id='+encodeURIComponent(id);
+  const sock=new WebSocket(url);videoSocket=sock;sock.binaryType='blob';
+  sock.onopen=()=>{opened=true;setState('Видеотрансляция подключена',true)};
+  sock.onmessage=e=>{
+   if(id!==current||!streaming)return;
+   if(typeof e.data==='string')return;
+   const nextUrl=URL.createObjectURL(e.data),oldUrl=frameUrl;
+   $('live').onload=()=>{
+    if(oldUrl)URL.revokeObjectURL(oldUrl);
+   };
+   frameUrl=nextUrl;$('live').src=nextUrl;
+   if(++frames===1)setState('Прямой эфир · до 12 кадров/с',true);
+  };
+  sock.onerror=()=>{if(id===current&&videoSocket===sock)fallbackStream(id)};
+  sock.onclose=()=>{if(id===current&&videoSocket===sock)fallbackStream(id)};
+  setTimeout(()=>{if(id===current&&videoSocket===sock&&!opened)fallbackStream(id)},5000);
+ }catch(e){fallbackStream(id)}
+}
+function selectSession(id){
+ if(!id){current='';stop();setState('Ожидаем сессию',false);return}
+ if(id===current&&streaming)return;
+ stop();current=id;$('placeholder').style.display='none';$('live').style.display='block';
+ streaming=true;setState('Подключаю прямой эфир…',false);startVideo(id);refreshFields();
+}
+$('sessions').onchange=()=>{stop();current='';selectSession($('sessions').value)};
+$('live').onerror=()=>{if(!videoFallback)setState('Ожидаю следующий кадр…',false)};
 async function update(){try{let res=await fetch('/live/sessions',{cache:'no-store',credentials:'same-origin'});if(res.status===401){stop();setState('Требуется вход',false);$('details').textContent='Войди через главную панель MiniFish.';return}if(!res.ok)throw Error('Ошибка сервера '+res.status);let list=(await res.json()).sessions||[];let wanted=current&&list.some(x=>x.session_id===current)?current:(list[0]?.session_id||'');let choice=$('sessions');if(choice.options.length!==list.length||Array.from(choice.options).some((o,i)=>o.value!==list[i].session_id)){choice.replaceChildren();for(let s of list){let o=document.createElement('option');o.value=s.session_id;o.textContent=s.site||'Страница';choice.append(o)}}choice.value=wanted; if(!wanted){selectSession('');$('details').textContent='Нет активных браузерных сессий.';return}if(wanted!==current||!streaming)selectSession(wanted);let item=list.find(s=>s.session_id===wanted);$('details').textContent=(item?.site||'Сайт')+' · Последнее действие: '+(item?.action||'Открыта страница');}catch(e){setState('Нет связи',false);$('details').textContent=e.message}}
 async function refreshFields(){
  const select=$('targetField'), prior=select.value;
