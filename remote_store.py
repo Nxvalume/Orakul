@@ -25,7 +25,8 @@ class RemoteStore(Store):
     def _setup(self):
         # Tables and their private schema are created using Supabase migrations,
         # not dynamically via untrusted HTTP requests.
-        self.execute("UPDATE mf_jobs SET status='interrupted', summary='Сервер перезапущен; повторный запуск только вручную' WHERE status='running'")
+        self.execute("UPDATE mf_jobs SET status='interrupted', summary=? WHERE status='running'",
+                     ("Сервер перезапущен; повторный запуск только вручную",))
 
     def sql(self, statement: str) -> str:
         for table in TABLES:
