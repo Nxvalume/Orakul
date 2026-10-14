@@ -263,14 +263,31 @@ class BrowserEngine:
         async with s.lock:
             return await s.page.screenshot(type='png', full_page=False, timeout=TIMEOUT_MS)
 
-    async def owner_control(self, sid: str, action: str, *, x=None, y=None, text=None, key=None) -> dict:
+    async def owner_fields(self, sid: str) -> dict:
+        """Owner-only: list visible browser form fields, never their values."""
+        s = self.get(sid)
+        async with s.lock:
+            fields = await s.page.locator('input:visible, textarea:visible, [contenteditable="true"]:visible').evaluate_all(
+                """els => els.slice(0, 24).map((el, i) => ({
+                    index: i,
+                    kind: (el.getAttribute('type') || (el.isContentEditable ? 'text' : 'text')).toLowerCase(),
+                    label: String(el.getAttribute('aria-label') ||
+                        el.getAttribute('placeholder') ||
+                        el.getAttribute('name') ||
+                        el.getAttribute('id') ||
+                        el.closest('label')?.innerText ||
+                        'Поле ' + (i + 1)).slice(0, 90)
+                }))""")
+            return {'fields': fields, 'site': urlsplit(s.page.url).hostname or ''}
+
+    async def owner_control(self, sid: str, action: str, *, x=None, y=None, text=None, key=None, field_index=None) -> dict:
         """Owner-only manual handoff. Do not expose as an MCP tool.
 
         Owner may type into the browser directly (including login forms) without
         passing account credentials to ChatGPT. Never log or return typed data.
         """
         s = self.get(sid)
-        if action not in ('click', 'type', 'key'):
+        if action not in ('click', 'type', 'key', 'fill_field'):
             raise ValueError('Неизвестное действие управления')
         async with s.lock:
             if action == 'click':
@@ -287,6 +304,21 @@ class BrowserEngine:
                     raise ValueError('Текст должен содержать от 1 до 1000 символов')
                 await s.page.keyboard.insert_text(text)
                 s.last_action = 'Владелец ввёл текст'
+            elif action == 'fill_field':
+                if (isinstance(field_index, bool) or not isinstance(field_index, int)
+                        or field_index < 0 or field_index > 23):
+                    raise ValueError('Выберите поле на странице')
+                if not isinstance(text, str) or not 0 < len(text) <= 1000:
+                    raise ValueError('Введите текст в поле MiniFish')
+                fields = s.page.locator('input:visible, textarea:visible, [contenteditable="true"]:visible')
+                if field_index >= await fields.count():
+                    raise ValueError('Поле больше не доступно. Обновите список полей')
+                target = fields.nth(field_index)
+                kind = (await target.get_attribute('type') or '').lower()
+                if kind in {'hidden','file','checkbox','radio','submit','button'}:
+                    raise ValueError('В это поле нельзя вводить текст')
+                await target.fill(text, timeout=TIMEOUT_MS)
+                s.last_action = 'Владелец заполнил поле'
             else:
                 allowed = {'Tab', 'Enter', 'Escape', 'Backspace', 'Delete',
                            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
