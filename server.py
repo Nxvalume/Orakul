@@ -23,17 +23,25 @@ from web_auth import authorized, make_cookie, verify_password, allowed_attempt
 from oauth_server import (protected_resource, oauth_metadata, register, authorize_get, authorize_post, token, authorized_access, CHALLENGE)
 
 engine = BrowserEngine()
-# Prefer configured durable PostgreSQL over an incomplete HTTPS gateway.
-if os.getenv('MINIFISH_DATABASE_URL'):
-    store = Store()
-elif os.getenv('MINIFISH_STORE_API_URL'):
-    try:
-        store = RemoteStore()
-    except Exception:
-        store = Store()
-        store.degraded = True
-else:
-    store = Store()
+
+def create_state_store():
+    configured = bool(os.getenv('MINIFISH_DATABASE_URL') or
+                      os.getenv('MINIFISH_STORE_API_URL'))
+    if os.getenv('MINIFISH_DATABASE_URL'):
+        try:
+            return Store()
+        except Exception:
+            pass
+    if os.getenv('MINIFISH_STORE_API_URL'):
+        try:
+            return RemoteStore()
+        except Exception:
+            pass
+    temporary = Store(database_url='')
+    temporary.degraded = configured
+    return temporary
+
+store = create_state_store()
 
 async def _checkpoint_browser_profile(name: str, state: dict):
     record = await asyncio.to_thread(store.get_profile,name)
