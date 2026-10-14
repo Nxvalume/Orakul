@@ -67,7 +67,22 @@ mcp = FastMCP(
 @mcp.tool()
 async def browser_open(url: str) -> dict:
     """Open an approved HTTPS website; report the active encrypted storage backend."""
-    opened = await engine.open(url)
+    # The connected ChatGPT plugin can only pass a URL. If the owner has
+    # already saved exactly one encrypted Telegram profile, resume it without
+    # exposing its credentials or state in the tool response.
+    host = urlsplit(url).hostname
+    matching = []
+    if host == 'web.telegram.org':
+        matching = [p for p in await asyncio.to_thread(store.list_profiles)
+                    if p['site'] == host]
+    if len(matching) == 1:
+        saved = await asyncio.to_thread(store.get_profile, matching[0]['name'])
+        opened = await engine.open(url, storage_state=saved['state'],
+                                   profile_name=matching[0]['name'])
+    else:
+        opened = await engine.open(url)
+        if len(matching) > 1:
+            opened['profile_selection_required'] = True
     opened['durable_storage'] = bool(store.durable)
     opened['storage_backend'] = ('edge_https' if isinstance(store, RemoteStore)
                                  else ('postgres' if store.is_postgres else 'sqlite'))
