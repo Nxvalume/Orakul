@@ -90,3 +90,40 @@ async def test_storage_error_does_not_leave_browser_open():
     assert result['profile_save_failed'] is True
     assert 'secret' not in str(result)
     session.context.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_owner_mobile_fill_field_never_replies_with_secret():
+    engine, page = mock_browser()
+    field = SimpleNamespace(
+        get_attribute=AsyncMock(return_value='tel'),
+        fill=AsyncMock())
+    fields = SimpleNamespace(count=AsyncMock(return_value=2),
+                             nth=lambda idx: field)
+    page.locator = lambda selector: fields
+    secret = 'not-a-real-phone-number-1234'
+    result = await engine.owner_control('session', 'fill_field',
+                                        field_index=1, text=secret)
+    assert result['ok'] is True
+    assert secret not in str(result)
+    assert secret not in engine._sessions['session'].last_action
+    field.fill.assert_awaited_once_with(secret, timeout=15000)
+    with pytest.raises(ValueError):
+        await engine.owner_control('session', 'fill_field', field_index=-1,
+                                   text=secret)
+    with pytest.raises(ValueError):
+        await engine.owner_control('session', 'fill_field', field_index=24,
+                                   text=secret)
+
+
+@pytest.mark.asyncio
+async def test_owner_mobile_fields_never_reveal_existing_values():
+    engine, page = mock_browser()
+    locator = SimpleNamespace(evaluate_all=AsyncMock(return_value=[
+        {'index':0, 'kind':'tel', 'label':'Phone Number'},
+        {'index':1, 'kind':'password', 'label':'Password'}]))
+    page.locator = lambda selector: locator
+    result = await engine.owner_fields('session')
+    assert result['fields'][0]['label'] == 'Phone Number'
+    assert 'value' not in str(result)
+    assert 'Phone' in str(result)
