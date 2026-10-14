@@ -58,8 +58,12 @@ mcp = FastMCP(
 
 @mcp.tool()
 async def browser_open(url: str) -> dict:
-    """Open an explicitly approved public HTTPS website in temporary Chromium."""
-    return await engine.open(url)
+    """Open an approved HTTPS website; report the active encrypted storage backend."""
+    opened = await engine.open(url)
+    opened['durable_storage'] = bool(store.durable)
+    opened['storage_backend'] = ('edge_https' if isinstance(store, RemoteStore)
+                                 else ('postgres' if store.is_postgres else 'sqlite'))
+    return opened
 
 @mcp.tool()
 async def browser_goto(session_id: str, url: str) -> dict:
