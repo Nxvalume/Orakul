@@ -131,6 +131,7 @@ async def test_owner_mobile_fields_never_reveal_existing_values():
 
 @pytest.mark.asyncio
 async def test_reopening_telegram_reuses_existing_live_session(monkeypatch):
+    monkeypatch.setattr('engine.validate_url', lambda url: url)
     engine, page = mock_browser()
     engine._sessions.pop('session')
     page.url = 'https://web.telegram.org/k/'
