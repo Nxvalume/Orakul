@@ -13,6 +13,15 @@ def make_store(tmp_path):
     return Store(database_url='', sqlite_path=str(tmp_path/'minifish.sqlite3'), secret='x'*64)
 
 
+def test_postgres_schema_is_private(tmp_path):
+    store = make_store(tmp_path)
+    store.is_postgres = True
+    assert store.sql('SELECT * FROM mf_profiles WHERE name=?') == (
+        'SELECT * FROM minifish.mf_profiles WHERE name=%s')
+    assert store.sql('ALTER TABLE mf_jobs ENABLE ROW LEVEL SECURITY') == (
+        'ALTER TABLE minifish.mf_jobs ENABLE ROW LEVEL SECURITY')
+
+
 def test_owner_domains_survive_store_reopen(tmp_path):
     first = make_store(tmp_path)
     first.save_domain('example.com')
