@@ -45,6 +45,8 @@ def create_state_store():
 store = create_state_store()
 
 async def _checkpoint_browser_profile(name: str, state: dict):
+    if getattr(store, 'degraded', False):
+        raise RuntimeError('Постоянное хранилище недоступно, данные входа не сохранены')
     if name == 'telegram':
         await asyncio.to_thread(store.save_profile, 'telegram', 'web.telegram.org', state)
     else:
@@ -171,6 +173,8 @@ async def browser_profiles() -> dict:
 @mcp.tool()
 async def browser_save_profile(session_id: str, name: str) -> dict:
     """Explicitly save the logged-in browser context encrypted, by profile name."""
+    if getattr(store, 'degraded', False):
+        raise RuntimeError('Постоянное хранилище недоступно, попробуйте позже')
     site = urlsplit(engine.get(session_id).page.url).hostname
     validate_url('https://' + site)
     state = await engine.export_state(session_id)
@@ -260,6 +264,7 @@ async def api(req: Request):
         if not isinstance(data,dict): raise ValueError('Ожидается объект JSON')
         sid=data.get('session_id','')
         if action == 'storage':return JSONResponse({'durable':store.durable,
+            'degraded':bool(getattr(store, 'degraded', False)),
             'note': 'Подключена постоянная БД' if store.durable else 'Локальное хранилище временное'})
         if action == 'telegram-status':
             profiles = await asyncio.to_thread(store.list_profiles)
@@ -379,6 +384,8 @@ async def _telegram_profile_watch():
         try:
             state = await engine.telegram_authenticated_state(sid)
             if state is None:
+                continue
+            if getattr(store, 'degraded', False):
                 continue
             await asyncio.to_thread(store.save_profile, 'telegram', 'web.telegram.org', state)
             engine.set_profile_name(sid, 'telegram')
