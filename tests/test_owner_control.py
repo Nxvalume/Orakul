@@ -12,7 +12,7 @@ def mock_browser():
     page = SimpleNamespace(
         viewport_size={'width': 1280, 'height': 900},
         url='https://example.com/login',
-        mouse=SimpleNamespace(click=AsyncMock()),
+        mouse=SimpleNamespace(click=AsyncMock(), move=AsyncMock()),
         keyboard=SimpleNamespace(insert_text=AsyncMock(), press=AsyncMock()),
         is_closed=lambda: False,
     )
@@ -190,3 +190,19 @@ async def test_telegram_active_session_selection_is_domain_scoped():
     assert engine.telegram_session_id() == 'session'
     page.url = 'https://example.com/'
     assert engine.telegram_session_id() is None
+
+
+
+@pytest.mark.asyncio
+async def test_cursor_moves_in_steps_before_click(monkeypatch):
+    engine, page = mock_browser()
+    monkeypatch.setattr('engine.asyncio.sleep', AsyncMock())
+    response = await engine.owner_control('session', 'click', x=800, y=500)
+    assert response['ok']
+    assert page.mouse.move.await_count == 14
+    first = page.mouse.move.await_args_list[0].args
+    final = page.mouse.move.await_args_list[-1].args
+    assert first[0] > 640 and first[0] < 800
+    assert final == (800.0, 500.0)
+    assert engine._sessions['session'].cursor == (800.0,500.0)
+    page.mouse.click.assert_awaited_once_with(800.0, 500.0)
