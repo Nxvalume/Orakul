@@ -25,6 +25,10 @@ def test_approved_domain_still_requires_https():
 
 @pytest.mark.asyncio
 async def test_mcp_domain_tool_persists_and_normalizes(monkeypatch):
+    # Isolated dummy values for import-time auth checks (never real credentials).
+    monkeypatch.setenv('MINIFISH_PASSWORD', 'test-owner-password-long')
+    monkeypatch.setenv('MINIFISH_SECRET', 'q' * 64)
+    monkeypatch.setenv('MINIFISH_MCP_TOKEN', 'x' * 64)
     import server
     from unittest.mock import Mock
 
