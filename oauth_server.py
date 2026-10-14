@@ -23,6 +23,10 @@ from web_auth import SECRET, allowed_attempt, verify_password, authorized
 
 BASE = os.getenv('MINIFISH_PUBLIC_URL', 'https://nxval-minifish-2026.onrender.com').rstrip('/')
 RESOURCE = BASE
+OAUTH_SECRET = os.getenv('MINIFISH_OAUTH_SIGNING_SECRET', SECRET)
+if len(OAUTH_SECRET) < 32:
+    raise RuntimeError('OAuth signing secret must be at least 32 characters')
+OAUTH_NOT_BEFORE = int(os.getenv('MINIFISH_OAUTH_NOT_BEFORE', '0'))
 SCOPES = 'browser:read browser:act'
 CHALLENGE = f'Bearer resource_metadata="{BASE}/.well-known/oauth-protected-resource", scope="browser:read browser:act"'
 # Authorization codes are one use, short lived, and never stored in logs.
@@ -39,7 +43,7 @@ def decode_bytes(s: str) -> bytes:
 
 def sign(payload: dict) -> str:
     raw = encode_bytes(json.dumps(payload, separators=(',', ':'), sort_keys=True).encode())
-    mac = encode_bytes(hmac.new(SECRET.encode(), raw.encode(), hashlib.sha256).digest())
+    mac = encode_bytes(hmac.new(OAUTH_SECRET.encode(), raw.encode(), hashlib.sha256).digest())
     return f'mf1.{raw}.{mac}'
 
 
@@ -48,14 +52,24 @@ def verify_signed(token: str, kind: str) -> dict | None:
         version, raw, mac = token.split('.')
         if version != 'mf1' or len(token) > 8000:
             return None
-        expected = hmac.new(SECRET.encode(), raw.encode(), hashlib.sha256).digest()
-        if not hmac.compare_digest(decode_bytes(mac), expected):
+        digest = decode_bytes(mac)
+        expected = hmac.new(OAUTH_SECRET.encode(), raw.encode(), hashlib.sha256).digest()
+        legacy = hmac.new(SECRET.encode(), raw.encode(), hashlib.sha256).digest()
+        # Accept old OAuth sessions during key separation without forcing login.
+        # The previous signer can later be retired by setting
+        # MINIFISH_OAUTH_DISABLE_LEGACY=1 after old refresh tokens expire.
+        valid = hmac.compare_digest(digest, expected)
+        if not valid and os.getenv('MINIFISH_OAUTH_DISABLE_LEGACY') != '1':
+            valid = hmac.compare_digest(digest, legacy)
+        if not valid:
             return None
         data = json.loads(decode_bytes(raw))
         if not isinstance(data, dict) or data.get('kind') != kind:
             return None
         now = time.time()
         if not (float(data.get('iat', 0)) <= now + 30 < float(data.get('exp', 0)) + 30):
+            return None
+        if kind in ('access', 'refresh') and float(data.get('iat', 0)) < OAUTH_NOT_BEFORE:
             return None
         return data
     except (ValueError, TypeError, KeyError, OverflowError, json.JSONDecodeError):
