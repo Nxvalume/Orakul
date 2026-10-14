@@ -13,7 +13,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
-from live_view import live_page, session_api, stream_api, control_api, fields_api
+from live_view import live_page, session_api, stream_api, control_api, fields_api, owner
+from live_video import screencast_socket
 from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url
 from state_store import Store
 from remote_store import RemoteStore
@@ -325,7 +326,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         form_targets = "'self' https://chatgpt.com" if path == '/oauth/authorize' else "'self'"
         result.headers['Content-Security-Policy']=(
             "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
-            "img-src 'self' blob:; connect-src 'self'; base-uri 'none'; "
+            "img-src 'self' blob:; connect-src 'self' wss://nxval-minifish-2026.onrender.com; base-uri 'none'; "
             "frame-ancestors 'none'; form-action " + form_targets
         )
         return result
@@ -337,6 +338,7 @@ app.add_route('/live',live_page,methods=['GET'])
 app.add_route('/live/sessions',session_api(engine),methods=['GET'])
 app.add_route('/live/fields',fields_api(engine),methods=['GET'])
 app.add_route('/live/stream',stream_api(engine),methods=['GET'])
+app.add_websocket_route('/live/video',screencast_socket(engine, owner))
 app.add_route('/live/control',control_api(engine),methods=['POST'])
 app.add_route('/api/me',me,methods=['GET'])
 app.add_route('/api/{action}',api,methods=['POST'])
