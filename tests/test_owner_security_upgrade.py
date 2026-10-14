@@ -1,7 +1,7 @@
 """Security regressions for owner-only login, action approvals and profile key rotation."""
 import asyncio
 import time
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock
 
 import pytest
 
@@ -62,3 +62,30 @@ def test_legacy_encrypted_profiles_survive_new_encryption_key(monkeypatch, tmp_p
     assert upgraded.get_profile('telegram')['state']=={'cookies':[]}
     with pytest.raises(ValueError):
         old.get_profile('telegram')
+
+
+@pytest.mark.asyncio
+async def test_mcp_cannot_force_sensitive_click_with_confirm_flag():
+    engine = BrowserEngine()
+    page = Mock()
+    page.url = 'https://example.com/orders'
+    page.is_closed.return_value = False
+    target = Mock()
+    target.inner_text = AsyncMock(return_value='Оплатить заказ')
+    target.get_attribute = AsyncMock(side_effect=lambda attr: None)
+    target.scroll_into_view_if_needed = AsyncMock()
+    target.bounding_box = AsyncMock(return_value=None)
+    target.click = AsyncMock()
+    page.locator.return_value.first = target
+    session = Session(context=Mock(pages=[page]), page=page)
+    engine._sessions['pay-test'] = session
+
+    with pytest.raises(PermissionError, match='подтверждение владельца'):
+        await engine.click('pay-test', 'button#pay', confirm_sensitive=True)
+    target.click.assert_not_called()
+    request_id = session.pending_click['id']
+    await engine.owner_approve_click('pay-test', request_id)
+    await engine.click('pay-test', 'button#pay', confirm_sensitive=True)
+    target.click.assert_awaited_once()
+    with pytest.raises(PermissionError):
+        await engine.click('pay-test', 'button#pay', confirm_sensitive=True)
