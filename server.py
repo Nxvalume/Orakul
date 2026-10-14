@@ -163,7 +163,7 @@ async def homepage(req: Request):
     return HTMLResponse(PAGE, headers={'Cache-Control': 'no-store'})
 
 async def health(req: Request):
-    return JSONResponse({'service':'minifish','status':'ok','durable_storage':store.durable})
+    return JSONResponse({'service':'minifish','status':'ok','durable_storage':store.durable,'storage_backend':'postgres' if store.is_postgres else 'sqlite','background_worker_running':runner._task is not None and not runner._task.done()})
 
 async def me(req: Request):
     if not authorized(req.headers.get('cookie',''),req.headers.get('authorization','')):
