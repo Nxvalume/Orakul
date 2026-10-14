@@ -22,3 +22,21 @@ def test_mobile_taps_enabled_by_default_and_visible_above_stream():
 def test_click_owner_endpoint_requires_authenticated_cookie():
     assert 'if not owner(req):' in VIEW
     assert "await engine.owner_control" in VIEW
+
+
+def test_mobile_stream_has_real_keyboard_input_next_to_video():
+    assert 'id="streamEntry"' in VIEW
+    assert 'id="streamInsert"' in VIEW
+    assert 'id="streamInputStatus"' in VIEW
+    assert 'Это настоящее поле ввода Android' in VIEW
+    assert VIEW.index('id="touch"') < VIEW.index('id="streamEntry"') < VIEW.index('id="live"')
+    assert "input.focus()" in VIEW
+
+
+def test_mobile_stream_input_uses_selected_browser_field_not_clipboard():
+    assert "ownerAction('fill_field',{field_index:Number(field),text})" in VIEW
+    assert "input.value='';" in VIEW
+    assert "stream.type=entry.type" in VIEW
+    assert "stream.inputMode=entry.inputMode" in VIEW
+    assert "PHONE_PASSWORD_FLOOD" in VIEW
+    assert "navigator.clipboard" not in VIEW
