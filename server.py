@@ -13,7 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
-from live_view import live_page, session_api, stream_api, control_api
+from live_view import live_page, session_api, stream_api, control_api, fields_api
 from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url
 from state_store import Store
 from remote_store import RemoteStore
