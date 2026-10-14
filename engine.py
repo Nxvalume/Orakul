@@ -323,7 +323,8 @@ class BrowserEngine:
             if now - s.touched >= TTL_SECONDS or s.page.is_closed():
                 continue
             site = urlsplit(s.page.url).hostname or 'Загрузка страницы'
-            result.append({'session_id': sid, 'site': site, 'action': s.last_action})
+            result.append({'session_id': sid, 'site': site, 'action': s.last_action,
+                           'viewport': s.page.viewport_size or {'width': 1280, 'height': 900}})
         return result
 
     def telegram_session_id(self) -> str | None:
