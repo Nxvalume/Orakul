@@ -71,6 +71,8 @@ mcp = FastMCP(
 async def _open_telegram(url: str) -> dict:
     validate_url(url)
     sid = engine.telegram_session_id()
+    if sid and engine._sessions.get(sid) and engine._sessions[sid].private_mode:
+        raise PermissionError('Личный вход владельца: подожди, пока управление будет возвращено')
     if sid and await engine.telegram_logged_in(sid):
         session = engine.get(sid)
         return {'session_id': sid, 'url': session.page.url,
@@ -155,7 +157,8 @@ async def browser_screenshot(session_id: str) -> Image:
 
 @mcp.tool()
 async def browser_close(session_id: str) -> dict:
-    """Close the temporary browser session."""
+    """Close a browser session only when owner private mode is off."""
+    engine.get(session_id)
     return await engine.close(session_id)
 
 @mcp.tool()
