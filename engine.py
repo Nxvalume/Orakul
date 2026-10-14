@@ -248,7 +248,9 @@ class BrowserEngine:
                         selector: (() => { let p=[], n=e; while (n && n.nodeType === 1 && p.length < 12) {
                             if (n.id) { p.unshift('#' + CSS.escape(n.id)); break; }
                             const tag=n.tagName.toLowerCase();
-                            const num=Array.from(n.parentElement?.children || []).filter(x => x.tagName === n.tagName).indexOf(n) + 1;
+                            if (!n.parentElement) { p.unshift(tag); break; }
+                            const siblings=Array.from(n.parentElement.children).filter(x => x.tagName === n.tagName);
+                            const num=siblings.indexOf(n) + 1;
                             p.unshift(tag + ':nth-of-type(' + num + ')'); n=n.parentElement;
                         } return p.join(' > '); })(),
                         i, tag: e.tagName.toLowerCase(), text: (e.innerText || e.getAttribute('aria-label') || '').slice(0, 100),
