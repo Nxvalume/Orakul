@@ -59,7 +59,14 @@ class Store:
                 con.close()
 
     def sql(self, statement: str) -> str:
-        return statement.replace('?', '%s') if self.is_postgres else statement
+        if not self.is_postgres:
+            return statement
+        # All application tables live in a private Postgres schema, never
+        # in Supabase's Data API-exposed public schema.
+        for table in ('mf_profiles', 'mf_jobs', 'mf_job_results', 'mf_allowed_domains'):
+            statement = re.sub(r'\\b' + table + r'\\b',
+                               'minifish.' + table, statement)
+        return statement.replace('?', '%s')
 
     def execute(self, statement: str, params: tuple = (), *, fetch: bool = False):
         with self._lock, self.connect() as con:
