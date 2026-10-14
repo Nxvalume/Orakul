@@ -32,9 +32,20 @@ class Store:
         secret = secret if secret is not None else os.getenv('MINIFISH_SECRET', '')
         if len(secret) < 32:
             raise RuntimeError('MINIFISH_SECRET must be at least 32 characters')
-        key = base64.urlsafe_b64encode(hashlib.sha256(
+        legacy_key = base64.urlsafe_b64encode(hashlib.sha256(
             b'MiniFish encrypted profiles and jobs v1:' + secret.encode()).digest())
-        self.cipher = Fernet(key)
+        separate_secret = os.getenv('MINIFISH_PROFILE_ENCRYPTION_SECRET', '')
+        if separate_secret and len(separate_secret) < 32:
+            raise RuntimeError('MINIFISH_PROFILE_ENCRYPTION_SECRET must be at least 32 characters')
+        if separate_secret:
+            key = base64.urlsafe_b64encode(hashlib.sha256(
+                b'MiniFish profile encryption v2:' + separate_secret.encode()).digest())
+            self.cipher = Fernet(key)
+            # Existing records can still be read and re-encrypted on their next save.
+            self._old_cipher = Fernet(legacy_key)
+        else:
+            self.cipher = Fernet(legacy_key)
+            self._old_cipher = None
         self.url = database_url if database_url is not None else os.getenv('MINIFISH_DATABASE_URL', '')
         self.is_postgres = bool(self.url)
         self.durable = self.is_postgres or os.getenv('MINIFISH_PERSISTENT_DISK') == '1'
@@ -105,10 +116,14 @@ class Store:
         return self.cipher.encrypt(raw)
 
     def _decrypt(self, data):
-        try:
-            return json.loads(self.cipher.decrypt(bytes(data)))
-        except (InvalidToken, ValueError, TypeError) as exc:
-            raise ValueError('Не удалось расшифровать данные. Проверьте MINIFISH_SECRET.') from exc
+        for cipher in (self.cipher, self._old_cipher):
+            if cipher is None:
+                continue
+            try:
+                return json.loads(cipher.decrypt(bytes(data)))
+            except (InvalidToken, ValueError, TypeError):
+                continue
+        raise ValueError('Не удалось расшифровать данные. Проверьте ключ шифрования MiniFish.')
 
     def save_domain(self, domain: str) -> None:
         if not isinstance(domain,str) or not re.fullmatch(
