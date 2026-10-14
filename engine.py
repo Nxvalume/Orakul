@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import os
+import secrets
 import re
 import socket
 import time
@@ -135,6 +136,9 @@ class Session:
     last_action: str = 'Открыта страница'
     profile_name: str | None = None
     cursor: tuple[float, float] = (640.0, 450.0)
+    private_mode: bool = False
+    pending_click: dict | None = None
+    approved_click: dict | None = None
 
 
 class BrowserEngine:
@@ -171,6 +175,7 @@ class BrowserEngine:
                 target_host = urlsplit(url).hostname
                 for sid, existing in reversed(list(self._sessions.items())):
                     if (not existing.page.is_closed()
+                            and not existing.private_mode
                             and urlsplit(existing.page.url).hostname == target_host
                             and existing.profile_name is None):
                         existing.touched = time.monotonic()
@@ -203,12 +208,14 @@ class BrowserEngine:
             s = self._sessions.pop(sid)
             await self._close_session_context(s)
 
-    def get(self, sid: str) -> Session:
+    def get(self, sid: str, *, owner: bool = False) -> Session:
         s = self._sessions.get(sid)
         if s is None:
             raise ValueError('Браузерная сессия не найдена. Вызовите browser_open.')
         if time.monotonic() - s.touched > TTL_SECONDS:
             raise ValueError('Браузерная сессия истекла. Вызовите browser_close, затем browser_open.')
+        if s.private_mode and not owner:
+            raise PermissionError('Личный режим владельца: доступ MCP временно заблокирован')
         s.touched = time.monotonic()
         return s
 
@@ -272,8 +279,21 @@ class BrowserEngine:
             el = s.page.locator(selector).first
             label = trim(((await el.inner_text(timeout=TIMEOUT_MS)) or '') + ' ' + ((await el.get_attribute('aria-label')) or ''), 300)
             typ = (await el.get_attribute('type') or '').lower()
-            if (typ == 'submit' or sensitive_action(label)) and not confirm_sensitive:
-                raise PermissionError(f'Для подтверждаемого действия «{label.strip()}» нужно explicit confirm_sensitive=true после согласия пользователя')
+            sensitive = typ == 'submit' or sensitive_action(label)
+            if sensitive:
+                now = time.monotonic()
+                approved = s.approved_click
+                if not (confirm_sensitive and approved and approved.get('selector') == selector
+                        and approved.get('url') == s.page.url and approved.get('expires', 0) > now):
+                    pending = s.pending_click
+                    if not pending or pending.get('selector') != selector or pending.get('url') != s.page.url or pending.get('expires', 0) <= now:
+                        s.pending_click = {'id': secrets.token_urlsafe(16), 'selector': selector,
+                                           'label': (label.strip()[:120] or 'Нажатие'), 'url': s.page.url,
+                                           'expires': now + 180}
+                    raise PermissionError('Требуется подтверждение владельца в MiniFish /live. Затем повтори вызов с confirm_sensitive=true.')
+                # A prior owner approval is consumed once before interacting with the page.
+                s.approved_click = None
+                s.pending_click = None
             await el.scroll_into_view_if_needed(timeout=TIMEOUT_MS)
             bounds = await el.bounding_box(timeout=TIMEOUT_MS)
             if bounds:
@@ -324,7 +344,9 @@ class BrowserEngine:
                 continue
             site = urlsplit(s.page.url).hostname or 'Загрузка страницы'
             result.append({'session_id': sid, 'site': site, 'action': s.last_action,
-                           'viewport': s.page.viewport_size or {'width': 1280, 'height': 900}})
+                           'viewport': s.page.viewport_size or {'width': 1280, 'height': 900},
+                           'private_mode': s.private_mode,
+                           'pending_click': (s.pending_click if s.pending_click and s.pending_click['expires'] > now else None)})
         return result
 
     def telegram_session_id(self) -> str | None:
@@ -357,7 +379,7 @@ class BrowserEngine:
     async def telegram_authenticated_state(self, sid: str) -> dict | None:
         """Secret browser state for server-side encryption only; no idle-TTL renewal."""
         session = self._sessions.get(sid)
-        if (session is None or session.page.is_closed()
+        if (session is None or session.page.is_closed() or session.private_mode
                 or time.monotonic()-session.touched >= TTL_SECONDS
                 or urlsplit(session.page.url).hostname != 'web.telegram.org'):
             return None
@@ -373,6 +395,8 @@ class BrowserEngine:
         s = self._sessions.get(sid)
         if not s or time.monotonic()-s.touched >= TTL_SECONDS or s.page.is_closed():
             raise ValueError('Сессия недоступна')
+        # Owner-only live video stays available during private mode; MCP screenshot
+        # and snapshots go through get(), which blocks them.
         # Live viewers must never monopolize the session lock and delay MCP
         # actions. A skipped frame is preferable to hanging an agent call.
         if s.lock.locked():
@@ -402,9 +426,38 @@ class BrowserEngine:
         async with s.lock:
             return await s.page.screenshot(type='png', full_page=False, timeout=TIMEOUT_MS)
 
+    async def owner_set_private(self, sid: str, enabled: bool) -> dict:
+        s = self.get(sid, owner=True)
+        async with s.lock:
+            s.private_mode = bool(enabled)
+            s.pending_click = None
+            s.approved_click = None
+            s.last_action = ('Личный режим владельца' if enabled else 'Управление ассистента разрешено')
+            return {'private_mode': s.private_mode}
+
+    async def owner_approve_click(self, sid: str, request_id: str) -> dict:
+        s = self.get(sid, owner=True)
+        async with s.lock:
+            pending = s.pending_click
+            if (not pending or not secrets.compare_digest(str(pending.get('id')), str(request_id))
+                    or pending['url'] != s.page.url or pending['expires'] <= time.monotonic()
+                    or s.private_mode):
+                raise ValueError('Подтверждение устарело или личный режим ещё включён')
+            s.approved_click = {'selector': pending['selector'], 'url': pending['url'],
+                                'expires': time.monotonic() + 90}
+            s.pending_click = None
+            return {'approved': True}
+
+    async def owner_reject_click(self, sid: str) -> dict:
+        s = self.get(sid, owner=True)
+        async with s.lock:
+            s.pending_click = None
+            s.approved_click = None
+            return {'rejected': True}
+
     async def owner_fields(self, sid: str) -> dict:
         """Owner-only: list visible browser form fields, never their values."""
-        s = self.get(sid)
+        s = self.get(sid, owner=True)
         async with s.lock:
             fields = await s.page.locator('input:visible, textarea:visible, [contenteditable="true"]:visible').evaluate_all(
                 """els => els.slice(0, 24).map((el, i) => ({
@@ -425,7 +478,7 @@ class BrowserEngine:
         Owner may type into the browser directly (including login forms) without
         passing account credentials to ChatGPT. Never log or return typed data.
         """
-        s = self.get(sid)
+        s = self.get(sid, owner=True)
         if action not in ('click', 'type', 'key', 'fill_field'):
             raise ValueError('Неизвестное действие управления')
         async with s.lock:
