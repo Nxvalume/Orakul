@@ -246,6 +246,15 @@ async def api(req: Request):
         sid=data.get('session_id','')
         if action == 'storage':return JSONResponse({'durable':store.durable,
             'note': 'Подключена постоянная БД' if store.durable else 'Локальное хранилище временное'})
+        if action == 'telegram-status':
+            profiles = await asyncio.to_thread(store.list_profiles)
+            saved = any(p['name'] == 'telegram' and p['site'] == 'web.telegram.org'
+                        for p in profiles)
+            telegram_sid = engine.telegram_session_id()
+            logged_in = (bool(telegram_sid) and
+                         await engine.telegram_logged_in(telegram_sid))
+            return JSONResponse({'saved': saved, 'logged_in': logged_in,
+                                 'durable': store.durable})
         if action == 'profiles':return JSONResponse({'profiles':await asyncio.to_thread(store.list_profiles),'durable':store.durable})
         if action == 'save-profile':return JSONResponse(await browser_save_profile(sid,str(data.get('name',''))))
         if action == 'open-profile':return JSONResponse(await browser_open_profile(str(data.get('name','')),str(data.get('url',''))))
