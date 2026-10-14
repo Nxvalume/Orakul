@@ -21,6 +21,33 @@ MAX_SESSIONS = 2
 TTL_SECONDS = 900
 TIMEOUT_MS = 15000
 
+# In-browser cursor is a visual-only overlay. It never intercepts input,
+# reads text/credentials, or communicates with any external endpoint.
+CURSOR_INIT = r"""(() => {
+  if (window.__minifishCursorReady) return;
+  window.__minifishCursorReady = true;
+  function install() {
+    if (document.getElementById('__minifish_cursor')) return;
+    const el = document.createElement('div');
+    el.id = '__minifish_cursor';
+    el.setAttribute('aria-hidden', 'true');
+    el.style.cssText = 'position:fixed;left:0;top:0;width:26px;height:34px;pointer-events:none;z-index:2147483647;opacity:0;transform:translate3d(-100px,-100px,0);filter:drop-shadow(0 2px 3px rgba(0,0,0,.75));transition:opacity .18s ease;';
+    el.innerHTML = '<svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg"><path d="M3 2v26l6.9-7.2 4.7 10.2 5.2-2.5-4.8-10.2 9.7-.2z" fill="#f9fafb" stroke="#10212b" stroke-width="2" stroke-linejoin="round"/></svg>';
+    (document.body || document.documentElement).appendChild(el);
+    document.addEventListener('mousemove', ev => {
+      el.style.transform = 'translate3d(' + ev.clientX + 'px,' + ev.clientY + 'px,0)';
+      el.style.opacity = '1';
+    }, {capture:true, passive:true});
+    document.addEventListener('mousedown', () => {
+      el.style.filter = 'drop-shadow(0 0 9px rgba(93,214,186,.95))';
+      setTimeout(() => el.style.filter = 'drop-shadow(0 2px 3px rgba(0,0,0,.75))', 170);
+    }, {capture:true, passive:true});
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true});
+  else install();
+})()"""
+
+
 
 def allowed_domains() -> list[str]:
     domains = [x.strip().lower().rstrip('.') for x in os.getenv('BROWSER_ALLOWED_DOMAINS', 'example.com').split(',')]
@@ -96,6 +123,7 @@ class Session:
     touched: float = field(default_factory=time.monotonic)
     last_action: str = 'Открыта страница'
     profile_name: str | None = None
+    cursor: tuple[float, float] = (640.0, 450.0)
 
 
 class BrowserEngine:
@@ -146,6 +174,7 @@ class BrowserEngine:
                     viewport={'width': 1280, 'height': 900},
                     **({'storage_state': storage_state} if storage_state is not None else {}))
             await context.route('**/*', self._route)
+            await context.add_init_script(CURSOR_INIT)
             page = await context.new_page()
             sid = str(uuid4())
             self._sessions[sid] = Session(context=context, page=page, profile_name=profile_name)
@@ -211,6 +240,19 @@ class BrowserEngine:
         except TimeoutError:
             raise RuntimeError('Telegram долго отвечает или экран занят трансляцией') from None
 
+    async def _move_cursor(self, session: Session, x: float, y: float) -> None:
+        """Genuine eased Playwright mouse movement, visible in the live stream."""
+        x, y = float(x), float(y)
+        start_x, start_y = session.cursor
+        for step in range(1, 15):
+            t = step / 14
+            ease = t * t * (3 - 2 * t)
+            await session.page.mouse.move(
+                start_x + (x - start_x) * ease,
+                start_y + (y - start_y) * ease)
+            await asyncio.sleep(0.018)
+        session.cursor = (x, y)
+
     async def click(self, sid: str, selector: str, confirm_sensitive: bool = False) -> dict:
         if not selector or len(selector) > 300:
             raise ValueError('Укажите корректный CSS-селектор')
@@ -221,6 +263,11 @@ class BrowserEngine:
             typ = (await el.get_attribute('type') or '').lower()
             if (typ == 'submit' or sensitive_action(label)) and not confirm_sensitive:
                 raise PermissionError(f'Для подтверждаемого действия «{label.strip()}» нужно explicit confirm_sensitive=true после согласия пользователя')
+            await el.scroll_into_view_if_needed(timeout=TIMEOUT_MS)
+            bounds = await el.bounding_box(timeout=TIMEOUT_MS)
+            if bounds:
+                await self._move_cursor(s, bounds['x'] + bounds['width'] / 2,
+                                        bounds['y'] + bounds['height'] / 2)
             await el.click(timeout=TIMEOUT_MS)
             if len(s.context.pages) > 1:
                 s.page = s.context.pages[-1]
@@ -236,6 +283,10 @@ class BrowserEngine:
             attrs = ' '.join([(await el.get_attribute(k) or '') for k in ['type', 'name', 'id', 'autocomplete']])
             if re.search(r'password|passwd|card|cc-number|cc-csc|cvv|cvc|otp|one-time-code|token|secret', attrs, re.I):
                 raise PermissionError('Ввод паролей, кодов и платёжных данных не поддерживается')
+            bounds = await el.bounding_box(timeout=TIMEOUT_MS)
+            if bounds:
+                await self._move_cursor(s, bounds['x'] + bounds['width'] / 2,
+                                        bounds['y'] + bounds['height'] / 2)
             await el.fill(value, timeout=TIMEOUT_MS)
             # Deliberately do not echo sensitive field values.
             s.last_action = 'Заполнение поля'
@@ -244,7 +295,12 @@ class BrowserEngine:
     async def select(self, sid: str, selector: str, value: str) -> dict:
         s = self.get(sid)
         async with s.lock:
-            await s.page.locator(selector).first.select_option(value, timeout=TIMEOUT_MS)
+            el = s.page.locator(selector).first
+            bounds = await el.bounding_box(timeout=TIMEOUT_MS)
+            if bounds:
+                await self._move_cursor(s, bounds['x'] + bounds['width'] / 2,
+                                        bounds['y'] + bounds['height'] / 2)
+            await el.select_option(value, timeout=TIMEOUT_MS)
             s.last_action = 'Выбор значения'
             return {'selected': selector, 'value': value}
 
@@ -368,6 +424,7 @@ class BrowserEngine:
                 viewport = s.page.viewport_size or {'width': 1280, 'height': 900}
                 if not (0 <= x < viewport['width'] and 0 <= y < viewport['height']):
                     raise ValueError('Нажатие вне экрана')
+                await self._move_cursor(s, float(x), float(y))
                 await s.page.mouse.click(float(x), float(y))
                 s.last_action = 'Владелец нажал на экране'
             elif action == 'type':
