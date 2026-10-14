@@ -64,7 +64,7 @@ class Store:
         # All application tables live in a private Postgres schema, never
         # in Supabase's Data API-exposed public schema.
         for table in ('mf_profiles', 'mf_jobs', 'mf_job_results', 'mf_allowed_domains'):
-            statement = re.sub(r'\\b' + table + r'\\b',
+            statement = re.sub(r'\b' + table + r'\b',
                                'minifish.' + table, statement)
         return statement.replace('?', '%s')
 
