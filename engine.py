@@ -192,21 +192,21 @@ class BrowserEngine:
         try:
             async with asyncio.timeout(11):
                 async with s.lock:
-                page = s.page
-                text = await page.locator('body').inner_text(timeout=TIMEOUT_MS)
-                # Semantically useful links, buttons and fields, bounded for model context.
-                elements = await page.locator('a, button, input, textarea, select, [role="button"]').evaluate_all('''els => els.slice(0, 80).map((e, i) => ({
-                    selector: (() => { let p=[], n=e; while (n && n.nodeType === 1 && p.length < 12) {
-                        if (n.id) { p.unshift('#' + CSS.escape(n.id)); break; }
-                        const tag=n.tagName.toLowerCase();
-                        const num=Array.from(n.parentElement?.children || []).filter(x => x.tagName === n.tagName).indexOf(n) + 1;
-                        p.unshift(tag + ':nth-of-type(' + num + ')'); n=n.parentElement;
-                    } return p.join(' > '); })(),
-                    i, tag: e.tagName.toLowerCase(), text: (e.innerText || e.getAttribute('aria-label') || '').slice(0, 100),
-                    type: e.getAttribute('type'), name: e.getAttribute('name'), id: e.id || null,
-                    placeholder: e.getAttribute('placeholder'), href: e.getAttribute('href')
-                }))''')
-                return {'url': page.url, 'title': await page.title(), 'text': trim(text), 'elements': elements}
+                    page = s.page
+                    text = await page.locator('body').inner_text(timeout=TIMEOUT_MS)
+                    # Semantically useful links, buttons and fields, bounded for model context.
+                    elements = await page.locator('a, button, input, textarea, select, [role="button"]').evaluate_all('''els => els.slice(0, 80).map((e, i) => ({
+                        selector: (() => { let p=[], n=e; while (n && n.nodeType === 1 && p.length < 12) {
+                            if (n.id) { p.unshift('#' + CSS.escape(n.id)); break; }
+                            const tag=n.tagName.toLowerCase();
+                            const num=Array.from(n.parentElement?.children || []).filter(x => x.tagName === n.tagName).indexOf(n) + 1;
+                            p.unshift(tag + ':nth-of-type(' + num + ')'); n=n.parentElement;
+                        } return p.join(' > '); })(),
+                        i, tag: e.tagName.toLowerCase(), text: (e.innerText || e.getAttribute('aria-label') || '').slice(0, 100),
+                        type: e.getAttribute('type'), name: e.getAttribute('name'), id: e.id || null,
+                        placeholder: e.getAttribute('placeholder'), href: e.getAttribute('href')
+                    }))''')
+                    return {'url': page.url, 'title': await page.title(), 'text': trim(text), 'elements': elements}
 
         except TimeoutError:
             raise RuntimeError('Telegram долго отвечает или экран занят трансляцией') from None
