@@ -125,8 +125,21 @@ class BrowserEngine:
         validate_url(url)
         async with self._lock:
             await self._cleanup_expired()
+            # Reuse a temporary browser already on the same website. This
+            # preserves an in-progress Telegram login and prevents the mobile
+            # "Open Telegram" button from exhausting session slots.
+            if storage_state is None and profile_name is None:
+                target_host = urlsplit(url).hostname
+                for sid, existing in reversed(list(self._sessions.items())):
+                    if (not existing.page.is_closed()
+                            and urlsplit(existing.page.url).hostname == target_host
+                            and existing.profile_name is None):
+                        existing.touched = time.monotonic()
+                        return {'session_id': sid, 'url': existing.page.url,
+                                'title': await existing.page.title(),
+                                'profile': None, 'reused': True}
             if len(self._sessions) >= MAX_SESSIONS:
-                raise RuntimeError('Лимит одновременных браузерных сессий; закройте одну из них')
+                raise RuntimeError('Лимит браузерных сессий. Выберите открытую вкладку в /live.')
             await self._launch()
             assert self._browser is not None
             context = await self._browser.new_context(accept_downloads=False, service_workers='block',
