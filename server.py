@@ -23,7 +23,10 @@ from web_auth import authorized, make_cookie, verify_password, allowed_attempt
 from oauth_server import (protected_resource, oauth_metadata, register, authorize_get, authorize_post, token, authorized_access, CHALLENGE)
 
 engine = BrowserEngine()
-if os.getenv('MINIFISH_STORE_API_URL'):
+# Prefer configured durable PostgreSQL over an incomplete HTTPS gateway.
+if os.getenv('MINIFISH_DATABASE_URL'):
+    store = Store()
+elif os.getenv('MINIFISH_STORE_API_URL'):
     try:
         store = RemoteStore()
     except Exception:
@@ -171,7 +174,7 @@ async def homepage(req: Request):
     return HTMLResponse(PAGE, headers={'Cache-Control': 'no-store'})
 
 async def health(req: Request):
-    return JSONResponse({'service':'minifish','status':'ok','durable_storage':store.durable,'storage_backend':'postgres' if store.is_postgres else 'sqlite','background_worker_running':runner._task is not None and not runner._task.done()})
+    return JSONResponse({'service':'minifish','status':'ok','durable_storage':store.durable,'storage_backend':'postgres' if store.is_postgres else ('edge_https' if isinstance(store, RemoteStore) else 'sqlite'),'background_worker_running':runner._task is not None and not runner._task.done()})
 
 async def me(req: Request):
     if not authorized(req.headers.get('cookie',''),req.headers.get('authorization','')):
