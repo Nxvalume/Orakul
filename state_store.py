@@ -89,6 +89,12 @@ class Store:
             updated DOUBLE PRECISION NOT NULL)''')
         self.execute('''CREATE TABLE IF NOT EXISTS mf_allowed_domains (
             domain TEXT PRIMARY KEY, added DOUBLE PRECISION NOT NULL)''')
+        if self.is_postgres:
+            # Tables are created and owned by the dedicated minifish_worker
+            # login, so we can safely apply defense-in-depth RLS without
+            # changing any permissions in other Supabase projects.
+            for table in ('mf_profiles','mf_jobs','mf_job_results','mf_allowed_domains'):
+                self.execute(f'ALTER TABLE {table} ENABLE ROW LEVEL SECURITY')
         # Interrupted runs are not automatically retried; clicks might not be idempotent.
         self.execute("UPDATE mf_jobs SET status='interrupted', summary='Сервер перезапущен; повторный запуск только вручную' WHERE status='running'")
 
