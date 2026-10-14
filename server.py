@@ -16,13 +16,21 @@ from starlette.routing import Route
 from live_view import live_page, session_api, stream_api, control_api
 from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url
 from state_store import Store
+from remote_store import RemoteStore
 from jobs import JobRunner
 from dashboard import PAGE
 from web_auth import authorized, make_cookie, verify_password, allowed_attempt
 from oauth_server import (protected_resource, oauth_metadata, register, authorize_get, authorize_post, token, authorized_access, CHALLENGE)
 
 engine = BrowserEngine()
-store = Store()
+if os.getenv('MINIFISH_STORE_API_URL'):
+    try:
+        store = RemoteStore()
+    except Exception:
+        store = Store()
+        store.degraded = True
+else:
+    store = Store()
 
 async def _checkpoint_browser_profile(name: str, state: dict):
     record = await asyncio.to_thread(store.get_profile,name)
