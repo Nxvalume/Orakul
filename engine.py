@@ -67,14 +67,22 @@ def add_allowed_domain(domain: str) -> list[str]:
     # Validate before making it available to the browser.
     validate_url(f'https://{domain}', [domain])
     with _domains_lock:
-        if len(_extra_domains) >= 30 and domain not in _extra_domains:
+        if not unrestricted_public_https() and len(_extra_domains) >= 30 and domain not in _extra_domains:
             raise ValueError('Достигнут лимит разрешённых доменов')
         _extra_domains.add(domain)
     return allowed_domains()
 
 
+def unrestricted_public_https() -> bool:
+    """Owner-configured permission for any public HTTPS website, never private networks."""
+    return os.getenv('MINIFISH_ALLOW_ANY_PUBLIC_HTTPS', '0') == '1'
+
+
 def is_allowed_domain(host: str, domains: list[str] | None = None) -> bool:
     host = host.lower().rstrip('.')
+    # Explicit domain scopes still work (e.g. for owner approval validation).
+    if domains is None and unrestricted_public_https():
+        return True
     return any(host == d or host.endswith('.' + d) for d in (domains if domains is not None else allowed_domains()))
 
 
@@ -89,7 +97,9 @@ def validate_url(url: str, domains: list[str] | None = None, *, check_dns: bool 
         port = parts.port
     except (ValueError, UnicodeError) as exc:
         raise ValueError('Недопустимый адрес') from exc
-    if port not in (None, 443) or not is_allowed_domain(host, domains):
+    if port not in (None, 443):
+        raise ValueError('Поддерживается только стандартный порт HTTPS (443)')
+    if not is_allowed_domain(host, domains):
         raise ValueError(f'Домен {host} не разрешён в BROWSER_ALLOWED_DOMAINS')
     try:
         parsed_ip = ipaddress.ip_address(host)
