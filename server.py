@@ -44,8 +44,11 @@ def create_state_store():
 store = create_state_store()
 
 async def _checkpoint_browser_profile(name: str, state: dict):
-    record = await asyncio.to_thread(store.get_profile,name)
-    await asyncio.to_thread(store.save_profile,name,record['site'],state)
+    if name == 'telegram':
+        await asyncio.to_thread(store.save_profile, 'telegram', 'web.telegram.org', state)
+    else:
+        record = await asyncio.to_thread(store.get_profile, name)
+        await asyncio.to_thread(store.save_profile, name, record['site'], state)
 
 engine.profile_save_callback = _checkpoint_browser_profile
 runner = JobRunner(engine, store)
@@ -64,25 +67,35 @@ mcp = FastMCP(
     ),
 )
 
+async def _open_telegram(url: str) -> dict:
+    validate_url(url)
+    sid = engine.telegram_session_id()
+    if sid and await engine.telegram_logged_in(sid):
+        session = engine.get(sid)
+        return {'session_id': sid, 'url': session.page.url,
+                'title': await session.page.title(), 'profile': session.profile_name,
+                'reused': True}
+    try:
+        saved = await asyncio.to_thread(store.get_profile, 'telegram')
+    except ValueError:
+        saved = None
+    if saved and saved['site'] == 'web.telegram.org':
+        if sid:
+            await engine.close(sid)
+        return await engine.open(url, storage_state=saved['state'], profile_name='telegram')
+    if sid:
+        session = engine.get(sid)
+        return {'session_id': sid, 'url': session.page.url,
+                'title': await session.page.title(), 'profile': session.profile_name,
+                'reused': True}
+    return await engine.open(url)
+
+
 @mcp.tool()
 async def browser_open(url: str) -> dict:
-    """Open an approved HTTPS website; report the active encrypted storage backend."""
-    # The connected ChatGPT plugin can only pass a URL. If the owner has
-    # already saved exactly one encrypted Telegram profile, resume it without
-    # exposing its credentials or state in the tool response.
-    host = urlsplit(url).hostname
-    matching = []
-    if host == 'web.telegram.org':
-        matching = [p for p in await asyncio.to_thread(store.list_profiles)
-                    if p['site'] == host]
-    if len(matching) == 1:
-        saved = await asyncio.to_thread(store.get_profile, matching[0]['name'])
-        opened = await engine.open(url, storage_state=saved['state'],
-                                   profile_name=matching[0]['name'])
-    else:
-        opened = await engine.open(url)
-        if len(matching) > 1:
-            opened['profile_selection_required'] = True
+    """Open HTTPS websites; Telegram reuses its encrypted login automatically."""
+    opened = (await _open_telegram(url) if urlsplit(url).hostname == 'web.telegram.org'
+              else await engine.open(url))
     opened['durable_storage'] = bool(store.durable)
     opened['storage_backend'] = ('edge_https' if isinstance(store, RemoteStore)
                                  else ('postgres' if store.is_postgres else 'sqlite'))
@@ -249,7 +262,7 @@ async def api(req: Request):
             result = add_allowed_domain(domain)
             await asyncio.to_thread(store.save_domain,domain)
             return JSONResponse({'domains':result,'durable':store.durable})
-        if action == 'open': return JSONResponse(await engine.open(str(data.get('url',''))))
+        if action == 'open': return JSONResponse(await browser_open(str(data.get('url',''))))
         if action == 'close': return JSONResponse(await engine.close(sid))
         if action == 'back': return JSONResponse(await engine.back(sid))
         if action == 'goto': return JSONResponse(await engine.goto(sid,str(data.get('url',''))))
@@ -327,6 +340,31 @@ app.add_route('/oauth/authorize', authorize_post, methods=['POST'])
 app.add_route('/oauth/token', token, methods=['POST'])
 app.add_middleware(SecurityMiddleware)
 
+async def _telegram_profile_watch():
+    """Auto-save signed-in Telegram browser storage, never a login prompt."""
+    last_saved = {}
+    while True:
+        await asyncio.sleep(8)
+        sid = engine.telegram_session_id()
+        if not sid:
+            continue
+        now = asyncio.get_running_loop().time()
+        if now - last_saved.get(sid, 0) < 75:
+            continue
+        try:
+            state = await engine.telegram_authenticated_state(sid)
+            if state is None:
+                continue
+            await asyncio.to_thread(store.save_profile, 'telegram', 'web.telegram.org', state)
+            engine.set_profile_name(sid, 'telegram')
+            last_saved[sid] = now
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # Never log Telegram account secrets or browser state.
+            pass
+
+
 _base_lifespan = app.router.lifespan_context
 
 @asynccontextmanager
@@ -339,9 +377,16 @@ async def _minifish_lifespan(application):
                 # Revalidate DNS on restart; reject domains that ceased to be public.
                 pass
         await runner.start()
+        watcher = asyncio.create_task(_telegram_profile_watch(), name='minifish-telegram-autosave')
         try:
             yield
         finally:
+            watcher.cancel()
+            try:
+                await watcher
+            except asyncio.CancelledError:
+                pass
             await runner.stop()
+            await engine.shutdown()
 
 app.router.lifespan_context = _minifish_lifespan
