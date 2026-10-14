@@ -146,3 +146,47 @@ async def test_reopening_telegram_reuses_existing_live_session(monkeypatch):
     assert result['reused'] is True
     assert result['session_id'] in ('telegram', 'example')
     assert len(engine._sessions) == 2
+
+
+
+@pytest.mark.asyncio
+async def test_telegram_auth_state_is_saved_only_after_visible_chats():
+    engine, page = mock_browser()
+    page.url = 'https://web.telegram.org/k/'
+    auth_pages = SimpleNamespace(is_visible=AsyncMock(return_value=True))
+    chat_column = SimpleNamespace(is_visible=AsyncMock(return_value=False))
+    page.locator = lambda css: chat_column if css == '#column-left' else auth_pages
+    engine._sessions['session'].context.storage_state = AsyncMock(
+        return_value={'cookies': [], 'origins': []})
+    assert await engine.telegram_authenticated_state('session') is None
+    chat_column.is_visible.return_value = True
+    auth_pages.is_visible.return_value = False
+    state = await engine.telegram_authenticated_state('session')
+    assert state == {'cookies': [], 'origins': []}
+
+
+@pytest.mark.asyncio
+async def test_logging_out_never_overwrites_saved_telegram_profile():
+    engine, page = mock_browser()
+    page.url = 'https://web.telegram.org/k/'
+    session = engine._sessions['session']
+    session.profile_name = 'telegram'
+    page.locator = lambda css: SimpleNamespace(is_visible=AsyncMock(
+        return_value=css == '#auth-pages'))
+    session.context.close = AsyncMock()
+    session.context.storage_state = AsyncMock(return_value={'cookies': []})
+    engine.profile_save_callback = AsyncMock()
+    result = await engine.close('session')
+    assert result['closed'] is True
+    assert result['profile_updated'] is False
+    engine.profile_save_callback.assert_not_awaited()
+    session.context.storage_state.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_telegram_active_session_selection_is_domain_scoped():
+    engine, page = mock_browser()
+    page.url = 'https://web.telegram.org/k/'
+    assert engine.telegram_session_id() == 'session'
+    page.url = 'https://example.com/'
+    assert engine.telegram_session_id() is None
