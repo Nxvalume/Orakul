@@ -127,3 +127,21 @@ async def test_owner_mobile_fields_never_reveal_existing_values():
     assert result['fields'][0]['label'] == 'Phone Number'
     assert 'value' not in str(result)
     assert 'Phone' in str(result)
+
+
+@pytest.mark.asyncio
+async def test_reopening_telegram_reuses_existing_live_session(monkeypatch):
+    engine, page = mock_browser()
+    engine._sessions.pop('session')
+    page.url = 'https://web.telegram.org/k/'
+    page.title = AsyncMock(return_value='Telegram Web')
+    for i in range(2):
+        engine._sessions['telegram' if i == 0 else 'example'] = Session(
+            context=SimpleNamespace(pages=[page]), page=page)
+    async def no_cleanup():
+        return None
+    engine._cleanup_expired = no_cleanup
+    result = await engine.open('https://web.telegram.org/k/')
+    assert result['reused'] is True
+    assert result['session_id'] in ('telegram', 'example')
+    assert len(engine._sessions) == 2
