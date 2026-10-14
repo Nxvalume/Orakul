@@ -191,6 +191,9 @@ async def browser_open_profile(name: str, url: str = '') -> dict:
     validate_url(url)
     if urlsplit(url).hostname != record['site']:
         raise ValueError('Профиль закреплён за другим доменом')
+    if any(session.private_mode and urlsplit(session.page.url).hostname == record['site']
+           for session in engine._sessions.values() if not session.page.is_closed()):
+        raise PermissionError('Личный вход владельца на этом сайте — профиль временно недоступен ассистенту')
     return await engine.open(url, storage_state=record['state'], profile_name=name)
 
 
