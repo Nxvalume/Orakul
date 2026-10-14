@@ -93,6 +93,17 @@ async def _open_telegram(url: str) -> dict:
 
 
 @mcp.tool()
+async def browser_allow_domain(domain: str) -> dict:
+    """Add a single owner-approved public HTTPS domain to the persistent allowlist.
+    Internal IPs, wildcards and unsafe DNS records are rejected by the browser engine.
+    """
+    hostname = domain.strip().lower().rstrip('.')
+    domains = add_allowed_domain(hostname)
+    await asyncio.to_thread(store.save_domain, hostname)
+    return {'domains': domains, 'durable': bool(store.durable)}
+
+
+@mcp.tool()
 async def browser_open(url: str) -> dict:
     """Open HTTPS websites; Telegram reuses its encrypted login automatically."""
     opened = (await _open_telegram(url) if urlsplit(url).hostname == 'web.telegram.org'

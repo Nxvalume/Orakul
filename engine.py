@@ -51,9 +51,10 @@ CURSOR_INIT = r"""(() => {
 
 def allowed_domains() -> list[str]:
     domains = [x.strip().lower().rstrip('.') for x in os.getenv('BROWSER_ALLOWED_DOMAINS', 'example.com').split(',')]
-    
+    # Kwork is explicitly approved by the owner; existing env and stored domains remain intact.
+    owner_approved = {'kwork.ru'}
     with _domains_lock:
-        return sorted(set(x for x in domains if x and x != '*') | _extra_domains)
+        return sorted(set(x for x in domains if x and x != '*') | owner_approved | _extra_domains)
 
 
 def add_allowed_domain(domain: str) -> list[str]:
