@@ -1,0 +1,48 @@
+name: MiniFish stability CI
+
+on:
+  push:
+    branches:
+      - minifish-v02
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - '.github/workflows/minifish-stability.yml'
+  pull_request:
+    branches:
+      - minifish-v02
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: minifish-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Chromium and storage regression tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      MINIFISH_PASSWORD: test-owner-password-long
+      MINIFISH_SECRET: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      MINIFISH_PUBLIC_URL: https://nxval-minifish-2026.onrender.com
+      BROWSER_ALLOWED_DOMAINS: example.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest==8.4.2 pytest-asyncio==1.2.0
+          python -m playwright install chromium --with-deps
+      - name: Validate Python syntax
+        run: python -m compileall -q engine.py server.py web_auth.py dashboard.py oauth_server.py live_view.py live_video.py state_store.py remote_store.py jobs.py
+      - name: Run full test suite
+        run: python -m pytest -q tests/
