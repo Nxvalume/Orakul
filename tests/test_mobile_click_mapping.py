@@ -28,8 +28,8 @@ def test_mobile_stream_has_real_keyboard_input_next_to_video():
     assert 'id="streamEntry"' in VIEW
     assert 'id="streamInsert"' in VIEW
     assert 'id="streamInputStatus"' in VIEW
-    assert 'Это настоящее поле ввода Android' in VIEW
-    assert VIEW.index('id="touch"') < VIEW.index('id="streamEntry"') < VIEW.index('id="live"')
+    assert 'Поле ввода телефона' in VIEW
+    assert VIEW.index('id="urlBar"') < VIEW.index('id="touch"') < VIEW.index('id="live"') < VIEW.index('id="streamEntry"')
     assert "input.focus()" in VIEW
 
 
