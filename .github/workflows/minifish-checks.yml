@@ -11,6 +11,11 @@ jobs:
   security-and-functionality:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      MINIFISH_PASSWORD: test-owner-password-long
+      MINIFISH_SECRET: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      MINIFISH_PUBLIC_URL: https://nxval-minifish-2026.onrender.com
+      BROWSER_ALLOWED_DOMAINS: example.com
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
