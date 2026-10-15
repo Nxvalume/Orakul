@@ -61,6 +61,11 @@ a{color:#93c9ff}
 <form id="unlockForm"><label for="ownerKey">Пароль владельца MiniFish (не Telegram)</label>
 <input id="ownerKey" type="password" autocomplete="off" placeholder="Пароль MiniFish" required>
 <button id="unlock" class="primary" type="submit">Открыть защищённый режим</button></form>
+<div id="secureFallback" hidden style="padding:10px;margin-top:10px;background:#203247;border-radius:9px">
+<strong>Встроенный ввод недоступен в этом клиенте ChatGPT.</strong>
+<p style="font-size:12px">Это блокировка соединения, а не неверный пароль. Не вводите пароль повторно здесь. Откройте доверенный сайт MiniFish для входа в ту же сессию и затем продолжайте управление из чата.</p>
+<a id="secureFallbackLink" href="https://nxval-minifish-2026.onrender.com/live" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:10px;background:#24619b;color:white;border-radius:9px">Открыть защищённый вход MiniFish</a>
+</div>
 <div id="secureTools" hidden>
 <p id="secureStatus" class="status" role="status">Личный режим включён</p>
 <div class="screen" style="margin-top:8px"><img id="secureShot" alt="Защищённый браузер — только владельцу" style="touch-action:manipulation"></div>
@@ -82,6 +87,19 @@ a{color:#93c9ff}
  const $=id=>document.getElementById(id);
  const pending=new Map();let nextId=1,session='',busy=false,ready=null;
  const SECURE_BASE='https://nxval-minifish-2026.onrender.com/chat/secure/';
+ const fallbackLink=$('secureFallbackLink');
+ function trustedLoginUrl(){
+  const base='https://nxval-minifish-2026.onrender.com/live';
+  return session?base+'?session_id='+encodeURIComponent(session):base;
+ }
+ fallbackLink.href=trustedLoginUrl();
+ fallbackLink.onclick=event=>{
+  const link=trustedLoginUrl();
+  if(window.openai?.openExternal){
+   event.preventDefault();
+   window.openai.openExternal({href:link});
+  }
+ };
  let secureToken='',secureImageUrl='',secureViewport={width:960,height:675},securePoll=null;
  const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Превышено время ожидания')),ms));
  const status=t=>$('status').textContent=t;
@@ -109,6 +127,7 @@ a{color:#93c9ff}
   const next=p?.session_id||p?.arguments?.session_id;
   if(next && next!==session){
    session=next;
+   fallbackLink.href=trustedLoginUrl();
    if(securePoll){clearInterval(securePoll);securePoll=null}
    secureToken='';
    $('unlockForm').hidden=false;$('secureTools').hidden=true;
@@ -262,7 +281,16 @@ a{color:#93c9ff}
    if(securePoll)clearInterval(securePoll);
    securePoll=setInterval(secureFrame,3500);
    status('Защищённый ввод активен');
-  }catch(e){status('Ошибка защищённого входа: '+String(e.message||e).slice(0,160))}
+  }catch(e){
+   const msg=String(e.message||e);
+   if(/Failed to fetch|Load failed|NetworkError|connection|соединение|CORS|fetch/i.test(msg)){
+    $('unlockForm').hidden=true;
+    $('secureFallback').hidden=false;
+    status('Этот клиент ChatGPT блокирует прямой защищённый ввод. Пароль MiniFish не был проверен.');
+   }else{
+    status('Ошибка защищённого входа: '+msg.slice(0,160));
+   }
+  }
  };
  $('secureRefresh').onclick=()=>{secureFrame();secureFields()};
  $('secureBackspace').onclick=()=>secureAction('key',{key:'Backspace'});
