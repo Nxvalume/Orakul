@@ -80,3 +80,12 @@ async def test_mcp_v3_browser_tap_metadata_and_fullscreen():
     assert "browser_tap" in CHAT_HTML
     assert "window.openai?.callTool" in CHAT_HTML
     assert "setInterval" in CHAT_HTML
+
+
+def test_native_chatgpt_widget_bridge_does_not_wait_on_mcp_initialize():
+    from chat_ui import CHAT_HTML
+    assert "typeof window.openai?.callTool==='function'" in CHAT_HTML
+    assert 'ready=Promise.resolve()' in CHAT_HTML
+    assert "ready=null;" in CHAT_HTML
+    assert "ui/initialize" in CHAT_HTML
+
