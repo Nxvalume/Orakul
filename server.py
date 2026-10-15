@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import secrets
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
 
@@ -25,6 +26,9 @@ from oauth_server import (protected_resource, oauth_metadata, register, authoriz
 
 engine = BrowserEngine()
 
+_storage_probe_status = 'pending'
+_log = logging.getLogger('minifish.health')
+
 def create_state_store():
     configured = bool(os.getenv('MINIFISH_DATABASE_URL') or
                       os.getenv('MINIFISH_STORE_API_URL'))
@@ -45,13 +49,17 @@ def create_state_store():
 store = create_state_store()
 
 async def _checkpoint_browser_profile(name: str, state: dict):
-    if getattr(store, 'degraded', False):
+    if getattr(store, 'degraded', False) or not store.durable:
         raise RuntimeError('Постоянное хранилище недоступно, данные входа не сохранены')
     if name == 'telegram':
-        await asyncio.to_thread(store.save_profile, 'telegram', 'web.telegram.org', state)
+        site = 'web.telegram.org'
     else:
         record = await asyncio.to_thread(store.get_profile, name)
-        await asyncio.to_thread(store.save_profile, name, record['site'], state)
+        site = record['site']
+    await asyncio.to_thread(store.save_profile, name, site, state)
+    loaded = await asyncio.to_thread(store.get_profile, name)
+    if loaded['site'] != site or loaded['state'] != state:
+        raise RuntimeError('Проверка сохранённого профиля не прошла')
 
 engine.profile_save_callback = _checkpoint_browser_profile
 runner = JobRunner(engine, store)
@@ -252,7 +260,7 @@ async def homepage(req: Request):
     return HTMLResponse(PAGE, headers={'Cache-Control': 'no-store'})
 
 async def health(req: Request):
-    return JSONResponse({'service':'minifish','status':'ok','durable_storage':store.durable,'storage_backend':'postgres' if store.is_postgres else ('edge_https' if isinstance(store, RemoteStore) else 'sqlite'),'background_worker_running':runner._task is not None and not runner._task.done()})
+    return JSONResponse({'service':'minifish','status':'ok','durable_storage':store.durable,'storage_probe':_storage_probe_status,'active_browsers':len(engine._sessions),'storage_backend':'postgres' if store.is_postgres else ('edge_https' if isinstance(store, RemoteStore) else 'sqlite'),'background_worker_running':runner._task is not None and not runner._task.done()})
 
 async def me(req: Request):
     if not authorized(req.headers.get('cookie',''),req.headers.get('authorization','')):
@@ -407,7 +415,7 @@ async def _telegram_profile_watch():
                 continue
             if getattr(store, 'degraded', False):
                 continue
-            await asyncio.to_thread(store.save_profile, 'telegram', 'web.telegram.org', state)
+            await _checkpoint_browser_profile('telegram', state)
             engine.set_profile_name(sid, 'telegram')
             last_saved[sid] = now
         except asyncio.CancelledError:
@@ -415,6 +423,50 @@ async def _telegram_profile_watch():
         except Exception:
             # Never log Telegram account secrets or browser state.
             pass
+
+
+def _storage_probe() -> bool:
+    """Non-destructive production roundtrip through the real encrypted backend."""
+    global _storage_probe_status
+    if getattr(store, 'degraded', False) or not store.durable:
+        _storage_probe_status = 'unavailable'
+        _log.warning('MINIFISH_STORAGE_PROBE_UNAVAILABLE')
+        return False
+    name = 'probe_' + secrets.token_hex(10)
+    token = secrets.token_urlsafe(24)
+    state = {'cookies': [], 'origins': [{'origin': 'https://example.com',
+             'localStorage': [{'name': 'health-check', 'value': token}]}]}
+    written = False
+    try:
+        store.save_profile(name, 'example.com', state)
+        written = True
+        loaded = store.get_profile(name)
+        success = (loaded['site'] == 'example.com' and loaded['state'] == state)
+        _storage_probe_status = 'ok' if success else 'readback_failed'
+        _log.info('MINIFISH_STORAGE_PROBE_OK' if success else 'MINIFISH_STORAGE_PROBE_READBACK_FAILED')
+        return success
+    except Exception as exc:
+        _storage_probe_status = 'failed'
+        _log.warning('MINIFISH_STORAGE_PROBE_FAILED: %s', type(exc).__name__)
+        return False
+    finally:
+        if written:
+            try:
+                store.delete_profile(name)
+            except Exception:
+                _log.warning('MINIFISH_STORAGE_PROBE_CLEANUP_FAILED')
+
+
+async def _browser_maintenance():
+    """Bound Chromium lifetime and memory after a viewer disconnects."""
+    while True:
+        await asyncio.sleep(35)
+        try:
+            await engine.reap_idle()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            _log.warning('MINIFISH_BROWSER_MAINTENANCE_FAILED: %s', type(exc).__name__)
 
 
 _base_lifespan = app.router.lifespan_context
@@ -428,16 +480,20 @@ async def _minifish_lifespan(application):
             except ValueError:
                 # Revalidate DNS on restart; reject domains that ceased to be public.
                 pass
+        await asyncio.to_thread(_storage_probe)
         await runner.start()
         watcher = asyncio.create_task(_telegram_profile_watch(), name='minifish-telegram-autosave')
+        maintenance = asyncio.create_task(_browser_maintenance(), name='minifish-browser-reaper')
         try:
             yield
         finally:
+            maintenance.cancel()
             watcher.cancel()
-            try:
-                await watcher
-            except asyncio.CancelledError:
-                pass
+            for task in (maintenance, watcher):
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
             await runner.stop()
             await engine.shutdown()
 
