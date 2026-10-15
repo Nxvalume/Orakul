@@ -21,10 +21,13 @@ async def test_chat_window_is_discoverable_as_mcp_app():
     assert 'tools/call' in str(html)
 
 
-def test_chat_app_ui_never_provides_secret_input():
-    # In-chat inputs are reserved for ordinary text; credentials stay with
-    # the owner's separate authenticated direct HTTPS interface.
-    assert 'type="password"' not in CHAT_HTML
+def test_chat_app_secret_form_is_not_connected_to_model_tool_bridge():
+    # A private owner form is embedded, but sends its credentials DIRECTLY
+    # over HTTPS. No secret is sent to tools/call or the assistant.
+    assert 'type="password"' in CHAT_HTML
+    assert 'secureRequest(\'unlock\'' in CHAT_HTML
+    assert 'secureRequest(\'control\'' in CHAT_HTML
     assert 'MINIFISH_PASSWORD' not in CHAT_HTML
     assert "appCapabilities" in CHAT_HTML
     assert "bridge('ui/notifications/initialized'" not in CHAT_HTML
+    assert 'https://nxval-minifish-2026.onrender.com/chat/secure/' in CHAT_HTML
