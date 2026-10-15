@@ -315,3 +315,58 @@ async def test_telegram_qr_screen_not_saved_on_close_when_profile_unnamed():
     assert result['profile_updated'] is False
     engine.profile_save_callback.assert_not_awaited()
     session.context.storage_state.assert_not_awaited()
+
+
+
+@pytest.mark.asyncio
+async def test_tap_coordinates_use_existing_safe_click():
+    engine, page = mock_browser()
+    page.evaluate = AsyncMock(return_value='#safe-button')
+    target = SimpleNamespace(
+        inner_text=AsyncMock(return_value='Open page'),
+        get_attribute=AsyncMock(return_value=None),
+        scroll_into_view_if_needed=AsyncMock(),
+        bounding_box=AsyncMock(return_value={'x':10,'y':20,'width':40,'height':50}),
+        click=AsyncMock())
+    page.locator = lambda css: SimpleNamespace(first=target)
+    engine._move_cursor = AsyncMock()
+    result = await engine.tap('session', 30, 35)
+    assert result['clicked'] == '#safe-button'
+    page.evaluate.assert_awaited_once()
+    engine._move_cursor.assert_awaited_once_with(engine._sessions['session'],30,45)
+    target.click.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_tap_protected_while_owner_is_entering_password():
+    engine, page = mock_browser()
+    engine._sessions['session'].private_mode = True
+    page.evaluate = AsyncMock()
+    with pytest.raises(PermissionError):
+        await engine.tap('session', 80, 120)
+    page.evaluate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_tap_never_bypasses_sensitive_click_confirmation():
+    engine, page = mock_browser()
+    page.evaluate = AsyncMock(return_value='#send')
+    target = SimpleNamespace(
+        inner_text=AsyncMock(return_value='Send'),
+        get_attribute=AsyncMock(return_value=None),
+        click=AsyncMock())
+    page.locator = lambda css: SimpleNamespace(first=target)
+    with pytest.raises(PermissionError, match='подтверждение'):
+        await engine.tap('session', 20, 40)
+    target.click.assert_not_awaited()
+    assert engine._sessions['session'].pending_click
+
+
+@pytest.mark.asyncio
+async def test_tap_rejects_out_of_bounds_positions():
+    engine, page = mock_browser()
+    page.evaluate = AsyncMock()
+    for xy in [(-1,2), (2,900), (1280,2), (True,2)]:
+        with pytest.raises(ValueError):
+            await engine.tap('session', *xy)
+    page.evaluate.assert_not_awaited()
