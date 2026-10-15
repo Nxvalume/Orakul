@@ -14,6 +14,7 @@ import os
 import re
 import sqlite3
 import threading
+import zlib
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -22,7 +23,8 @@ from uuid import uuid4
 from cryptography.fernet import Fernet, InvalidToken
 
 NAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,40}$')
-MAX_STATE_SIZE = 750_000
+MAX_STATE_SIZE = 8_000_000
+MAX_COMPRESSED_STATE_SIZE = 1_250_000
 MAX_JOB_SIZE = 35_000
 
 
@@ -113,6 +115,13 @@ class Store:
         raw = json.dumps(obj, ensure_ascii=False, separators=(',', ':')).encode()
         if len(raw) > max_size:
             raise ValueError('Сохранённые данные слишком большие')
+        if max_size == MAX_STATE_SIZE:
+            # Telegram IndexedDB storage may exceed 750 KB uncompressed.
+            # The payload remains encrypted before leaving the server.
+            packed = zlib.compress(raw, level=6)
+            if len(packed) > MAX_COMPRESSED_STATE_SIZE:
+                raise ValueError('Сохранённый браузерный профиль слишком большой')
+            raw = b'MFZ1:' + packed
         return self.cipher.encrypt(raw)
 
     def _decrypt(self, data):
@@ -120,8 +129,15 @@ class Store:
             if cipher is None:
                 continue
             try:
-                return json.loads(cipher.decrypt(bytes(data)))
-            except (InvalidToken, ValueError, TypeError):
+                raw = cipher.decrypt(bytes(data))
+                if raw.startswith(b'MFZ1:'):
+                    decoder = zlib.decompressobj()
+                    raw = decoder.decompress(raw[5:], MAX_STATE_SIZE + 1)
+                    if (len(raw) > MAX_STATE_SIZE or decoder.unconsumed_tail
+                            or not decoder.eof):
+                        raise ValueError('Сохранённые данные слишком большие или повреждены')
+                return json.loads(raw)
+            except (InvalidToken, ValueError, TypeError, zlib.error):
                 continue
         raise ValueError('Не удалось расшифровать данные. Проверьте ключ шифрования MiniFish.')
 
