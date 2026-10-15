@@ -16,6 +16,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from live_view import live_page, session_api, stream_api, control_api, fields_api, elements_api, owner
 from live_video import screencast_socket
+from chat_ui import CHAT_UI_URI, CHAT_UI_MIME, CHAT_TOOL_META, CHAT_HTML
 from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url, unrestricted_public_https
 from state_store import Store
 from remote_store import RemoteStore
@@ -115,7 +116,28 @@ async def browser_allow_domain(domain: str) -> dict:
     return {'domains': domains, 'durable': bool(store.durable)}
 
 
-@mcp.tool()
+@mcp.resource(CHAT_UI_URI, name="minifish-chat-browser", mime_type=CHAT_UI_MIME)
+def browser_chat_app() -> str:
+    """MCP Apps iframe: interactive ChatGPT browser window without secrets."""
+    return CHAT_HTML
+
+
+@mcp.tool(meta=CHAT_TOOL_META)
+async def browser_window(session_id: str) -> dict:
+    """Show the current MiniFish browser inside the ChatGPT conversation.
+
+    Use this after browser_open or when the user asks for a browser window.
+    The embedded UI can click, scroll, view frames and fill ordinary fields;
+    account passwords/OTP remain outside ChatGPT for safety.
+    """
+    session = engine.get(session_id)
+    return {'session_id': session_id,
+            'site': urlsplit(session.page.url).hostname or '',
+            'ui': 'MiniFish browser in ChatGPT',
+            'secrets_in_chat': False}
+
+
+@mcp.tool(meta=CHAT_TOOL_META)
 async def browser_open(url: str) -> dict:
     """Open HTTPS websites; Telegram reuses its encrypted login automatically."""
     opened = (await _open_telegram(url) if urlsplit(url).hostname == 'web.telegram.org'
