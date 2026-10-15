@@ -170,17 +170,33 @@ async def browser_profiles() -> dict:
             'durable': store.durable}
 
 
+async def _save_browser_profile(session_id: str, name: str, *, owner: bool = False) -> dict:
+    """Save owner-authorized browser state, never a Telegram login screen."""
+    if getattr(store, 'degraded', False) or not store.durable:
+        raise RuntimeError('Постоянное хранилище недоступно, вход не сохранён')
+    session = engine.get(session_id, owner=owner)
+    site = urlsplit(session.page.url).hostname
+    validate_url('https://' + site)
+    if site == 'web.telegram.org':
+        # Canonical name enables automatic restoration after restarting Render.
+        name = 'telegram'
+        state = await engine.telegram_authenticated_state(session_id)
+        if state is None:
+            raise ValueError('Telegram ещё не авторизован. Нельзя сохранять экран входа.')
+    else:
+        state = await engine.export_state(session_id, owner=owner)
+    result = await asyncio.to_thread(store.save_profile, name, site, state)
+    verified = await asyncio.to_thread(store.get_profile, name)
+    if verified['site'] != site or verified['state'] != state:
+        raise RuntimeError('Проверка сохранённого профиля не прошла')
+    engine.set_profile_name(session_id, name)
+    return dict(result, verified=True)
+
+
 @mcp.tool()
 async def browser_save_profile(session_id: str, name: str) -> dict:
-    """Explicitly save the logged-in browser context encrypted, by profile name."""
-    if getattr(store, 'degraded', False):
-        raise RuntimeError('Постоянное хранилище недоступно, попробуйте позже')
-    site = urlsplit(engine.get(session_id).page.url).hostname
-    validate_url('https://' + site)
-    state = await engine.export_state(session_id)
-    result = await asyncio.to_thread(store.save_profile, name, site, state)
-    engine.set_profile_name(session_id, name)
-    return result
+    """Save nonprivate browser state encrypted; owner login uses separate private UI."""
+    return await _save_browser_profile(session_id, name)
 
 
 @mcp.tool()
@@ -279,7 +295,7 @@ async def api(req: Request):
             return JSONResponse({'saved': saved, 'logged_in': logged_in,
                                  'durable': store.durable})
         if action == 'profiles':return JSONResponse({'profiles':await asyncio.to_thread(store.list_profiles),'durable':store.durable})
-        if action == 'save-profile':return JSONResponse(await browser_save_profile(sid,str(data.get('name',''))))
+        if action == 'save-profile':return JSONResponse(await _save_browser_profile(sid,str(data.get('name','')),owner=True))
         if action == 'open-profile':return JSONResponse(await browser_open_profile(str(data.get('name','')),str(data.get('url',''))))
         if action == 'delete-profile':return JSONResponse(await browser_delete_profile(str(data.get('name',''))))
         if action == 'jobs':return JSONResponse({'jobs':await asyncio.to_thread(store.list_jobs),'durable':store.durable})
