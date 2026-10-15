@@ -459,6 +459,21 @@ class BrowserEngine:
             s.approved_click = None
             return {'rejected': True}
 
+    async def owner_elements(self, sid: str) -> dict:
+        """Visible action labels for mobile owner controls, with no field values or cookies."""
+        s = self.get(sid, owner=True)
+        async with s.lock:
+            actions = await s.page.locator(
+                'button:visible, a:visible, [role="button"]:visible, '
+                'input[type="submit"]:visible, input[type="button"]:visible'
+            ).evaluate_all("""els => els.slice(0, 50).map((el, index) => ({
+                index, label: String(el.innerText || el.getAttribute('aria-label') ||
+                    el.getAttribute('title') || el.getAttribute('value') ||
+                    el.getAttribute('placeholder') || el.tagName.toLowerCase()).trim().slice(0, 90),
+                kind: el.tagName.toLowerCase()
+            }))""")
+            return {'actions': actions, 'site': urlsplit(s.page.url).hostname or ''}
+
     async def owner_fields(self, sid: str) -> dict:
         """Owner-only: list visible browser form fields, never their values."""
         s = self.get(sid, owner=True)
@@ -476,15 +491,18 @@ class BrowserEngine:
                 }))""")
             return {'fields': fields, 'site': urlsplit(s.page.url).hostname or ''}
 
-    async def owner_control(self, sid: str, action: str, *, x=None, y=None, text=None, key=None, field_index=None) -> dict:
+    async def owner_control(self, sid: str, action: str, *, x=None, y=None, text=None, key=None, field_index=None, element_index=None, pixels=None, url=None) -> dict:
         """Owner-only manual handoff. Do not expose as an MCP tool.
 
         Owner may type into the browser directly (including login forms) without
         passing account credentials to ChatGPT. Never log or return typed data.
         """
         s = self.get(sid, owner=True)
-        if action not in ('click', 'type', 'key', 'fill_field'):
+        if action not in ('click', 'click_element', 'navigate', 'back', 'reload',
+                          'scroll', 'type', 'key', 'fill_field'):
             raise ValueError('Неизвестное действие управления')
+        if action == 'navigate':
+            await asyncio.to_thread(validate_url, url)
         async with s.lock:
             if action == 'click':
                 if (isinstance(x, bool) or isinstance(y, bool)
@@ -496,6 +514,32 @@ class BrowserEngine:
                 await self._move_cursor(s, float(x), float(y))
                 await s.page.mouse.click(float(x), float(y))
                 s.last_action = 'Владелец нажал на экране'
+            elif action == 'click_element':
+                if (type(element_index) is not int or not 0 <= element_index < 50):
+                    raise ValueError('Выберите кнопку на странице')
+                actions = s.page.locator(
+                    'button:visible, a:visible, [role="button"]:visible, '
+                    'input[type="submit"]:visible, input[type="button"]:visible'
+                )
+                if element_index >= await actions.count():
+                    raise ValueError('Элемент изменился, обновите список кнопок')
+                element = actions.nth(element_index)
+                await element.click(timeout=5000)
+                s.last_action = 'Владелец нажал кнопку сайта'
+            elif action == 'navigate':
+                await s.page.goto(url, timeout=TIMEOUT_MS, wait_until='domcontentloaded')
+                s.last_action = 'Владелец перешёл на сайт'
+            elif action == 'back':
+                await s.page.go_back(timeout=TIMEOUT_MS, wait_until='domcontentloaded')
+                s.last_action = 'Владелец вернулся назад'
+            elif action == 'reload':
+                await s.page.reload(timeout=TIMEOUT_MS, wait_until='domcontentloaded')
+                s.last_action = 'Владелец обновил страницу'
+            elif action == 'scroll':
+                if (type(pixels) is not int or not -3000 <= pixels <= 3000):
+                    raise ValueError('Некорректная прокрутка')
+                await s.page.mouse.wheel(0, pixels)
+                s.last_action = 'Владелец прокрутил страницу'
             elif action == 'type':
                 if not isinstance(text, str) or not 0 < len(text) <= 1000:
                     raise ValueError('Текст должен содержать от 1 до 1000 символов')
