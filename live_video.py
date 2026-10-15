@@ -15,8 +15,8 @@ from urllib.parse import urlsplit
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
 _viewing: set[str] = set()
-MAX_FPS = 12
-MAX_FRAME_BYTES = 550_000
+MAX_FPS = 8
+MAX_FRAME_BYTES = 300_000
 
 
 def same_origin(ws: WebSocket) -> bool:
@@ -45,11 +45,13 @@ def screencast_socket(engine, authorized_owner):
 
         _viewing.add(sid)
         cdp = None
-        queue: asyncio.Queue[str] = asyncio.Queue(maxsize=2)
+        queue: asyncio.Queue[str] = asyncio.Queue(maxsize=1)
         ack_tasks: set[asyncio.Task] = set()
 
         def frame_received(event: dict):
-            if 'sessionId' in event and cdp is not None:
+            if 'sessionId' in event and cdp is not None and len(ack_tasks) < 3:
+                # Bound in-flight CDP acknowledgement tasks. Unbounded
+                # tasks accumulate when the phone/network is slow.
                 task = asyncio.create_task(cdp.send(
                     'Page.screencastFrameAck', {'sessionId': event['sessionId']}))
                 ack_tasks.add(task)
@@ -68,8 +70,8 @@ def screencast_socket(engine, authorized_owner):
             cdp = await s.context.new_cdp_session(s.page)
             cdp.on('Page.screencastFrame', frame_received)
             await cdp.send('Page.startScreencast', {
-                'format': 'jpeg', 'quality': 48,
-                'maxWidth': 960, 'maxHeight': 675,
+                'format': 'jpeg', 'quality': 40,
+                'maxWidth': 800, 'maxHeight': 562,
                 'everyNthFrame': 1,
             })
             await ws.send_json({'type': 'ready', 'mode': 'live-jpeg',
