@@ -136,19 +136,13 @@ async def browser_telegram_status() -> dict:
     and verifies that it can be read back. Only status booleans are returned.
     """
     sid = engine.telegram_session_id()
-    if sid is None:
-        return {'phase': 'not_open', 'logged_in': False, 'saved': False,
-                'storage': 'not_checked', 'session_id': None}
-    session = engine._sessions.get(sid)
-    if session is None:
-        return {'phase': 'not_open', 'logged_in': False, 'saved': False,
-                'storage': 'not_checked', 'session_id': None}
-    if session.private_mode:
+    session = engine._sessions.get(sid) if sid else None
+    if session is not None and session.private_mode:
         # Never take screenshots, snapshots, read form fields or page content
         # while the owner is entering a phone number, password or code.
         return {'phase': 'private_login', 'logged_in': False,
                 'saved': None, 'storage': 'not_checked', 'session_id': sid}
-    logged_in = await engine.telegram_logged_in(sid)
+    logged_in = bool(session is not None and await engine.telegram_logged_in(sid))
     saved = False
     storage_status = 'ok'
     if not store.durable or getattr(store, 'degraded', False):
@@ -171,7 +165,8 @@ async def browser_telegram_status() -> dict:
                     storage_status = 'snapshot_unavailable'
             except Exception:
                 storage_status = 'save_failed'
-    return {'phase': 'authenticated' if logged_in else 'login_required',
+    return {'phase': ('not_open' if session is None else
+                      'authenticated' if logged_in else 'login_required'),
             'logged_in': logged_in, 'saved': saved,
             'storage': storage_status, 'session_id': sid}
 
