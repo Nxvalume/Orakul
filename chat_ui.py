@@ -6,10 +6,11 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v1.html"
+CHAT_UI_URI = "ui://minifish/browser-v2.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
+CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 CHAT_TOOL_META = {
-    "ui": {"resourceUri": CHAT_UI_URI},
+    "ui": {"resourceUri": CHAT_UI_URI, "csp": CHAT_UI_CSP},
     "openai/outputTemplate": CHAT_UI_URI,
 }
 
@@ -53,12 +54,34 @@ a{color:#93c9ff}
 <input id="text" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Тестовый текст или поисковый запрос">
 <button id="fill" type="submit">Ввести в выбранное поле</button>
 </form>
-<aside>Пароли, SMS-коды, данные карт и авторизация Telegram через это окно не передаются. Для них нужна отдельная защищённая форма владельца.</aside>
+<details id="securePanel" style="margin-top:14px;padding:12px;border:1px solid #647b94;border-radius:12px">
+<summary style="font-weight:600;cursor:pointer;padding:5px">Защищённый ввод · Telegram и другие сайты</summary>
+<p class="status">Вход в этом окне отправляется напрямую по HTTPS в MiniFish, мимо инструментов модели. Пароли и коды не публикуются в чате.</p>
+<form id="unlockForm"><label for="ownerKey">Пароль владельца MiniFish (не Telegram)</label>
+<input id="ownerKey" type="password" autocomplete="off" placeholder="Пароль MiniFish" required>
+<button id="unlock" class="primary" type="submit">Открыть защищённый режим</button></form>
+<div id="secureTools" hidden>
+<p id="secureStatus" class="status" role="status">Личный режим включён</p>
+<div class="screen" style="margin-top:8px"><img id="secureShot" alt="Защищённый браузер — только владельцу" style="touch-action:manipulation"></div>
+<div class="controls"><button type="button" id="secureRefresh">Кадр</button>
+<button type="button" id="secureBackspace">Backspace</button>
+<button type="button" id="secureEnter">Enter</button>
+<button type="button" id="secureTab">Tab</button></div>
+<form id="secureForm"><label for="secureField">Поле страницы</label>
+<select id="secureField"><option value="">Читаю поля…</option></select>
+<input id="secureValue" type="password" autocomplete="off" spellcheck="false" placeholder="Ввод только на сервер MiniFish">
+<button type="submit" class="primary">Вставить в браузер (без отправки в ChatGPT)</button></form>
+<button type="button" id="secureFinish" style="margin-top:10px">Закончить вход и сохранить авторизацию</button>
+</div>
+</details>
+<aside>В обычном режиме секреты не передаются через инструменты ChatGPT. Для авторизации используйте защищённый режим выше.</aside>
 <p><small>После переходов экран обновляется автоматически. MiniFish выполняет действия через реальные инструменты Playwright, а не имитацию.</small></p>
 <script>
 (()=>{
  const $=id=>document.getElementById(id);
  const pending=new Map();let nextId=1,session='',busy=false,ready=null;
+ const SECURE_BASE='https://nxval-minifish-2026.onrender.com/chat/secure/';
+ let secureToken='',secureImageUrl='',secureViewport={width:960,height:675},securePoll=null;
  const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Превышено время ожидания')),ms));
  const status=t=>$('status').textContent=t;
  function bridge(method,params){
@@ -160,6 +183,117 @@ a{color:#93c9ff}
   }
   $('text').value='';act('browser_fill',{session_id:session,css_selector:selector,text:value});
  };
+
+ async function secureRequest(operation,data,method='POST'){
+  const headers={'Content-Type':'application/json'};
+  if(secureToken)headers['X-MiniFish-Owner']=secureToken;
+  const url=SECURE_BASE+operation+(method==='GET'?'?session_id='+encodeURIComponent(session):'');
+  const opts={method,mode:'cors',credentials:'omit',headers,cache:'no-store'};
+  if(method==='POST')opts.body=JSON.stringify({session_id:session,...data});
+  const response=await fetch(url,opts);
+  if(!response.ok){
+   let message='HTTP '+response.status;
+   try{message=(await response.json()).error||message}catch(e){}
+   throw new Error(message);
+  }
+  return response;
+ }
+ const secureStatus=t=>$('secureStatus').textContent=t;
+ async function secureFields(){
+  try{
+   const res=await secureRequest('fields',{});
+   const data=await res.json();
+   secureViewport=data.viewport||secureViewport;
+   const select=$('secureField');select.replaceChildren();
+   for(const fld of (data.fields||[])){
+    const type=(fld.kind||'text').toLowerCase();
+    if(['hidden','file','checkbox','radio','submit','button'].includes(type))continue;
+    const option=document.createElement('option');option.value=String(fld.index);
+    option.textContent=fld.label||('Поле '+(fld.index+1));select.appendChild(option);
+   }
+   if(!select.options.length){
+    const option=document.createElement('option');option.value='';option.textContent='Поля пока не загружены';select.appendChild(option);
+   }
+  }catch(e){secureStatus('Ошибка полей: '+String(e.message||e).slice(0,140))}
+ }
+ async function secureFrame(){
+  if(!secureToken||document.visibilityState==='hidden')return;
+  try{
+   const res=await secureRequest('frame',null,'GET');
+   const blob=await res.blob();
+   if(!blob.type.startsWith('image/'))throw new Error('Получен некорректный кадр');
+   const url=URL.createObjectURL(blob),last=secureImageUrl;
+   secureImageUrl=url;$('secureShot').src=url;
+   if(last)URL.revokeObjectURL(last);
+  }catch(e){secureStatus('Не удалось показать кадр: '+String(e.message||e).slice(0,120))}
+ }
+ async function secureAction(action,extra){
+  if(!secureToken)return;
+  try{
+   secureStatus('Передаю действие напрямую MiniFish…');
+   await (await secureRequest('control',{action,...extra})).json();
+   secureStatus('Действие выполнено');await secureFrame();
+   if(action==='click'||action==='key')await secureFields();
+  }catch(e){secureStatus('Ошибка: '+String(e.message||e).slice(0,180))}
+ }
+ $('unlockForm').onsubmit=async e=>{
+  e.preventDefault();
+  if(!session){status('Сначала откройте браузер MiniFish');return}
+  const input=$('ownerKey'),password=input.value;
+  input.value=''; // The owner password is never sent through the MCP host bridge.
+  if(!password)return;
+  try{
+   status('Проверяю владельца напрямую по HTTPS…');
+   const res=await secureRequest('unlock',{owner_password:password});
+   const body=await res.json();
+   secureToken=body.token;
+   $('unlockForm').hidden=true;$('secureTools').hidden=false;
+   $('screen').hidden=true;$('actions').hidden=true;$('form').hidden=true;
+   secureStatus('Защищённый режим. ChatGPT не имеет доступа к полям входа.');
+   await secureFields();await secureFrame();
+   if(securePoll)clearInterval(securePoll);
+   securePoll=setInterval(secureFrame,3500);
+   status('Защищённый ввод активен');
+  }catch(e){status('Ошибка защищённого входа: '+String(e.message||e).slice(0,160))}
+ };
+ $('secureRefresh').onclick=()=>{secureFrame();secureFields()};
+ $('secureBackspace').onclick=()=>secureAction('key',{key:'Backspace'});
+ $('secureEnter').onclick=()=>secureAction('key',{key:'Enter'});
+ $('secureTab').onclick=()=>secureAction('key',{key:'Tab'});
+ $('secureForm').onsubmit=e=>{
+  e.preventDefault();
+  const index=Number($('secureField').value),value=$('secureValue').value;
+  $('secureValue').value='';
+  if(!$('secureField').value||!value)return;
+  secureAction('fill_field',{field_index:index,text:value});
+ };
+ $('secureShot').onclick=e=>{
+  if(!secureToken)return;
+  const img=$('secureShot'),r=img.getBoundingClientRect();
+  const iw=img.naturalWidth,ih=img.naturalHeight;
+  if(!iw||!ih)return;
+  const scale=Math.min(r.width/iw,r.height/ih);
+  const drawW=iw*scale,drawH=ih*scale;
+  const offsetX=r.left+(r.width-drawW)/2,offsetY=r.top+(r.height-drawH)/2;
+  const x=(e.clientX-offsetX)/drawW*secureViewport.width;
+  const y=(e.clientY-offsetY)/drawH*secureViewport.height;
+  if(x>=0&&x<secureViewport.width&&y>=0&&y<secureViewport.height)
+    secureAction('click',{x,y});
+ };
+ $('secureFinish').onclick=async()=>{
+  if(!secureToken)return;
+  try{
+   const result=await (await secureRequest('finish',{})).json();
+   if(securePoll){clearInterval(securePoll);securePoll=null}
+   secureToken='';$('secureTools').hidden=true;$('unlockForm').hidden=false;
+   $('screen').hidden=false;$('actions').hidden=false;$('form').hidden=false;
+   if(secureImageUrl){URL.revokeObjectURL(secureImageUrl);secureImageUrl=''}
+   const note=result.profile_saved?'Авторизация сохранена в постоянном хранилище.':
+     result.save_error?'ВНИМАНИЕ: '+result.save_error:'Вход завершён; профиль не подтверждён.';
+   status(note);await render();
+  }catch(e){secureStatus('Ошибка завершения: '+String(e.message||e).slice(0,140))}
+ };
+ 
  if(!session)status('Ожидаю сеанс MiniFish от ChatGPT…');
 })();
 </script></body></html>"""
