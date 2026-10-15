@@ -305,6 +305,22 @@ def fields_api(engine):
     return fields
 
 
+def elements_api(engine):
+    async def elements(req: Request):
+        if not owner(req):
+            return JSONResponse({'error': 'Требуется вход владельца'}, status_code=401)
+        sid = req.query_params.get('session_id', '')
+        if not re.fullmatch(r'[0-9a-f-]{36}', sid):
+            return JSONResponse({'error': 'Некорректная сессия'}, status_code=400)
+        try:
+            return JSONResponse(await engine.owner_elements(sid), headers={'Cache-Control': 'no-store'})
+        except (ValueError, RuntimeError) as exc:
+            return JSONResponse({'error': str(exc)}, status_code=400)
+        except Exception:
+            return JSONResponse({'error': 'Не удалось прочитать кнопки сайта'}, status_code=502)
+    return elements
+
+
 def stream_api(engine):
     async def stream(req: Request):
         if not owner(req):
@@ -363,7 +379,10 @@ def control_api(engine):
                 result = await engine.owner_control(sid, action,
                                                     x=data.get('x'), y=data.get('y'),
                                                     text=data.get('text'), key=data.get('key'),
-                                                    field_index=data.get('field_index'))
+                                                    field_index=data.get('field_index'),
+                                                    element_index=data.get('element_index'),
+                                                    pixels=data.get('pixels'),
+                                                    url=data.get('url'))
             return JSONResponse(result, headers={'Cache-Control': 'no-store'})
         except (ValueError, RuntimeError) as exc:
             return JSONResponse({'error': str(exc)}, status_code=400)
