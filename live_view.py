@@ -118,7 +118,8 @@ $('sessions').onchange=()=>{deepSession='';stop();current='';selectSession($('se
 $('live').onerror=()=>{if(!videoFallback)setState('Ожидаю следующий кадр…',false)};
 async function update(){try{let res=await fetch('/live/sessions',{cache:'no-store',credentials:'same-origin'});if(res.status===401){stop();setState('Требуется вход',false);$('details').textContent='Войди через главную панель MiniFish.';return}if(!res.ok)throw Error('Ошибка сервера '+res.status);let list=(await res.json()).sessions||[];let wanted=current&&list.some(x=>x.session_id===current)?current:(deepSession&&list.some(x=>x.session_id===deepSession)?deepSession:(list[0]?.session_id||''));let choice=$('sessions');if(choice.options.length!==list.length||Array.from(choice.options).some((o,i)=>o.value!==list[i].session_id)){choice.replaceChildren();for(let s of list){let o=document.createElement('option');o.value=s.session_id;o.textContent=s.site||'Страница';choice.append(o)}}choice.value=wanted; if(!wanted){
   selectSession('');
-  $('details').textContent='Нет активных браузерных сессий.';
+  $('details').textContent='Активного браузера нет. Сохранённый профиль Telegram можно восстановить при новом открытии.';
+  if(!window.__mfLastEmptyStatus||Date.now()-window.__mfLastEmptyStatus>17000){window.__mfLastEmptyStatus=Date.now();checkTelegramStatus();}
   if(launchTelegramIfEmpty){
     launchTelegramIfEmpty=false;
     $('details').textContent='Открываю Telegram в новой защищённой сессии…';
@@ -231,13 +232,12 @@ $('openTelegram').onclick=async()=>{
   const d=await r.json();if(!r.ok)throw Error(d.error||'Не удалось открыть Telegram');
   current='';selectSession(d.session_id);await update();
   $('quickFeedback').textContent=d.profile==='telegram'?
-      'Восстановлена сохранённая сессия Telegram.':
+      'Загружен сохранённый профиль Telegram. Проверяю авторизацию…':
       'Telegram открыт. Если вход ещё нужен, выполни его один раз.';
   await checkTelegramStatus();
  }catch(e){$('quickFeedback').textContent='Ошибка: '+e.message;}
 };
 async function checkTelegramStatus(){
- if(!current)return;
  try{
   const response=await fetch('/api/telegram-status',{method:'POST',
     credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'});
