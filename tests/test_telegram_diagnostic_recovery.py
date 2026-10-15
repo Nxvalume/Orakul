@@ -8,6 +8,7 @@ import pytest
 @pytest.mark.parametrize("saved_profile", [False, True])
 async def test_telegram_open_retires_only_unprofiled_health_probe(monkeypatch, saved_profile):
     import server
+    monkeypatch.setattr(server, 'validate_url', lambda url: url)
     page = SimpleNamespace(
         url='https://nxval-minifish-2026.onrender.com/healthz',
         is_closed=lambda: False,
@@ -43,6 +44,7 @@ async def test_telegram_open_retires_only_unprofiled_health_probe(monkeypatch, s
 ])
 async def test_telegram_open_never_closes_non_diagnostic_session(monkeypatch, site, protected, profile):
     import server
+    monkeypatch.setattr(server, 'validate_url', lambda url: url)
     session = SimpleNamespace(
         page=SimpleNamespace(url=site, is_closed=lambda:False),
         private_mode=protected, profile_name=profile)
