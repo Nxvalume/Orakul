@@ -41,7 +41,7 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <div id="actionButtons" class="site-actions" aria-label="Нажимаемые кнопки текущего сайта"></div>
 <div class="row" style="margin-bottom:12px"><button type="button" id="touch" aria-pressed="true">Нажатия включены · Выключить</button><span id="manualStatus" class="status small">Касания по экрану включены</span></div>
 <div class="screen interactive"><p id="placeholder">Пока нет активных страниц. Запусти задачу через ChatGPT и MiniFish.</p><img id="live" alt="Прямая трансляция экрана браузера MiniFish"><div id="tapLayer" class="tap-layer" role="button" aria-label="Нажать на изображение браузера"></div></div>
-<div class="stream-input"><div class="row"><label for="targetField">Поле текущего сайта</label><button type="button" id="fieldRefreshTop">Обновить поля</button></div><select id="targetField" aria-label="Поле ввода на текущем сайте" style="width:100%;margin-bottom:10px"><option value="">Поиск полей…</option></select><label for="streamEntry">ВВОД С ТЕЛЕФОНА — ПЕЧАТАЙ СЮДА</label><div class="row"><input type="text" id="streamEntry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер, сообщение или код"><button id="streamInsert" type="button">Вставить</button></div><p id="streamInputStatus" class="hint" role="status">Поле ввода телефона. Для любого сайта выбери поле ниже, затем нажми «Вставить».</p><p class="hint">Если Telegram пишет PHONE_PASSWORD_FLOOD, это временное ограничение самого Telegram. Не повторяй попытки входа.</p></div>
+<div class="stream-input"><div class="row"><label for="targetField">Поле текущего сайта</label><button type="button" id="fieldRefreshTop">Обновить поля</button></div><select id="targetField" aria-label="Поле ввода на текущем сайте" style="width:100%;margin-bottom:10px"><option value="">Поиск полей…</option></select><label for="streamEntry">ВВОД С ТЕЛЕФОНА — ПЕЧАТАЙ СЮДА</label><div class="row"><input type="text" id="streamEntry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер, сообщение или код"><button id="streamInsert" type="button">Вставить</button></div><div class="row" style="margin-top:8px"><button id="streamNext" type="button" style="width:100%;background:#24619b;color:#fff">Продолжить вход · NEXT</button></div><p id="streamInputStatus" class="hint" role="status">Сначала «Вставить», затем отдельно «Продолжить вход · NEXT». Данные остаются в защищённом MiniFish, не в чате.</p><p class="hint">Если Telegram пишет PHONE_PASSWORD_FLOOD, это временное ограничение самого Telegram. Не повторяй попытки входа.</p></div>
 <p class="hint">Непрерывная трансляция Chromium до 12 кадров/с, без звука и записи. Если WebSocket недоступен, включится резервный режим с редкими кадрами. Экран обновляется во время переходов, прокрутки и нажатий. Сессии исчезают после закрытия или перезапуска сервера.</p></div>
 <div class="panel" style="border-color:#e8bf79"><h2 style="margin-top:0">Безопасное управление</h2>
 <p id="privateState" role="status">Режим доступа ассистента: проверяю…</p>
@@ -56,7 +56,7 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <p id="telegramSavedStatus" class="hint" role="status">После первого входа Telegram сохранится автоматически. Повторно вводить номер и код обычно не потребуется.</p>
 
 <label for="quickValue">Что ввести</label><input id="quickValue" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер телефона или код">
-<div class="row" style="margin-top:12px"><button class="primary" id="quickApply" type="button">Вставить в Telegram</button><button id="quickNext" type="button">Продолжить (Enter)</button></div>
+<div class="row" style="margin-top:12px"><button class="primary" id="quickApply" type="button">Вставить в Telegram</button><button id="quickNext" type="button">Продолжить (NEXT)</button></div>
 <p id="quickFeedback" class="status" role="status">Выбери поле и введи данные.</p><p class="hint security">Номер, коды и пароль не отправляются в ChatGPT. Не пересылай их в чат.</p></div></details>
 <div class="panel"><h2>Управление браузером с телефона</h2><p class="hint">Для входа в сторонний аккаунт открой сайт через MiniFish. Включи клики и нажимай прямо на изображение. Пароль или код вводи здесь — данные передаются в браузер, но не в чат ChatGPT и не отображаются в истории MiniFish.</p>
 <div class="row" style="margin-top:12px"><input id="profileName" placeholder="Имя профиля, например telegram" maxlength="40" autocapitalize="off" spellcheck="false"><button id="saveProfile" type="button">Сохранить вход</button></div>
@@ -257,12 +257,12 @@ $('quickApply').onclick=async()=>{
  if(field===''||!current){$('quickFeedback').textContent='Сначала выбери открытую сессию и поле.';return;}
  if(!entry.value){$('quickFeedback').textContent='Введите данные в поле над кнопкой.';return;}
  const ok=await ownerAction('fill_field',{field_index:Number(field),text:entry.value});
- if(ok){entry.value='';$('quickFeedback').textContent='Данные вставлены в выбранное поле Telegram.';await refreshFields();}
+ if(ok){entry.value='';$('quickFeedback').textContent='Поле Telegram заполнено. Нажми «Продолжить (NEXT)», чтобы отправить его на проверку.';await refreshFields();}
  else {$('quickFeedback').textContent=$('manualStatus').textContent;}
 };
 $('quickNext').onclick=async()=>{
- const ok=await ownerAction('key',{key:'Enter'});
- $('quickFeedback').textContent=ok?'Нажат Enter. Обнови поля при переходе.':$('manualStatus').textContent;
+ const ok=await ownerAction('telegram_next');
+ $('quickFeedback').textContent=ok?'Кнопка NEXT нажата. Ожидай ответ Telegram.':$('manualStatus').textContent;
  if(ok){await new Promise(resolve=>setTimeout(resolve,450));await refreshFields();}
 };
 $('quickValue').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('quickApply').click()}});
@@ -271,13 +271,23 @@ $('streamInsert').onclick=async()=>{
  if(!current||!streaming){$('streamInputStatus').textContent='Сначала открой любой сайт в MiniFish.';return;}
  if(field===''){$('streamInputStatus').textContent='Нажми «Обновить поля» и выбери поле Telegram в списке выше.';return;}
  if(!input.value){$('streamInputStatus').textContent='Сначала введи текст в настоящее поле над этой кнопкой.';input.focus();return;}
- const text=input.value;input.value='';
- $('streamInputStatus').textContent='Передаю ввод в Telegram…';
+ const text=input.value;
+ $('streamInputStatus').textContent='Передаю ввод в защищённый браузер…';
  const ok=await ownerAction('fill_field',{field_index:Number(field),text});
- $('streamInputStatus').textContent=ok?'Текст вставлен в выбранное поле Telegram.':'Не удалось вставить: '+$('manualStatus').textContent;
+ if(ok)input.value='';
+ $('streamInputStatus').textContent=ok?'Ввод подтверждён браузером. Для проверки Telegram нажми «Продолжить вход · NEXT».':'Ввод не подтверждён: '+$('manualStatus').textContent;
  if(ok)await refreshFields();
 };
 $('streamEntry').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('streamInsert').click();}});
+$('streamNext').onclick=async()=>{
+ if(!current||!streaming){$('streamInputStatus').textContent='Сначала открой Telegram в MiniFish';return;}
+ const btn=$('streamNext');if(btn.disabled)return;btn.disabled=true;
+ try{
+  const ok=await ownerAction('telegram_next');
+  $('streamInputStatus').textContent=ok?'NEXT нажат один раз. Ожидай ответ Telegram; не повторяй попытку при ошибке авторизации.':'Не удалось нажать NEXT: '+$('manualStatus').textContent;
+  if(ok){await new Promise(resolve=>setTimeout(resolve,650));await refreshFields();await checkTelegramStatus();}
+ }finally{btn.disabled=false;}
+};
 $('privateStart').onclick=async()=>{if(!current)return;await ownerAction('private_mode',{enabled:true})};
 $('privateFinish').onclick=async()=>{if(!current)return;const ok=await ownerAction('private_mode',{enabled:false});if(ok)await checkTelegramStatus()};
 $('approveAction').onclick=async()=>{if(!pendingClick)return;await ownerAction('approve_click',{request_id:pendingClick.id});$('approvalPanel').style.display='none';pendingClick=null;};
