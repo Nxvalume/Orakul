@@ -23,7 +23,7 @@ document.getElementById('ownerLogin').onclick=async()=>{
  try{
   const r=await fetch('/api/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});
   if(!r.ok)throw Error((await r.json()).error||'Не удалось войти');
-  location.replace('/live');
+  location.replace('/live'+location.search);
  }catch(e){document.getElementById('error').textContent=e.message;button.disabled=false;}
 };
 document.getElementById('ownerPassword').onkeydown=e=>{if(e.key==='Enter')document.getElementById('ownerLogin').click()};
@@ -67,6 +67,7 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 </main><script>
 const $=id=>document.getElementById(id);
 let current='',streaming=false,videoSocket=null,frameUrl=null,videoFallback=false;
+let deepSession = /^[0-9a-f-]{36}$/.test(new URLSearchParams(location.search).get('session_id')||'') ? new URLSearchParams(location.search).get('session_id') : '';
 let currentViewport={width:1280,height:900};
 let privateMode=false,pendingClick=null;
 let touchStart=null;let actionsLoading=false;
@@ -112,9 +113,9 @@ function selectSession(id){
  stop();current=id;$('placeholder').style.display='none';$('live').style.display='block';
  streaming=true;setState('Подключаю прямой эфир…',false);startVideo(id);refreshFields();refreshActions();
 }
-$('sessions').onchange=()=>{stop();current='';selectSession($('sessions').value)};
+$('sessions').onchange=()=>{deepSession='';stop();current='';selectSession($('sessions').value)};
 $('live').onerror=()=>{if(!videoFallback)setState('Ожидаю следующий кадр…',false)};
-async function update(){try{let res=await fetch('/live/sessions',{cache:'no-store',credentials:'same-origin'});if(res.status===401){stop();setState('Требуется вход',false);$('details').textContent='Войди через главную панель MiniFish.';return}if(!res.ok)throw Error('Ошибка сервера '+res.status);let list=(await res.json()).sessions||[];let wanted=current&&list.some(x=>x.session_id===current)?current:(list[0]?.session_id||'');let choice=$('sessions');if(choice.options.length!==list.length||Array.from(choice.options).some((o,i)=>o.value!==list[i].session_id)){choice.replaceChildren();for(let s of list){let o=document.createElement('option');o.value=s.session_id;o.textContent=s.site||'Страница';choice.append(o)}}choice.value=wanted; if(!wanted){selectSession('');$('details').textContent='Нет активных браузерных сессий.';return}if(wanted!==current||!streaming)selectSession(wanted);let item=list.find(s=>s.session_id===wanted);if(item?.viewport?.width>0&&item?.viewport?.height>0)currentViewport=item.viewport;
+async function update(){try{let res=await fetch('/live/sessions',{cache:'no-store',credentials:'same-origin'});if(res.status===401){stop();setState('Требуется вход',false);$('details').textContent='Войди через главную панель MiniFish.';return}if(!res.ok)throw Error('Ошибка сервера '+res.status);let list=(await res.json()).sessions||[];let wanted=current&&list.some(x=>x.session_id===current)?current:(deepSession&&list.some(x=>x.session_id===deepSession)?deepSession:(list[0]?.session_id||''));let choice=$('sessions');if(choice.options.length!==list.length||Array.from(choice.options).some((o,i)=>o.value!==list[i].session_id)){choice.replaceChildren();for(let s of list){let o=document.createElement('option');o.value=s.session_id;o.textContent=s.site||'Страница';choice.append(o)}}choice.value=wanted; if(!wanted){selectSession('');$('details').textContent='Нет активных браузерных сессий.';return}if(wanted!==current||!streaming)selectSession(wanted);let item=list.find(s=>s.session_id===wanted);if(item?.viewport?.width>0&&item?.viewport?.height>0)currentViewport=item.viewport;
  privateMode=!!item?.private_mode;pendingClick=item?.pending_click||null;
  $('privateState').textContent=privateMode?'Личный вход: ассистент заблокирован':'Личный вход выключен: управление ассистента доступно';
  $('privateStart').disabled=privateMode;$('privateFinish').disabled=!privateMode;
