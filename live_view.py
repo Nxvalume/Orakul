@@ -266,7 +266,7 @@ function setQuickInput(){
  $('loginPhase').textContent=isPassword?'Дополнительная защита · пароль Telegram':isCode?'Подтверждение · код Telegram':isPhone?'Авторизация · номер телефона':'Следуй инструкции на экране Telegram';
 }
 $('targetField').onchange=setQuickInput;
-$('fieldRefresh').onclick=refreshFields;
+
 $('fieldRefreshTop').onclick=refreshFields;
 $('openTelegram').onclick=async()=>{
  try{
