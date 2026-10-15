@@ -43,3 +43,20 @@ async def test_inline_ui_resource_csp_is_returned_in_resource_contents():
     assert item.mime_type == CHAT_UI_MIME
     assert item.meta and item.meta['ui']['csp'] == CHAT_UI_CSP
 
+
+
+
+def test_blocked_inline_tls_shows_clear_fallback_without_secret_exposure():
+    from chat_ui import CHAT_HTML
+    assert 'secureFallback' in CHAT_HTML
+    assert 'Пароль MiniFish не был проверен' in CHAT_HTML
+    assert 'https://nxval-minifish-2026.onrender.com/live?telegram=1' in CHAT_HTML
+    assert "window.openai?.openExternal" in CHAT_HTML
+
+
+def test_owner_login_preserves_deep_link_and_recovers_expired_browser():
+    from live_view import LOGIN_PAGE, PAGE
+    assert "location.replace('/live'+location.search)" in LOGIN_PAGE
+    assert "launchTelegramIfEmpty" in PAGE
+    assert "deepSession" in PAGE
+    assert "$('openTelegram').click()" in PAGE
