@@ -18,8 +18,8 @@ from playwright.async_api import Browser, BrowserContext, Page, Playwright, asyn
 _extra_domains: set[str] = set()
 _domains_lock = threading.Lock()
 MAX_TEXT = 16000
-MAX_SESSIONS = 2
-TTL_SECONDS = 900
+MAX_SESSIONS = 1
+TTL_SECONDS = 600
 TIMEOUT_MS = 15000
 
 # In-browser cursor is a visual-only overlay. It never intercepts input,
@@ -185,11 +185,11 @@ class BrowserEngine:
                                 'title': await existing.page.title(),
                                 'profile': None, 'reused': True}
             if len(self._sessions) >= MAX_SESSIONS:
-                raise RuntimeError('Лимит браузерных сессий. Выберите открытую вкладку в /live.')
+                raise RuntimeError('Render Free поддерживает один браузер одновременно. Закройте предыдущую сессию в панели MiniFish перед открытием другого сайта.')
             await self._launch()
             assert self._browser is not None
             context = await self._browser.new_context(accept_downloads=False, service_workers='block',
-                    viewport={'width': 1280, 'height': 900},
+                    viewport={'width': 960, 'height': 675},
                     **({'storage_state': storage_state} if storage_state is not None else {}))
             await context.route('**/*', self._route)
             await context.add_init_script(CURSOR_INIT)
@@ -209,6 +209,22 @@ class BrowserEngine:
         for sid in stale:
             s = self._sessions.pop(sid)
             await self._close_session_context(s)
+
+    async def reap_idle(self) -> dict:
+        """Reap expired contexts even without new browser_open calls.
+
+        A free 512-MiB instance cannot retain Chromium forever after a mobile
+        browser disconnects. Active sessions with owner controls are renewed.
+        """
+        async with self._lock:
+            await self._cleanup_expired()
+            if not self._sessions and self._browser is not None:
+                await self._browser.close()
+                self._browser = None
+                if self._pw is not None:
+                    await self._pw.stop()
+                    self._pw = None
+            return {'active_sessions': len(self._sessions)}
 
     def get(self, sid: str, *, owner: bool = False) -> Session:
         s = self._sessions.get(sid)
