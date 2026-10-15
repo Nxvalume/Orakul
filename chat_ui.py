@@ -6,12 +6,15 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v2.html"
+CHAT_UI_URI = "ui://minifish/browser-v3.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 CHAT_TOOL_META = {
-    "ui": {"resourceUri": CHAT_UI_URI, "csp": CHAT_UI_CSP},
+    "ui": {"resourceUri": CHAT_UI_URI, "visibility": ["model", "app"]},
     "openai/outputTemplate": CHAT_UI_URI,
+    "openai/widgetAccessible": True,
+    "openai/toolInvocation/invoking": "Открываю браузер MiniFish…",
+    "openai/toolInvocation/invoked": "Окно браузера подготовлено",
 }
 
 CHAT_HTML = r"""<!doctype html>
@@ -42,7 +45,8 @@ a{color:#93c9ff}
 <body>
 <header><h1>MiniFish · браузер</h1><span id="site" class="status">Подключение…</span></header>
 <p id="status" class="status" role="status">Подключаю интерфейс ChatGPT…</p>
-<div class="screen" id="screen"><img id="shot" alt="Текущий кадр браузера MiniFish"><span id="noimage" class="status">Загрузка кадра…</span></div>
+<div class="screen" id="screen"><img id="shot" alt="Интерактивный кадр браузера MiniFish — нажимайте на кнопки и поля" style="cursor:crosshair;touch-action:manipulation"><span id="noimage" class="status">Загрузка кадра…</span></div>
+<p class="status">Нажимай прямо на экран браузера. Для выбора полей и кнопок используется настоящий курсор Playwright. Изображение обновляется автоматически, пока окно открыто.</p>
 <div class="controls">
 <button id="refresh" class="primary">Обновить экран</button>
 <button id="back">Назад</button>
@@ -110,6 +114,10 @@ a{color:#93c9ff}
   }),timeout(18000)]).finally(()=>pending.delete(id));
  }
  async function call(name,args){
+  // ChatGPT compatibility path and standards-first MCP Apps host bridge.
+  // Secrets never pass through either tool-call transport.
+  if(typeof window.openai?.callTool==='function')
+    return window.openai.callTool(name,args);
   if(ready)await ready;
   const r=await bridge('tools/call',{name,arguments:args});
   if(r?.isError)throw new Error((r?.content||[]).filter(x=>x.type==='text').map(x=>x.text).join(' ').slice(0,200)||'Ошибка браузера');
@@ -198,6 +206,19 @@ a{color:#93c9ff}
   }catch(e){busy=false;status('Ошибка: '+String(e.message||e).slice(0,140))}
  }
  $('refresh').onclick=()=>render();
+ $('shot').onclick=e=>{
+  if(!session||busy||secureToken)return;
+  const img=$('shot'),box=img.getBoundingClientRect();
+  if(!img.naturalWidth||!img.naturalHeight||!box.width||!box.height)return;
+  const x=(e.clientX-box.left)/box.width*img.naturalWidth;
+  const y=(e.clientY-box.top)/box.height*img.naturalHeight;
+  if(x<0||y<0||x>=img.naturalWidth||y>=img.naturalHeight)return;
+  act('browser_tap',{session_id:session,x:Math.floor(x),y:Math.floor(y)});
+ };
+ setInterval(()=>{
+  if(session&&!busy&&!secureToken&&document.visibilityState!=='hidden')
+    render();
+ },4600);
  $('back').onclick=()=>act('browser_back',{session_id:session});
  $('up').onclick=()=>act('browser_scroll',{session_id:session,pixels:-460});
  $('down').onclick=()=>act('browser_scroll',{session_id:session,pixels:460});
