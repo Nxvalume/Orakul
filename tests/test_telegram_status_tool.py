@@ -45,9 +45,26 @@ async def test_status_authenticated_verifies_encrypted_profile(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_status_no_session_leaves_storage_untouched(monkeypatch):
+async def test_status_no_live_session_reports_saved_profile_after_restart(monkeypatch):
     import server
     monkeypatch.setattr(server.engine, 'telegram_session_id', lambda: None)
+    monkeypatch.setattr(server.store, 'durable', True, raising=False)
+    monkeypatch.setattr(server.store, 'degraded', False, raising=False)
+    monkeypatch.setattr(server.store, 'get_profile', lambda name: {'site':'web.telegram.org'})
     result = await server.browser_telegram_status()
     assert result == {'phase':'not_open','logged_in':False,
-                      'saved':False,'storage':'not_checked','session_id':None}
+                      'saved':True,'storage':'ok','session_id':None}
+
+
+@pytest.mark.asyncio
+async def test_status_no_live_session_missing_saved_profile(monkeypatch):
+    import server
+    monkeypatch.setattr(server.engine, 'telegram_session_id', lambda: None)
+    monkeypatch.setattr(server.store, 'durable', True, raising=False)
+    monkeypatch.setattr(server.store, 'degraded', False, raising=False)
+    def not_found(name):
+        raise ValueError('not found')
+    monkeypatch.setattr(server.store, 'get_profile', not_found)
+    result = await server.browser_telegram_status()
+    assert result == {'phase':'not_open','logged_in':False,
+                      'saved':False,'storage':'ok','session_id':None}
