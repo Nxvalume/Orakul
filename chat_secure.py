@@ -136,7 +136,9 @@ def create_owner_routes(engine):
                 return JSONResponse({'error': 'Личный режим не активен'}, status_code=403, headers=headers)
 
             if operation == 'fields':
-                return JSONResponse(await engine.owner_fields(sid), headers=headers)
+                result = await engine.owner_fields(sid)
+                result['viewport'] = session.page.viewport_size or {'width': 960, 'height': 675}
+                return JSONResponse(result, headers=headers)
             if operation == 'control':
                 action = data.get('action', '')
                 if action not in {'click', 'fill_field', 'key', 'scroll'}:
