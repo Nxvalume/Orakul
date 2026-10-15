@@ -334,6 +334,41 @@ class BrowserEngine:
             s.last_action = 'Нажатие: ' + (label.strip()[:80] or selector[:80])
             return {'clicked': selector, 'url': s.page.url, 'label': label}
 
+    async def tap(self, sid: str, x: float, y: float) -> dict:
+        """Click a visible interactive element at screenshot coordinates.
+
+        Uses the *same* approval-aware selector click path as browser_click.
+        This does not grant model/widget access to owner private login mode.
+        """
+        s = self.get(sid)
+        viewport = s.page.viewport_size or {'width': 960, 'height': 675}
+        if (isinstance(x, bool) or isinstance(y, bool)
+                or not isinstance(x, (int, float)) or not isinstance(y, (int, float))
+                or not 0 <= x < viewport['width'] or not 0 <= y < viewport['height']):
+            raise ValueError('Координаты за пределами экрана браузера')
+        async with s.lock:
+            selector = await s.page.evaluate("""([x,y]) => {
+                const el = document.elementFromPoint(x, y);
+                const target = el?.closest('button,a,input,textarea,select,[role="button"]');
+                if (!target) return null;
+                const rect = target.getBoundingClientRect();
+                if (!rect.width || !rect.height) return null;
+                let node=target, parts=[];
+                while (node && node.nodeType===1 && parts.length<12) {
+                    if (node.id) {parts.unshift('#'+CSS.escape(node.id));break;}
+                    const tag=node.tagName.toLowerCase();
+                    if (!node.parentElement) {parts.unshift(tag);break;}
+                    const siblings=Array.from(node.parentElement.children)
+                        .filter(n=>n.tagName===node.tagName);
+                    parts.unshift(tag+':nth-of-type('+(siblings.indexOf(node)+1)+')');
+                    node=node.parentElement;
+                }
+                return parts.join(' > ');
+            }""", [x, y])
+        if not isinstance(selector, str) or not selector or len(selector) > 300:
+            raise ValueError('Нажми на кнопку или поле страницы')
+        return await self.click(sid, selector, confirm_sensitive=False)
+
     async def fill(self, sid: str, selector: str, value: str) -> dict:
         if not selector or len(selector) > 300 or len(value) > 4000:
             raise ValueError('Слишком длинный селектор или значение')
