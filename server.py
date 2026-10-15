@@ -13,7 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
-from live_view import live_page, session_api, stream_api, control_api, fields_api, owner
+from live_view import live_page, session_api, stream_api, control_api, fields_api, elements_api, owner
 from live_video import screencast_socket
 from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url, unrestricted_public_https
 from state_store import Store
@@ -359,6 +359,7 @@ app.add_route('/healthz',health,methods=['GET'])
 app.add_route('/live',live_page,methods=['GET'])
 app.add_route('/live/sessions',session_api(engine),methods=['GET'])
 app.add_route('/live/fields',fields_api(engine),methods=['GET'])
+app.add_route('/live/elements',elements_api(engine),methods=['GET'])
 app.add_route('/live/stream',stream_api(engine),methods=['GET'])
 app.router.routes.append(WebSocketRoute('/live/video',screencast_socket(engine, owner)))
 app.add_route('/live/control',control_api(engine),methods=['POST'])
