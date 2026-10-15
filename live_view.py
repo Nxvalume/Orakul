@@ -36,7 +36,7 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <div class="panel"><div class="row"><span id="led" class="indicator"></span><strong id="state">Ожидаем сессию</strong><select id="sessions" aria-label="Сессия браузера"></select></div><p id="details" class="status muted">Ищу активный браузер…</p></div>
 <div class="panel"><h2 style="margin-top:0">Браузер MiniFish — любой HTTPS-сайт</h2>
 <div class="browser-nav"><input id="urlBar" type="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="https://example.com" aria-label="Адрес сайта"><button type="button" id="goUrl">Перейти</button></div>
-<div class="browser-nav"><button id="goBack" type="button">← Назад</button><button id="reloadPage" type="button">↻ Обновить</button><button id="scrollUp" type="button">↑ Прокрутить</button><button id="scrollDown" type="button">↓ Прокрутить</button></div>
+<div class="browser-nav"><button id="goBack" type="button">← Назад</button><button id="reloadPage" type="button">↻ Обновить</button><button id="scrollUp" type="button">↑ Прокрутить</button><button id="scrollDown" type="button">↓ Прокрутить</button><button id="closeBrowser" type="button">Закрыть браузер</button></div>
 <div class="row" style="margin-bottom:8px"><button type="button" id="refreshActions">Кнопки сайта · обновить</button><span class="status" id="clickStatus">Нажимай на экран или используй кнопки ниже</span></div>
 <div id="actionButtons" class="site-actions" aria-label="Нажимаемые кнопки текущего сайта"></div>
 <div class="row" style="margin-bottom:12px"><button type="button" id="touch" aria-pressed="true">Нажатия включены · Выключить</button><span id="manualStatus" class="status small">Касания по экрану включены</span></div>
@@ -166,6 +166,17 @@ $('goUrl').onclick=async()=>{
  }
 };
 $('urlBar').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('goUrl').click()}});
+$('closeBrowser').onclick=async()=>{
+ if(!current)return;
+ if(!confirm('Закрыть этот браузер? Сохранённый профиль останется в базе.'))return;
+ try{
+  const r=await fetch('/api/close',{method:'POST',credentials:'same-origin',
+   headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:current})});
+  const d=await r.json();if(!r.ok)throw Error(d.error||'Не удалось закрыть');
+  const msg=d.profile_save_failed?'Сессия закрыта, но сохранить профиль не удалось.':'Сессия закрыта.';
+  stop();current='';$('clickStatus').textContent=msg;await update();
+ }catch(e){$('clickStatus').textContent='Ошибка закрытия: '+e.message}
+};
 $('goBack').onclick=async()=>{if(await ownerAction('back'))setTimeout(refreshActions,350)};
 $('reloadPage').onclick=async()=>{if(await ownerAction('reload'))setTimeout(refreshActions,500)};
 $('scrollUp').onclick=()=>ownerAction('scroll',{pixels:-550});
