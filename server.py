@@ -16,7 +16,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from live_view import live_page, session_api, stream_api, control_api, fields_api, elements_api, owner
 from live_video import screencast_socket
-from chat_ui import CHAT_UI_URI, CHAT_UI_MIME, CHAT_TOOL_META, CHAT_HTML
+from chat_ui import CHAT_UI_URI, CHAT_UI_MIME, CHAT_UI_CSP, CHAT_TOOL_META, CHAT_HTML
 from chat_secure import create_owner_routes, trusted_chat_origin
 from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url, unrestricted_public_https
 from state_store import Store
@@ -117,7 +117,8 @@ async def browser_allow_domain(domain: str) -> dict:
     return {'domains': domains, 'durable': bool(store.durable)}
 
 
-@mcp.resource(CHAT_UI_URI, name="minifish-chat-browser", mime_type=CHAT_UI_MIME)
+@mcp.resource(CHAT_UI_URI, name="minifish-chat-browser", mime_type=CHAT_UI_MIME,
+              meta={"ui": {"csp": CHAT_UI_CSP}})
 def browser_chat_app() -> str:
     """MCP Apps iframe: interactive ChatGPT browser window without secrets."""
     return CHAT_HTML
