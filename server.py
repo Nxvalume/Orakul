@@ -17,6 +17,7 @@ from starlette.routing import Route, WebSocketRoute
 from live_view import live_page, session_api, stream_api, control_api, fields_api, elements_api, owner
 from live_video import screencast_socket
 from chat_ui import CHAT_UI_URI, CHAT_UI_MIME, CHAT_TOOL_META, CHAT_HTML
+from chat_secure import create_owner_routes, trusted_chat_origin
 from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url, unrestricted_public_https
 from state_store import Store
 from remote_store import RemoteStore
@@ -376,7 +377,11 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         # browsers may send a different Origin from the forwarded Host.
         # Exempt ONLY the OAuth form POST, never the owner API endpoints.
         oauth_approval = path == '/oauth/authorize' and req.method == 'POST'
-        if req.method not in ('GET','HEAD','OPTIONS') and not path.startswith('/mcp') and not oauth_approval:
+        # Only this isolated HMAC-bound owner channel may receive cross-origin
+        # requests from the sandboxed ChatGPT widget. No cookies are accepted.
+        widget_owner = (path.startswith('/chat/secure/')
+                        and trusted_chat_origin(req.headers.get('origin','')))
+        if req.method not in ('GET','HEAD','OPTIONS') and not path.startswith('/mcp') and not oauth_approval and not widget_owner:
             origin=req.headers.get('origin','')
             if origin:
                 parsed=urlsplit(origin)
@@ -409,6 +414,7 @@ app.add_route('/live/elements',elements_api(engine),methods=['GET'])
 app.add_route('/live/stream',stream_api(engine),methods=['GET'])
 app.router.routes.append(WebSocketRoute('/live/video',screencast_socket(engine, owner)))
 app.add_route('/live/control',control_api(engine),methods=['POST'])
+app.add_route('/chat/secure/{operation}',create_owner_routes(engine),methods=['GET','POST','OPTIONS'])
 app.add_route('/api/me',me,methods=['GET'])
 app.add_route('/api/{action}',api,methods=['POST'])
 app.add_route('/.well-known/oauth-protected-resource', protected_resource, methods=['GET'])
