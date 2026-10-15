@@ -41,9 +41,8 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <div id="actionButtons" class="site-actions" aria-label="Нажимаемые кнопки текущего сайта"></div>
 <div class="row" style="margin-bottom:12px"><button type="button" id="touch" aria-pressed="true">Нажатия включены · Выключить</button><span id="manualStatus" class="status small">Касания по экрану включены</span></div>
 <div class="screen interactive"><p id="placeholder">Пока нет активных страниц. Запусти задачу через ChatGPT и MiniFish.</p><img id="live" alt="Прямая трансляция экрана браузера MiniFish"><div id="tapLayer" class="tap-layer" role="button" aria-label="Нажать на изображение браузера"></div></div>
-<div class="stream-input"><label for="streamEntry">ВВОД С ТЕЛЕФОНА — ПЕЧАТАЙ СЮДА</label><div class="row"><input type="text" id="streamEntry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер, сообщение или код"><button id="streamInsert" type="button">Вставить</button></div><p id="streamInputStatus" class="hint" role="status">Это настоящее поле ввода Android, а не изображение. Выбери нужное поле Telegram выше и вставь текст сюда.</p><p class="hint">Если Telegram пишет PHONE_PASSWORD_FLOOD, это временное ограничение самого Telegram. Не повторяй попытки входа.</p></div>
+<div class="stream-input"><label for="streamEntry">ВВОД С ТЕЛЕФОНА — ПЕЧАТАЙ СЮДА</label><div class="row"><input type="text" id="streamEntry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер, сообщение или код"><button id="streamInsert" type="button">Вставить</button></div><p id="streamInputStatus" class="hint" role="status">Поле ввода телефона. Для любого сайта выбери поле ниже, затем нажми «Вставить».</p><p class="hint">Если Telegram пишет PHONE_PASSWORD_FLOOD, это временное ограничение самого Telegram. Не повторяй попытки входа.</p></div>
 <p class="hint">Непрерывная трансляция Chromium до 12 кадров/с, без звука и записи. Если WebSocket недоступен, включится резервный режим с редкими кадрами. Экран обновляется во время переходов, прокрутки и нажатий. Сессии исчезают после закрытия или перезапуска сервера.</p></div>
-</div>
 <div class="panel" style="border-color:#e8bf79"><h2 style="margin-top:0">Безопасное управление</h2>
 <p id="privateState" role="status">Режим доступа ассистента: проверяю…</p>
 <div class="row"><button type="button" id="privateStart">Начать личный вход</button><button type="button" id="privateFinish" disabled>Вернуть управление ассистенту</button></div>
@@ -70,6 +69,7 @@ const $=id=>document.getElementById(id);
 let current='',streaming=false,videoSocket=null,frameUrl=null,videoFallback=false;
 let currentViewport={width:1280,height:900};
 let privateMode=false,pendingClick=null;
+let touchStart=null;let actionsLoading=false;
 function setState(text,live){$('state').textContent=text;$('led').className='indicator'+(live?' live':'');}
 function stop(){
  if(videoSocket){const sock=videoSocket;videoSocket=null;sock.onclose=null;sock.onerror=null;sock.close();}
@@ -110,7 +110,7 @@ function selectSession(id){
  if(!id){current='';stop();setState('Ожидаем сессию',false);return}
  if(id===current&&streaming)return;
  stop();current=id;$('placeholder').style.display='none';$('live').style.display='block';
- streaming=true;setState('Подключаю прямой эфир…',false);startVideo(id);refreshFields();
+ streaming=true;setState('Подключаю прямой эфир…',false);startVideo(id);refreshFields();refreshActions();
 }
 $('sessions').onchange=()=>{stop();current='';selectSession($('sessions').value)};
 $('live').onerror=()=>{if(!videoFallback)setState('Ожидаю следующий кадр…',false)};
@@ -121,10 +121,59 @@ async function update(){try{let res=await fetch('/live/sessions',{cache:'no-stor
  $('approvalPanel').style.display=pendingClick&&!privateMode?'block':'none';
  if(pendingClick&&!privateMode)$('approvalLabel').textContent='Сайт: '+new URL(pendingClick.url).hostname+'; действие: '+pendingClick.label;
  $('details').textContent=(item?.site||'Сайт')+' · Последнее действие: '+(item?.action||'Открыта страница');}catch(e){setState('Нет связи',false);$('details').textContent=e.message}}
+async function refreshActions(){
+ if(actionsLoading)return;
+ const wrap=$('actionButtons');
+ if(!current){wrap.replaceChildren();$('clickStatus').textContent='Сначала открой сайт';return;}
+ actionsLoading=true;
+ try{
+  const r=await fetch('/live/elements?session_id='+encodeURIComponent(current),{credentials:'same-origin',cache:'no-store'});
+  const data=await r.json();if(!r.ok)throw Error(data.error||'Нет связи с браузером');
+  wrap.replaceChildren();
+  const actions=data.actions||[];
+  if(!actions.length){const hint=document.createElement('span');hint.className='hint';hint.textContent='Видимых кнопок нет — нажми прямо на экран';wrap.append(hint);}
+  for(const a of actions){
+   const b=document.createElement('button');
+   b.type='button';b.textContent=(a.index+1)+'. '+(a.label||a.kind||'Кнопка');
+   b.dataset.actionIndex=String(a.index);
+   b.onclick=async()=>{
+    $('clickStatus').textContent='Нажимаю кнопку '+(a.index+1)+'…';
+    if(await ownerAction('click_element',{element_index:a.index})){
+     $('clickStatus').textContent='Кнопка нажата';
+     setTimeout(()=>{refreshActions();refreshFields();},600);
+    }
+   };
+   wrap.append(b);
+  }
+  $('clickStatus').textContent='Кнопки сайта доступны как обычные кнопки телефона';
+ }catch(e){$('clickStatus').textContent='Не удалось получить кнопки: '+e.message}
+ finally{actionsLoading=false}
+}
+$('refreshActions').onclick=()=>{refreshActions();refreshFields()};
+$('goUrl').onclick=async()=>{
+ let url=$('urlBar').value.trim();
+ if(!url){$('clickStatus').textContent='Введи адрес сайта';return;}
+ if(!url.toLowerCase().startsWith('https://'))url='https://'+url;
+ $('clickStatus').textContent='Открываю '+url.split('/')[2]+'…';
+ if(current){
+  if(await ownerAction('navigate',{url})){setTimeout(()=>{refreshActions();refreshFields();},600);}
+ }else{
+  try{
+   const r=await fetch('/api/open',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+   const v=await r.json();if(!r.ok)throw Error(v.error||'Ошибка открытия');
+   current='';selectSession(v.session_id);await update();
+  }catch(e){$('clickStatus').textContent=e.message;}
+ }
+};
+$('urlBar').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('goUrl').click()}});
+$('goBack').onclick=async()=>{if(await ownerAction('back'))setTimeout(refreshActions,350)};
+$('reloadPage').onclick=async()=>{if(await ownerAction('reload'))setTimeout(refreshActions,500)};
+$('scrollUp').onclick=()=>ownerAction('scroll',{pixels:-550});
+$('scrollDown').onclick=()=>ownerAction('scroll',{pixels:550});
 async function refreshFields(){
  const select=$('targetField'), prior=select.value;
  select.replaceChildren();
- if(!current){let o=document.createElement('option');o.value='';o.textContent='Сначала открой Telegram';select.append(o);return;}
+ if(!current){let o=document.createElement('option');o.value='';o.textContent='Сначала открой сайт';select.append(o);return;}
  try{
   const r=await fetch('/live/fields?session_id='+encodeURIComponent(current),{credentials:'same-origin',cache:'no-store'});
   const d=await r.json();if(!r.ok)throw Error(d.error||'Нет связи');
@@ -195,7 +244,7 @@ $('quickNext').onclick=async()=>{
 $('quickValue').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('quickApply').click()}});
 $('streamInsert').onclick=async()=>{
  const input=$('streamEntry'),field=$('targetField').value;
- if(!current||!streaming){$('streamInputStatus').textContent='Сначала открой Telegram через MiniFish.';return;}
+ if(!current||!streaming){$('streamInputStatus').textContent='Сначала открой любой сайт в MiniFish.';return;}
  if(field===''){$('streamInputStatus').textContent='Нажми «Обновить поля» и выбери поле Telegram в списке выше.';return;}
  if(!input.value){$('streamInputStatus').textContent='Сначала введи текст в настоящее поле над этой кнопкой.';input.focus();return;}
  const text=input.value;input.value='';
@@ -228,26 +277,41 @@ async function ownerAction(action,payload={}) {
   return true;
  }catch(e){$('manualStatus').textContent='Ошибка: '+e.message;return false}
 }
-$('live').addEventListener('click', e=>{
- if(!clickEnabled||!current)return;
- // CDP screencast JPEG is downsized to 960x675 but Chromium's true viewport
- // is usually 1280x900. Coordinate input MUST use viewport dimensions,
- // not JPEG naturalWidth/naturalHeight, or every mobile tap misses its target.
+function touchAt(clientX,clientY){
+ if(!clickEnabled||!current||!streaming)return;
  const image=$('live'),r=image.getBoundingClientRect();
- if(!r.width||!r.height)return;
- const v=currentViewport;
- const w=Number(v.width)||1280,h=Number(v.height)||900;
- // Account for object-fit:contain and any letterboxing inside the <img>.
+ if(!r.width||!r.height||!image.naturalWidth)return;
+ const v=currentViewport,w=Number(v.width)||1280,h=Number(v.height)||900;
  const iw=image.naturalWidth||w,ih=image.naturalHeight||h;
- const ratio=Math.min(r.width/iw,r.height/ih);
- const dw=iw*ratio,dh=ih*ratio;
+ const scale=Math.min(r.width/iw,r.height/ih);
+ const dw=iw*scale,dh=ih*scale;
  const left=r.left+(r.width-dw)/2,top=r.top+(r.height-dh)/2;
- const nx=(e.clientX-left)/dw,ny=(e.clientY-top)/dh;
- if(nx<0||nx>=1||ny<0||ny>=1)return;
- e.preventDefault();
- $('manualStatus').textContent='Нажимаю…';
- ownerAction('click',{x:Math.min(w-1,Math.max(0,nx*w)),y:Math.min(h-1,Math.max(0,ny*h))});
+ const nx=(clientX-left)/dw,ny=(clientY-top)/dh;
+ if(nx<0||nx>=1||ny<0||ny>=1){$('manualStatus').textContent='За пределами картинки';return}
+ const x=Math.min(w-1,Math.max(0,nx*w)),y=Math.min(h-1,Math.max(0,ny*h));
+ $('manualStatus').textContent='Касание '+Math.round(x)+', '+Math.round(y)+' — отправляю';
+ ownerAction('click',{x,y}).then(ok=>{
+  if(ok){$('manualStatus').textContent='Касание выполнено: '+Math.round(x)+', '+Math.round(y);
+   setTimeout(()=>{refreshActions();refreshFields();},400);}
+ });
+}
+$('tapLayer').addEventListener('pointerdown',e=>{
+ if(!clickEnabled||!current)return;
+ e.preventDefault();touchStart={id:e.pointerId,x:e.clientX,y:e.clientY};
+ try{$('tapLayer').setPointerCapture(e.pointerId)}catch(err){}
 });
+$('tapLayer').addEventListener('pointerup',e=>{
+ if(!touchStart||e.pointerId!==touchStart.id)return;
+ e.preventDefault();const start=touchStart;touchStart=null;
+ const deltaY=e.clientY-start.y,deltaX=e.clientX-start.x;
+ if(Math.hypot(deltaX,deltaY)>22){
+  if(Math.abs(deltaY)>Math.abs(deltaX))ownerAction('scroll',{pixels:Math.max(-1400,Math.min(1400,Math.round(-deltaY*3)))});
+  return;
+ }
+ touchAt(e.clientX,e.clientY);
+});
+$('tapLayer').addEventListener('pointercancel',()=>{touchStart=null});
+
 async function showStorage(){
  try{const r=await fetch('/api/storage',{method:'POST',credentials:'same-origin',
     headers:{'Content-Type':'application/json'},body:'{}'});
