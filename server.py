@@ -118,9 +118,13 @@ async def browser_allow_domain(domain: str) -> dict:
 
 
 @mcp.resource(CHAT_UI_URI, name="minifish-chat-browser", mime_type=CHAT_UI_MIME,
-              meta={"ui": {"csp": CHAT_UI_CSP},
-                    "openai/widgetCSP": {"redirect_domains":
-                        ["https://nxval-minifish-2026.onrender.com"]}})
+              meta={"ui": {"csp": CHAT_UI_CSP, "prefersBorder": True},
+                    "openai/ui": {"availableDisplayModes": ["inline", "fullscreen"]},
+                    "openai/widgetCSP": {"connect_domains":
+                        ["https://nxval-minifish-2026.onrender.com"],
+                        "redirect_domains":
+                        ["https://nxval-minifish-2026.onrender.com"]},
+                    "openai/widgetPrefersBorder": True})
 def browser_chat_app() -> str:
     """MCP Apps iframe: interactive ChatGPT browser window without secrets."""
     return CHAT_HTML
@@ -215,6 +219,16 @@ async def browser_snapshot(session_id: str) -> dict:
 async def browser_click(session_id: str, css_selector: str, confirm_sensitive: bool = False) -> dict:
     """Click an element. Sensitive and submit actions require separate user approval."""
     return await engine.click(session_id, css_selector, confirm_sensitive)
+
+@mcp.tool(meta=CHAT_TOOL_META)
+async def browser_tap(session_id: str, x: float, y: float) -> dict:
+    """Tap the live browser image at viewport coordinates, like TinyFish.
+
+    Real cursor movement; sensitive buttons still require separate owner
+    approval. Login passwords and one-time codes never enter this tool.
+    """
+    return await engine.tap(session_id, x, y)
+
 
 @mcp.tool()
 async def browser_fill(session_id: str, css_selector: str, text: str) -> dict:
