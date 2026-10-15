@@ -40,3 +40,37 @@ def test_mobile_stream_input_uses_selected_browser_field_not_clipboard():
     assert "stream.inputMode=entry.inputMode" in VIEW
     assert "PHONE_PASSWORD_FLOOD" in VIEW
     assert "navigator.clipboard" not in VIEW
+
+
+def test_telegram_entry_is_single_guided_mobile_flow():
+    """Critical owner UX: one obvious protected input rather than duplicate forms."""
+    from live_view import PAGE, LOGIN_PAGE
+    assert 'id="telegramTitle"' in PAGE
+    assert 'id="loginPhase"' in PAGE
+    assert 'id="openTelegram"' in PAGE
+    assert 'id="entryLabel"' in PAGE
+    assert 'id="streamEntry"' in PAGE
+    assert 'id="streamInsert"' in PAGE
+    assert 'id="streamNext"' in PAGE
+    assert PAGE.index('id="openTelegram"') < PAGE.index('id="live"') < PAGE.index('id="streamEntry"')
+    assert PAGE.count('id="openTelegram"') == 1
+    assert PAGE.count('id="streamEntry"') == 1
+    assert 'id="quickValue"' not in PAGE
+    assert 'id="quickApply"' not in PAGE
+    assert 'id="quickNext"' not in PAGE
+    assert "$('fieldRefresh').onclick" not in PAGE
+    assert 'Другие сайты, навигация и дополнительные кнопки' in PAGE
+    assert 'Дополнительно: управление другими сайтами' in PAGE
+    assert "$('entryLabel').textContent=" in PAGE
+    assert "if(data.logged_in&&data.saved&&data.durable)" in PAGE
+    assert 'Это пароль MiniFish, не код и не пароль Telegram' in LOGIN_PAGE
+
+
+def test_telegram_mobility_keeps_password_input_private_and_clear_on_success():
+    from live_view import PAGE
+    assert "stream.type=secret?'password':'text'" in PAGE
+    assert "if(ok)input.value='';" in PAGE
+    assert "ownerAction('fill_field',{field_index:Number(field),text})" in PAGE
+    assert "ownerAction('telegram_next')" in PAGE
+    assert "'streamInsert').disabled=true" in PAGE
+    assert 'Не повторяй попытки входа' not in PAGE or 'PHONE_PASSWORD_FLOOD' in PAGE
