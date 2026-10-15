@@ -601,15 +601,14 @@ class BrowserEngine:
         """
         s = self.get(sid, owner=True)
         if action not in ('click', 'click_element', 'navigate', 'back', 'reload',
-                          'scroll', 'type', 'key', 'fill_field'):
+                          'scroll', 'type', 'key', 'fill_field', 'telegram_next'):
             raise ValueError('Неизвестное действие управления')
         if action == 'navigate':
             await asyncio.to_thread(validate_url, url)
         async with s.lock:
             if (urlsplit(s.page.url).hostname == 'web.telegram.org'
-                    and action in ('click', 'click_element')
-                         or (urlsplit(s.page.url).hostname == 'web.telegram.org'
-                             and action == 'key' and key == 'Enter')):
+                    and (action in ('click', 'click_element', 'telegram_next')
+                         or (action == 'key' and key == 'Enter'))):
                 # Never retry Telegram authentication after a flood notice.
                 # Detect the notice locally; do not send the page or credentials
                 # to ChatGPT or application logs.
@@ -675,7 +674,21 @@ class BrowserEngine:
                 if kind in {'hidden','file','checkbox','radio','submit','button'}:
                     raise ValueError('В это поле нельзя вводить текст')
                 await target.fill(text, timeout=TIMEOUT_MS)
+                # Do not report success when a reactive form has discarded the input.
+                # Read only a boolean: passwords and codes must never enter responses.
+                accepted = await target.evaluate(
+                    "el => Boolean('value' in el ? el.value : el.textContent)")
+                if not accepted:
+                    raise ValueError('Поле не приняло ввод; обновите поля и попробуйте снова')
                 s.last_action = 'Владелец заполнил поле'
+            elif action == 'telegram_next':
+                if urlsplit(s.page.url).hostname != 'web.telegram.org':
+                    raise ValueError('Продолжить вход можно только в Telegram Web')
+                next_button = s.page.get_by_role('button', name='NEXT', exact=True)
+                if await next_button.count() != 1:
+                    raise ValueError('Кнопка NEXT не найдена; обновите экран Telegram')
+                await next_button.click(timeout=TIMEOUT_MS)
+                s.last_action = 'Владелец подтвердил ввод в Telegram'
             else:
                 allowed = {'Tab', 'Enter', 'Escape', 'Backspace', 'Delete',
                            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
