@@ -256,7 +256,7 @@ $('streamInsert').onclick=async()=>{
 };
 $('streamEntry').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('streamInsert').click();}});
 $('privateStart').onclick=async()=>{if(!current)return;await ownerAction('private_mode',{enabled:true})};
-$('privateFinish').onclick=async()=>{if(!current)return;await ownerAction('private_mode',{enabled:false})};
+$('privateFinish').onclick=async()=>{if(!current)return;const ok=await ownerAction('private_mode',{enabled:false});if(ok)await checkTelegramStatus()};
 $('approveAction').onclick=async()=>{if(!pendingClick)return;await ownerAction('approve_click',{request_id:pendingClick.id});$('approvalPanel').style.display='none';pendingClick=null;};
 $('rejectAction').onclick=async()=>{await ownerAction('reject_click');$('approvalPanel').style.display='none';pendingClick=null;};
 let clickEnabled=true;
@@ -274,7 +274,18 @@ async function ownerAction(action,payload={}) {
   const data=await response.json();
   if(!response.ok)throw Error(data.error||'Ошибка управления');
   $('manualStatus').textContent='Действие выполнено';
-  if(action==='private_mode'){privateMode=!!payload.enabled;$('privateState').textContent=privateMode?'Личный вход: ассистент заблокирован':'Личный вход выключен: управление ассистента доступно';$('privateStart').disabled=privateMode;$('privateFinish').disabled=!privateMode;}
+  if(action==='private_mode'){
+   privateMode=!!payload.enabled;
+   $('privateState').textContent=privateMode?'Личный вход: ассистент заблокирован':'Личный вход выключен: управление ассистента доступно';
+   $('privateStart').disabled=privateMode;$('privateFinish').disabled=!privateMode;
+   if(!privateMode && data.profile_saved){
+    $('manualStatus').textContent='Авторизация Telegram сохранена в постоянной базе';
+    $('telegramSavedStatus').textContent='Telegram: вход сохранён и проверен.';
+   }else if(!privateMode && data.save_error){
+    $('manualStatus').textContent='ВНИМАНИЕ: '+data.save_error;
+    $('telegramSavedStatus').textContent='Ошибка: вход не сохранён. '+data.save_error;
+   }
+  }
   return true;
  }catch(e){$('manualStatus').textContent='Ошибка: '+e.message;return false}
 }
@@ -324,13 +335,14 @@ async function showStorage(){
 showStorage();
 $('saveProfile').onclick=async()=>{
  if(!current){$('manualStatus').textContent='Нет активной сессии';return;}
- const name=$('profileName').value.trim();
+ const name=$('profileName').value.trim()||'telegram';
  if(!/^[A-Za-z0-9_-]{1,40}$/.test(name)){$('manualStatus').textContent='Имя: латиница, цифры, _ и -';return;}
  try{
  const r=await fetch('/api/save-profile',{method:'POST',credentials:'same-origin',
  headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:current,name})});
  const d=await r.json();if(!r.ok)throw Error(d.error||'Не удалось сохранить');
- $('manualStatus').textContent='Профиль '+name+' сохранён'+(d.durable?' в постоянной базе':' временно');
+ $('manualStatus').textContent=d.verified?'Профиль '+d.name+' сохранён и проверен в постоянной базе':'Сохранение не подтверждено';
+ if(d.verified){$('telegramSavedStatus').textContent='Профиль '+d.name+' сохранён и проверен';await checkTelegramStatus();}
  }catch(e){$('manualStatus').textContent='Ошибка: '+e.message;}
 };
 $('type').onclick=()=>{
