@@ -154,12 +154,23 @@ a{color:#93c9ff}
   if(m.method==='ui/notifications/tool-result')inputFrom(m.params);
   if(m.method==='ui/notifications/tool-input')inputFrom(m.params);
  });
- ready=bridge('ui/initialize',{
-  appInfo:{name:'MiniFish chat browser',version:'0.5.0'},
-  appCapabilities:{},protocolVersion:'2026-01-26'
- }).then(()=>{
-  window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized',params:{}},'*');
- }).catch(err=>{status('Протокол ChatGPT недоступен: '+String(err.message||err));throw err;});
+ // Legacy ChatGPT widget bridge already supplies callTool and toolInput.
+ // Do not send a second MCP Apps handshake to such hosts: they may reject
+ // ui/initialize even while their native widget API is fully functional.
+ if(typeof window.openai?.callTool==='function'){
+  ready=Promise.resolve();
+ }else{
+  ready=bridge('ui/initialize',{
+   appInfo:{name:'MiniFish chat browser',version:'0.5.1'},
+   appCapabilities:{},protocolVersion:'2026-01-26'
+  }).then(()=>{
+   window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized',params:{}},'*');
+  }).catch(err=>{
+   status('Клиент не поддерживает интерактивные MCP Apps: '+String(err.message||err).slice(0,100));
+   // Do not cause unhandled rejections when the widget is unsupported.
+   ready=null;
+  });
+ }
  const initial=window.openai?.toolOutput;
  if(initial)inputFrom(initial);
  const toolInput=window.openai?.toolInput;
