@@ -206,3 +206,43 @@ async def test_cursor_moves_in_steps_before_click(monkeypatch):
     assert final == (800.0, 500.0)
     assert engine._sessions['session'].cursor == (800.0,500.0)
     page.mouse.click.assert_awaited_once_with(800.0, 500.0)
+
+
+
+@pytest.mark.asyncio
+async def test_telegram_auth_is_persisted_in_owner_private_mode():
+    engine, page = mock_browser()
+    page.url='https://web.telegram.org/k/'
+    session=engine._sessions['session']
+    session.private_mode=True
+    loggedin=SimpleNamespace(is_visible=AsyncMock(return_value=True))
+    login=SimpleNamespace(is_visible=AsyncMock(return_value=False))
+    page.locator=lambda sel: loggedin if sel=='#column-left' else login
+    session.context.storage_state=AsyncMock(return_value={'cookies':[{'name':'test'}], 'origins':[]})
+    assert await engine.telegram_authenticated_state('session') == {'cookies':[{'name':'test'}], 'origins':[]}
+    callback=AsyncMock()
+    engine.profile_save_callback=callback
+    result=await engine.owner_set_private('session',False)
+    assert result['profile_saved'] is True
+    assert result['save_error'] is None
+    assert result['private_mode'] is False
+    assert session.profile_name=='telegram'
+    callback.assert_awaited_once_with('telegram',{'cookies':[{'name':'test'}], 'origins':[]})
+
+
+@pytest.mark.asyncio
+async def test_telegram_private_mode_exposes_clean_save_failure():
+    engine,page=mock_browser()
+    page.url='https://web.telegram.org/k/'
+    session=engine._sessions['session']
+    session.private_mode=True
+    loggedin=SimpleNamespace(is_visible=AsyncMock(return_value=True))
+    login=SimpleNamespace(is_visible=AsyncMock(return_value=False))
+    page.locator=lambda sel: loggedin if sel=='#column-left' else login
+    session.context.storage_state=AsyncMock(return_value={'cookies':[],'origins':[]})
+    engine.profile_save_callback=AsyncMock(side_effect=RuntimeError('sensitive-sentinel'))
+    result=await engine.owner_set_private('session',False)
+    assert result['profile_saved'] is False
+    assert 'RuntimeError' in result['save_error']
+    assert 'sensitive-sentinel' not in str(result)
+    assert result['private_mode'] is False
