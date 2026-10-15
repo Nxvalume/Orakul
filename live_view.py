@@ -41,7 +41,7 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <div id="actionButtons" class="site-actions" aria-label="Нажимаемые кнопки текущего сайта"></div>
 <div class="row" style="margin-bottom:12px"><button type="button" id="touch" aria-pressed="true">Нажатия включены · Выключить</button><span id="manualStatus" class="status small">Касания по экрану включены</span></div>
 <div class="screen interactive"><p id="placeholder">Пока нет активных страниц. Запусти задачу через ChatGPT и MiniFish.</p><img id="live" alt="Прямая трансляция экрана браузера MiniFish"><div id="tapLayer" class="tap-layer" role="button" aria-label="Нажать на изображение браузера"></div></div>
-<div class="stream-input"><label for="streamEntry">ВВОД С ТЕЛЕФОНА — ПЕЧАТАЙ СЮДА</label><div class="row"><input type="text" id="streamEntry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер, сообщение или код"><button id="streamInsert" type="button">Вставить</button></div><p id="streamInputStatus" class="hint" role="status">Поле ввода телефона. Для любого сайта выбери поле ниже, затем нажми «Вставить».</p><p class="hint">Если Telegram пишет PHONE_PASSWORD_FLOOD, это временное ограничение самого Telegram. Не повторяй попытки входа.</p></div>
+<div class="stream-input"><div class="row"><label for="targetField">Поле текущего сайта</label><button type="button" id="fieldRefreshTop">Обновить поля</button></div><select id="targetField" aria-label="Поле ввода на текущем сайте" style="width:100%;margin-bottom:10px"><option value="">Поиск полей…</option></select><label for="streamEntry">ВВОД С ТЕЛЕФОНА — ПЕЧАТАЙ СЮДА</label><div class="row"><input type="text" id="streamEntry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер, сообщение или код"><button id="streamInsert" type="button">Вставить</button></div><p id="streamInputStatus" class="hint" role="status">Поле ввода телефона. Для любого сайта выбери поле ниже, затем нажми «Вставить».</p><p class="hint">Если Telegram пишет PHONE_PASSWORD_FLOOD, это временное ограничение самого Telegram. Не повторяй попытки входа.</p></div>
 <p class="hint">Непрерывная трансляция Chromium до 12 кадров/с, без звука и записи. Если WebSocket недоступен, включится резервный режим с редкими кадрами. Экран обновляется во время переходов, прокрутки и нажатий. Сессии исчезают после закрытия или перезапуска сервера.</p></div>
 <div class="panel" style="border-color:#e8bf79"><h2 style="margin-top:0">Безопасное управление</h2>
 <p id="privateState" role="status">Режим доступа ассистента: проверяю…</p>
@@ -54,7 +54,7 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <details class="panel"><summary style="font-weight:600;cursor:pointer;min-height:44px">Дополнительно: вход в Telegram</summary><div class="quickpanel"><h2>Ввод в Telegram с телефона</h2><p class="hint">Печатай здесь, а MiniFish вставит данные в поле настоящего Telegram Web. Нажимать на мелкие поля видеотрансляции не нужно.</p>
 <div class="row"><button type="button" id="openTelegram">Открыть Telegram</button><button type="button" id="fieldRefresh">Обновить поля</button></div>
 <p id="telegramSavedStatus" class="hint" role="status">После первого входа Telegram сохранится автоматически. Повторно вводить номер и код обычно не потребуется.</p>
-<label for="targetField">Поле на странице Telegram</label><select id="targetField" aria-label="Поле Telegram"><option value="">Поиск полей…</option></select>
+
 <label for="quickValue">Что ввести</label><input id="quickValue" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер телефона или код">
 <div class="row" style="margin-top:12px"><button class="primary" id="quickApply" type="button">Вставить в Telegram</button><button id="quickNext" type="button">Продолжить (Enter)</button></div>
 <p id="quickFeedback" class="status" role="status">Выбери поле и введи данные.</p><p class="hint security">Номер, коды и пароль не отправляются в ChatGPT. Не пересылай их в чат.</p></div></details>
@@ -201,6 +201,7 @@ function setQuickInput(){
 }
 $('targetField').onchange=setQuickInput;
 $('fieldRefresh').onclick=refreshFields;
+$('fieldRefreshTop').onclick=refreshFields;
 $('openTelegram').onclick=async()=>{
  try{
   $('quickFeedback').textContent='Открываю Telegram Web…';
