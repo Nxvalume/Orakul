@@ -126,6 +126,56 @@ def browser_chat_app() -> str:
     return CHAT_HTML
 
 
+@mcp.tool()
+async def browser_telegram_status() -> dict:
+    """Check Telegram authorization in the existing browser WITHOUT viewing credentials.
+
+    This safe status tool does not open a second browser, send any login request,
+    reveal page content or access a page while owner private mode is active.
+    If the chat UI is authenticated, it checkpoints storage to existing Supabase
+    and verifies that it can be read back. Only status booleans are returned.
+    """
+    sid = engine.telegram_session_id()
+    if sid is None:
+        return {'phase': 'not_open', 'logged_in': False, 'saved': False,
+                'storage': 'not_checked', 'session_id': None}
+    session = engine._sessions.get(sid)
+    if session is None:
+        return {'phase': 'not_open', 'logged_in': False, 'saved': False,
+                'storage': 'not_checked', 'session_id': None}
+    if session.private_mode:
+        # Never take screenshots, snapshots, read form fields or page content
+        # while the owner is entering a phone number, password or code.
+        return {'phase': 'private_login', 'logged_in': False,
+                'saved': None, 'storage': 'not_checked', 'session_id': sid}
+    logged_in = await engine.telegram_logged_in(sid)
+    saved = False
+    storage_status = 'ok'
+    if not store.durable or getattr(store, 'degraded', False):
+        storage_status = 'unavailable'
+    else:
+        try:
+            previous = await asyncio.to_thread(store.get_profile, 'telegram')
+            saved = previous['site'] == 'web.telegram.org'
+        except ValueError:
+            saved = False
+        except Exception:
+            storage_status = 'read_failed'
+        if logged_in and storage_status == 'ok':
+            try:
+                state = await engine.telegram_authenticated_state(sid)
+                if state is not None:
+                    await _checkpoint_browser_profile('telegram', state)
+                    saved = True
+                else:
+                    storage_status = 'snapshot_unavailable'
+            except Exception:
+                storage_status = 'save_failed'
+    return {'phase': 'authenticated' if logged_in else 'login_required',
+            'logged_in': logged_in, 'saved': saved,
+            'storage': storage_status, 'session_id': sid}
+
+
 @mcp.tool(meta=CHAT_TOOL_META)
 async def browser_window(session_id: str) -> dict:
     """Show the current MiniFish browser inside the ChatGPT conversation.
