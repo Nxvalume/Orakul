@@ -103,6 +103,17 @@ async def _open_telegram(url: str) -> dict:
         return {'session_id': sid, 'url': session.page.url,
                 'title': await session.page.title(), 'profile': session.profile_name,
                 'reused': True}
+    # Owner may see a white /healthz diagnostic page if an assistant probed
+    # the server using the single Render Free browser slot. That page has no
+    # user profile and is never a login: retire it before opening Telegram.
+    public_host = urlsplit(os.getenv('MINIFISH_PUBLIC_URL',
+        'https://nxval-minifish-2026.onrender.com')).hostname
+    for diagnostic_sid, diagnostic in list(engine._sessions.items()):
+        if (not diagnostic.private_mode and diagnostic.profile_name is None
+                and not diagnostic.page.is_closed()
+                and urlsplit(diagnostic.page.url).hostname == public_host
+                and urlsplit(diagnostic.page.url).path == '/healthz'):
+            await engine.close(diagnostic_sid)
     return await engine.open(url)
 
 
