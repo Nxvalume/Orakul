@@ -475,30 +475,48 @@ app.add_route('/oauth/token', token, methods=['POST'])
 app.add_middleware(SecurityMiddleware)
 
 async def _telegram_profile_watch():
-    """Auto-save signed-in Telegram browser storage, never a login prompt."""
+    """Persist Telegram promptly, even if the owner closes the login page.
+
+    No page text, OTP, cookies or exception details are written into logs.
+    After a verified save, return browser control to the assistant automatically
+    if an owner-private Telegram login has completed.
+    """
     last_saved = {}
+    last_error_at = 0.0
     while True:
-        await asyncio.sleep(8)
+        await asyncio.sleep(3)
         sid = engine.telegram_session_id()
         if not sid:
             continue
         now = asyncio.get_running_loop().time()
-        if now - last_saved.get(sid, 0) < 75:
+        s = engine._sessions.get(sid)
+        # Do not delay first save or owner handoff; after that checkpoint every
+        # 60 seconds to refresh Telegram's persistent IndexedDB state.
+        if s is not None and not s.private_mode and now - last_saved.get(sid, 0) < 60:
             continue
         try:
             state = await engine.telegram_authenticated_state(sid)
             if state is None:
                 continue
-            if getattr(store, 'degraded', False):
-                continue
+            if getattr(store, 'degraded', False) or not store.durable:
+                raise RuntimeError('Permanent storage unavailable')
             await _checkpoint_browser_profile('telegram', state)
             engine.set_profile_name(sid, 'telegram')
             last_saved[sid] = now
+            if s is not None and s.private_mode:
+                await engine.release_verified_telegram_login(sid)
+                _log.info('MINIFISH_TELEGRAM_LOGIN_PERSISTED_AND_RELEASED')
+            else:
+                _log.info('MINIFISH_TELEGRAM_PROFILE_CHECKPOINT_OK')
         except asyncio.CancelledError:
             raise
-        except Exception:
-            # Never log Telegram account secrets or browser state.
-            pass
+        except Exception as exc:
+            # 30 s rate limit to avoid filling logs on temporary network issues;
+            # the error class (not its message) is safe to report.
+            if now - last_error_at >= 30:
+                _log.warning('MINIFISH_TELEGRAM_PROFILE_CHECKPOINT_FAILED: %s',
+                             type(exc).__name__)
+                last_error_at = now
 
 
 def _storage_probe() -> bool:
