@@ -58,7 +58,7 @@ a{color:#93c9ff}
 <script>
 (()=>{
  const $=id=>document.getElementById(id);
- const pending=new Map();let nextId=1,session='',busy=false;
+ const pending=new Map();let nextId=1,session='',busy=false,ready=null;
  const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Превышено время ожидания')),ms));
  const status=t=>$('status').textContent=t;
  function bridge(method,params){
@@ -67,7 +67,9 @@ a{color:#93c9ff}
    window.parent.postMessage({jsonrpc:'2.0',id,method,params},'*');
   }),timeout(18000)]).finally(()=>pending.delete(id));
  }
- async function call(name,args){const r=await bridge('tools/call',{name,arguments:args});
+ async function call(name,args){
+  if(ready)await ready;
+  const r=await bridge('tools/call',{name,arguments:args});
   if(r?.isError)throw new Error((r?.content||[]).filter(x=>x.type==='text').map(x=>x.text).join(' ').slice(0,200)||'Ошибка браузера');
   return r;
  }
@@ -94,6 +96,12 @@ a{color:#93c9ff}
   if(m.method==='ui/notifications/tool-result')inputFrom(m.params);
   if(m.method==='ui/notifications/tool-input')inputFrom(m.params);
  });
+ ready=bridge('ui/initialize',{
+  appInfo:{name:'MiniFish chat browser',version:'0.5.0'},
+  appCapabilities:{},protocolVersion:'2026-01-26'
+ }).then(()=>{
+  window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized',params:{}},'*');
+ }).catch(err=>{status('Протокол ChatGPT недоступен: '+String(err.message||err));throw err;});
  const initial=window.openai?.toolOutput;
  if(initial)inputFrom(initial);
  const toolInput=window.openai?.toolInput;
@@ -152,8 +160,6 @@ a{color:#93c9ff}
   }
   $('text').value='';act('browser_fill',{session_id:session,css_selector:selector,text:value});
  };
- bridge('ui/initialize',{protocolVersion:'2026-01-26',clientInfo:{name:'MiniFish chat',version:'0.5.0'},capabilities:{}})
- .then(()=>bridge('ui/notifications/initialized',{})).catch(()=>{});
  if(!session)status('Ожидаю сеанс MiniFish от ChatGPT…');
 })();
 </script></body></html>"""
