@@ -31,3 +31,15 @@ def test_chat_app_secret_form_is_not_connected_to_model_tool_bridge():
     assert "appCapabilities" in CHAT_HTML
     assert "bridge('ui/notifications/initialized'" not in CHAT_HTML
     assert 'https://nxval-minifish-2026.onrender.com/chat/secure/' in CHAT_HTML
+
+@pytest.mark.asyncio
+async def test_inline_ui_resource_csp_is_returned_in_resource_contents():
+    from server import mcp
+    from chat_ui import CHAT_UI_CSP
+    contents = await mcp.read_resource(CHAT_UI_URI)
+    assert contents, 'No resource content'
+    item = contents[0]
+    assert 'MiniFish' in item.content
+    assert item.mime_type == CHAT_UI_MIME
+    assert item.meta and item.meta['ui']['csp'] == CHAT_UI_CSP
+
