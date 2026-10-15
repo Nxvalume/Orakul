@@ -21,7 +21,11 @@ function permitted(input: unknown): input is string {
   const statement = input.replace(/\s+/g, ' ').trim();
   if (/[;]|--|\/\*|\*\//.test(statement)) return false;
   if (/\b(?:DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|COPY|EXECUTE|UNION|JOIN|pg_catalog|information_schema|public|auth|pg_read_file)\b/i.test(statement)) return false;
-  if ((statement.match(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b/gi) || []).length !== 1) return false;
+  const operations = statement.match(/\b(?:SELECT|INSERT|UPDATE|DELETE)\b/gi) || [];
+  const isKnownUpsert = operations.length === 2 &&
+    /^INSERT INTO minifish\.mf_profiles\s*\(/i.test(statement) &&
+    /\bON CONFLICT\s*\(name\)\s*DO UPDATE SET\s+/i.test(statement);
+  if (operations.length !== 1 && !isKnownUpsert) return false;
   return allowed.some((rule) => rule.test(statement));
 }
 
