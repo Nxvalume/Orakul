@@ -222,10 +222,11 @@ async function checkTelegramStatus(){
   if(!response.ok)return;
   const data=await response.json();
   $('telegramSavedStatus').textContent = data.saved && data.durable?
-    (data.logged_in?'Telegram подключён. Вход сохранён в зашифрованной базе.':
-                    'Вход Telegram сохранён. Открой Telegram для восстановления.') :
-    (data.logged_in?'Вход выполнен. MiniFish автоматически сохраняет сессию.':
-                    'Войди в Telegram один раз. После входа MiniFish сохранит сессию автоматически.');
+    (data.logged_in?'Telegram подключён. Вход сохранён в постоянной базе.':
+                    'Авторизация Telegram сохранена в базе. При следующем запуске профиль восстановится.') :
+    (privateMode?'Личный режим: после успешного входа проверь сохранение или нажми «Вернуть управление ассистенту».':
+                  data.logged_in?'Авторизация активна, но в базе ещё НЕ сохранена.':
+                                 'Авторизации в базе нет. После входа проверь подтверждение сохранения.');
  }catch(e){}
 }
 setInterval(checkTelegramStatus,18000);
