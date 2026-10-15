@@ -246,3 +246,72 @@ async def test_telegram_private_mode_exposes_clean_save_failure():
     assert 'RuntimeError' in result['save_error']
     assert 'sensitive-sentinel' not in str(result)
     assert result['private_mode'] is False
+
+
+
+@pytest.mark.asyncio
+async def test_closing_fresh_telegram_login_saves_even_without_profile_name():
+    """Closing the mobile /live tab before pressing Finish must not lose auth."""
+    engine, page = mock_browser()
+    session = engine._sessions['session']
+    session.profile_name = None
+    page.url = 'https://web.telegram.org/k/'
+    page.locator = lambda sel: SimpleNamespace(
+        is_visible=AsyncMock(return_value=sel == '#column-left'))
+    session.context.storage_state = AsyncMock(
+        return_value={'cookies': [{'name': 'fixture'}], 'origins': []})
+    session.context.close = AsyncMock()
+    callback = AsyncMock()
+    engine.profile_save_callback = callback
+    result = await engine.close('session')
+    assert result['closed'] is True
+    assert result['profile_updated'] is True
+    callback.assert_awaited_once_with('telegram', {
+        'cookies': [{'name': 'fixture'}], 'origins': []})
+
+
+@pytest.mark.asyncio
+async def test_telegram_private_login_waits_longer_than_standard_idle(monkeypatch):
+    from engine import session_idle_limit, TTL_SECONDS, TELEGRAM_LOGIN_TTL_SECONDS
+    engine, page = mock_browser()
+    session = engine._sessions['session']
+    page.url = 'https://web.telegram.org/k/'
+    session.touched -= TTL_SECONDS + 20
+    assert session_idle_limit(session) == TTL_SECONDS
+    session.private_mode = True
+    assert session_idle_limit(session) == TELEGRAM_LOGIN_TTL_SECONDS
+    assert engine.telegram_session_id() == 'session'
+    assert engine.get('session', owner=True) is session
+    assert engine.telegram_session_id() == 'session'
+
+
+@pytest.mark.asyncio
+async def test_verified_telegram_owner_handoff_never_reads_secrets():
+    engine, page = mock_browser()
+    session = engine._sessions['session']
+    page.url = 'https://web.telegram.org/k/'
+    session.private_mode = True
+    page.locator = lambda sel: SimpleNamespace(
+        is_visible=AsyncMock(return_value=sel == '#column-left'))
+    assert await engine.release_verified_telegram_login('session') is True
+    assert session.private_mode is False
+    assert session.profile_name == 'telegram'
+    assert 'вход сохранён' in session.last_action
+    assert 'value' not in session.last_action
+
+
+@pytest.mark.asyncio
+async def test_telegram_qr_screen_not_saved_on_close_when_profile_unnamed():
+    engine, page = mock_browser()
+    session = engine._sessions['session']
+    session.profile_name = None
+    page.url = 'https://web.telegram.org/k/'
+    page.locator = lambda sel: SimpleNamespace(
+        is_visible=AsyncMock(return_value=sel == '#auth-pages'))
+    session.context.close = AsyncMock()
+    session.context.storage_state = AsyncMock()
+    engine.profile_save_callback = AsyncMock()
+    result = await engine.close('session')
+    assert result['profile_updated'] is False
+    engine.profile_save_callback.assert_not_awaited()
+    session.context.storage_state.assert_not_awaited()
