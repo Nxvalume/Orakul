@@ -442,6 +442,13 @@ def _storage_probe() -> bool:
         written = True
         loaded = store.get_profile(name)
         success = (loaded['site'] == 'example.com' and loaded['state'] == state)
+        if success:
+            # Verify the ON CONFLICT update path used by periodic Telegram
+            # autosave, not merely a first-time INSERT.
+            state['origins'][0]['localStorage'][0]['value'] = secrets.token_urlsafe(24)
+            store.save_profile(name, 'example.com', state)
+            updated = store.get_profile(name)
+            success = updated['site'] == 'example.com' and updated['state'] == state
         _storage_probe_status = 'ok' if success else 'readback_failed'
         _log.info('MINIFISH_STORAGE_PROBE_OK' if success else 'MINIFISH_STORAGE_PROBE_READBACK_FAILED')
         return success
