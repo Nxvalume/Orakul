@@ -12,7 +12,7 @@ async def test_status_private_owner_mode_does_not_inspect_page(monkeypatch):
     monkeypatch.setattr(server.engine, '_sessions', {'test-session':session})
     login = AsyncMock()
     monkeypatch.setattr(server.engine, 'telegram_logged_in', login)
-    result = await server.browser_telegram_status.fn()
+    result = await server.browser_telegram_status()
     assert result['phase'] == 'private_login'
     assert result['saved'] is None
     assert result['storage'] == 'not_checked'
@@ -37,7 +37,7 @@ async def test_status_authenticated_verifies_encrypted_profile(monkeypatch):
     monkeypatch.setattr(server.store, 'degraded', False, raising=False)
     checkpoint = AsyncMock(side_effect=lambda name,state: saved.append(name))
     monkeypatch.setattr(server, '_checkpoint_browser_profile',checkpoint)
-    result = await server.browser_telegram_status.fn()
+    result = await server.browser_telegram_status()
     assert result['phase'] == 'authenticated'
     assert result['saved'] is True
     assert result['storage'] == 'ok'
@@ -48,6 +48,6 @@ async def test_status_authenticated_verifies_encrypted_profile(monkeypatch):
 async def test_status_no_session_leaves_storage_untouched(monkeypatch):
     import server
     monkeypatch.setattr(server.engine, 'telegram_session_id', lambda: None)
-    result = await server.browser_telegram_status.fn()
+    result = await server.browser_telegram_status()
     assert result == {'phase':'not_open','logged_in':False,
                       'saved':False,'storage':'not_checked','session_id':None}
