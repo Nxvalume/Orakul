@@ -54,14 +54,14 @@ def test_generic_mobile_page_has_stable_pointer_layer_and_native_controls():
     view = Path(__file__).resolve().parents[1].joinpath('live_view.py').read_text()
     server = Path(__file__).resolve().parents[1].joinpath('server.py').read_text()
     assert 'id="tapLayer"' in view
-    assert view.index('id="targetField"') < view.index('Дополнительно: вход в Telegram')
+    assert view.index('id="live"') < view.index('id="targetField"') < view.index('Дополнительно: управление другими сайтами')
     assert 'id="fieldRefreshTop"' in view
     assert "'pointerdown'" in view and "'pointerup'" in view
     assert 'setPointerCapture' in view
     assert "ownerAction('click_element',{element_index:a.index})" in view
     assert "ownerAction('navigate',{url})" in view
     assert "ownerAction('scroll',{pixels:550})" in view
-    assert view.index('id="urlBar"') < view.index('id="live"') < view.index('Дополнительно: вход в Telegram')
+    assert view.index('id="urlBar"') < view.index('id="live"') < view.index('id="streamEntry"')
     assert "app.add_route('/live/elements',elements_api(engine)" in server
 
 
