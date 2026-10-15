@@ -118,7 +118,9 @@ async def browser_allow_domain(domain: str) -> dict:
 
 
 @mcp.resource(CHAT_UI_URI, name="minifish-chat-browser", mime_type=CHAT_UI_MIME,
-              meta={"ui": {"csp": CHAT_UI_CSP}})
+              meta={"ui": {"csp": CHAT_UI_CSP},
+                    "openai/widgetCSP": {"redirect_domains":
+                        ["https://nxval-minifish-2026.onrender.com"]}})
 def browser_chat_app() -> str:
     """MCP Apps iframe: interactive ChatGPT browser window without secrets."""
     return CHAT_HTML
