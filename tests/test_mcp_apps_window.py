@@ -72,7 +72,7 @@ async def test_mcp_v3_browser_tap_metadata_and_fullscreen():
     assert opened.meta['openai/widgetAccessible'] is True
     assert opened.meta['ui']['visibility'] == ['model', 'app']
     assert tapped.meta['ui']['resourceUri'] == CHAT_UI_URI
-    assert CHAT_UI_URI.endswith('browser-v3.html')
+    assert CHAT_UI_URI.endswith('browser-v4.html')
     resources = await mcp.list_resources()
     window = next(resource for resource in resources if str(resource.uri) == CHAT_UI_URI)
     assert window.meta['openai/ui']['availableDisplayModes'] == ['inline', 'fullscreen']
@@ -89,3 +89,10 @@ def test_native_chatgpt_widget_bridge_does_not_wait_on_mcp_initialize():
     assert "ready=null;" in CHAT_HTML
     assert "ui/initialize" in CHAT_HTML
 
+
+
+def test_unavailable_mcp_host_fails_fast_instead_of_waiting_on_tool_calls():
+    from chat_ui import CHAT_HTML
+    assert 'let bridgeAvailable=true;' in CHAT_HTML
+    assert 'bridgeAvailable=false;' in CHAT_HTML
+    assert "if(!bridgeAvailable)throw new Error" in CHAT_HTML
