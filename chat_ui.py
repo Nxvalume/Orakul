@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v3.html"
+CHAT_UI_URI = "ui://minifish/browser-v4.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 CHAT_TOOL_META = {
@@ -105,6 +105,7 @@ a{color:#93c9ff}
   }
  };
  let secureToken='',secureImageUrl='',secureViewport={width:960,height:675},securePoll=null;
+ let bridgeAvailable=true;
  const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Превышено время ожидания')),ms));
  const status=t=>$('status').textContent=t;
  function bridge(method,params){
@@ -119,6 +120,7 @@ a{color:#93c9ff}
   if(typeof window.openai?.callTool==='function')
     return window.openai.callTool(name,args);
   if(ready)await ready;
+  if(!bridgeAvailable)throw new Error('ChatGPT не предоставил MCP Apps-канал. Обнови подключение MiniFish или открой веб-версию ChatGPT.');
   const r=await bridge('tools/call',{name,arguments:args});
   if(r?.isError)throw new Error((r?.content||[]).filter(x=>x.type==='text').map(x=>x.text).join(' ').slice(0,200)||'Ошибка браузера');
   return r;
@@ -161,12 +163,13 @@ a{color:#93c9ff}
   ready=Promise.resolve();
  }else{
   ready=bridge('ui/initialize',{
-   appInfo:{name:'MiniFish chat browser',version:'0.5.1'},
+   appInfo:{name:'MiniFish chat browser',version:'0.5.2'},
    appCapabilities:{},protocolVersion:'2026-01-26'
   }).then(()=>{
    window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized',params:{}},'*');
   }).catch(err=>{
-   status('Клиент не поддерживает интерактивные MCP Apps: '+String(err.message||err).slice(0,100));
+   bridgeAvailable=false;
+   status('Клиент не предоставил MCP Apps: '+String(err.message||err).slice(0,100));
    // Do not cause unhandled rejections when the widget is unsupported.
    ready=null;
   });
