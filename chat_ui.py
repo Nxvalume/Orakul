@@ -21,6 +21,7 @@ CHAT_HTML = r"""<!doctype html>
 <style>
 :root{color-scheme:dark;--bg:#111b27;--panel:#1d2939;--fg:#f2f6fc;--muted:#becbd9;--accent:#54b0fd}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{font:14px/1.42 system-ui,sans-serif;margin:0;padding:12px;color:var(--fg);background:var(--bg)}
 header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}
 h1{font-size:18px;margin:0}.status{font-size:12px;color:var(--muted);margin:7px 0}
@@ -105,8 +106,15 @@ a{color:#93c9ff}
  function inputFrom(payload){
   if(!payload)return;
   const p=payload.structuredContent||payload;
-  if(p?.session_id){session=p.session_id;render()}
-  if(p?.arguments?.session_id){session=p.arguments.session_id;render()}
+  const next=p?.session_id||p?.arguments?.session_id;
+  if(next && next!==session){
+   session=next;
+   if(securePoll){clearInterval(securePoll);securePoll=null}
+   secureToken='';
+   $('unlockForm').hidden=false;$('secureTools').hidden=true;
+   $('screen').hidden=false;$('actions').hidden=false;$('form').hidden=false;
+   render();
+  }
  }
  window.addEventListener('message',ev=>{
   if(ev.source!==window.parent || ev.data?.jsonrpc!=='2.0')return;
