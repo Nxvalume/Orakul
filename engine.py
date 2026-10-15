@@ -20,6 +20,15 @@ _domains_lock = threading.Lock()
 MAX_TEXT = 16000
 MAX_SESSIONS = 1
 TTL_SECONDS = 600
+TELEGRAM_LOGIN_TTL_SECONDS = 1800  # owner authentication window; reaped afterwards
+
+
+def session_idle_limit(session) -> int:
+    """Keep an in-progress owner login open long enough for Telegram 2FA."""
+    if (session.private_mode and
+            urlsplit(session.page.url).hostname == 'web.telegram.org'):
+        return TELEGRAM_LOGIN_TTL_SECONDS
+    return TTL_SECONDS
 TIMEOUT_MS = 15000
 
 # In-browser cursor is a visual-only overlay. It never intercepts input,
@@ -205,7 +214,7 @@ class BrowserEngine:
             raise
 
     async def _cleanup_expired(self) -> None:
-        stale = [k for k, s in self._sessions.items() if time.monotonic() - s.touched > TTL_SECONDS]
+        stale = [k for k, s in self._sessions.items() if time.monotonic() - s.touched > session_idle_limit(s)]
         for sid in stale:
             s = self._sessions.pop(sid)
             await self._close_session_context(s)
@@ -230,7 +239,7 @@ class BrowserEngine:
         s = self._sessions.get(sid)
         if s is None:
             raise ValueError('Браузерная сессия не найдена. Вызовите browser_open.')
-        if time.monotonic() - s.touched > TTL_SECONDS:
+        if time.monotonic() - s.touched > session_idle_limit(s):
             raise ValueError('Браузерная сессия истекла. Вызовите browser_close, затем browser_open.')
         if s.private_mode and not owner:
             raise PermissionError('Личный режим владельца: доступ MCP временно заблокирован')
@@ -360,7 +369,7 @@ class BrowserEngine:
         now = time.monotonic()
         result = []
         for sid, s in list(self._sessions.items()):
-            if now - s.touched >= TTL_SECONDS or s.page.is_closed():
+            if now - s.touched >= session_idle_limit(s) or s.page.is_closed():
                 continue
             site = urlsplit(s.page.url).hostname or 'Загрузка страницы'
             result.append({'session_id': sid, 'site': site, 'action': s.last_action,
@@ -373,7 +382,7 @@ class BrowserEngine:
         """Existing live Telegram session, regardless of its saved profile."""
         now = time.monotonic()
         for sid, session in reversed(list(self._sessions.items())):
-            if (now-session.touched < TTL_SECONDS and not session.page.is_closed()
+            if (now-session.touched < session_idle_limit(session) and not session.page.is_closed()
                     and urlsplit(session.page.url).hostname == 'web.telegram.org'):
                 return sid
         return None
@@ -382,7 +391,7 @@ class BrowserEngine:
         """Only persist Telegram after the chat UI has replaced its login page."""
         session = self._sessions.get(sid)
         if (session is None or session.page.is_closed() or session.private_mode
-                or time.monotonic()-session.touched >= TTL_SECONDS):
+                or time.monotonic()-session.touched >= session_idle_limit(session)):
             return False
         async with session.lock:
             if urlsplit(session.page.url).hostname != 'web.telegram.org':
@@ -400,7 +409,7 @@ class BrowserEngine:
         """Secret browser state for server-side encryption only; no idle-TTL renewal."""
         session = self._sessions.get(sid)
         if (session is None or session.page.is_closed()
-                or time.monotonic()-session.touched >= TTL_SECONDS
+                or time.monotonic()-session.touched >= session_idle_limit(session)
                 or urlsplit(session.page.url).hostname != 'web.telegram.org'):
             return None
         async with session.lock:
@@ -409,6 +418,24 @@ class BrowserEngine:
             if await session.page.locator('#auth-pages').is_visible():
                 return None
             return await session.context.storage_state(indexed_db=True)
+
+    async def release_verified_telegram_login(self, sid: str) -> bool:
+        """Return control to chat only after authenticated UI was safely persisted."""
+        session = self._sessions.get(sid)
+        if session is None or session.page.is_closed():
+            return False
+        async with session.lock:
+            if (session.private_mode
+                    and urlsplit(session.page.url).hostname == 'web.telegram.org'
+                    and await session.page.locator('#column-left').is_visible()
+                    and not await session.page.locator('#auth-pages').is_visible()):
+                session.profile_name = 'telegram'
+                session.private_mode = False
+                session.pending_click = None
+                session.approved_click = None
+                session.last_action = 'Telegram: вход сохранён, управление возвращено ассистенту'
+                return True
+            return False
 
     async def live_jpeg(self, sid: str) -> bytes:
         """Read-only low-bandwidth frame that does not keep a session alive."""
@@ -638,22 +665,27 @@ class BrowserEngine:
         updated = False
         failed = False
         try:
-            if session.profile_name and self.profile_save_callback is not None:
-                # Never overwrite a saved Telegram login with a logged-out
-                # browser context or an in-progress reauthentication screen.
-                can_checkpoint = True
-                if session.profile_name == 'telegram':
+            if self.profile_save_callback is not None:
+                name = session.profile_name
+                # Users may close the owner login tab before pressing
+                # "Finish". Save a *new* authenticated Telegram session even
+                # if no profile name has been assigned by the background task.
+                telegram_page = urlsplit(session.page.url).hostname == 'web.telegram.org'
+                if telegram_page:
                     try:
-                        can_checkpoint = (
-                            urlsplit(session.page.url).hostname == 'web.telegram.org'
-                            and await session.page.locator('#column-left').is_visible()
+                        signed_in = (
+                            await session.page.locator('#column-left').is_visible()
                             and not await session.page.locator('#auth-pages').is_visible()
                         )
                     except Exception:
-                        can_checkpoint = False
-                if can_checkpoint:
+                        signed_in = False
+                    if signed_in:
+                        name = 'telegram'
+                    elif name == 'telegram':
+                        name = None  # never replace a saved login with QR state
+                if name:
                     state = await session.context.storage_state(indexed_db=True)
-                    await self.profile_save_callback(session.profile_name, state)
+                    await self.profile_save_callback(name, state)
                     updated = True
         except Exception:
             # Do not leak cookies or credentials into errors or logs.
