@@ -383,7 +383,7 @@ class BrowserEngine:
     async def telegram_authenticated_state(self, sid: str) -> dict | None:
         """Secret browser state for server-side encryption only; no idle-TTL renewal."""
         session = self._sessions.get(sid)
-        if (session is None or session.page.is_closed() or session.private_mode
+        if (session is None or session.page.is_closed()
                 or time.monotonic()-session.touched >= TTL_SECONDS
                 or urlsplit(session.page.url).hostname != 'web.telegram.org'):
             return None
@@ -412,9 +412,9 @@ class BrowserEngine:
         except (asyncio.TimeoutError, TimeoutError):
             raise TimeoutError('Кадр временно недоступен') from None
 
-    async def export_state(self, sid: str) -> dict:
-        """Get browser cookies/localStorage to save encrypted; never expose via MCP result."""
-        s = self.get(sid)
+    async def export_state(self, sid: str, *, owner: bool = False) -> dict:
+        """Get browser storage for encryption; owner-only private-mode export."""
+        s = self.get(sid, owner=owner)
         async with s.lock:
             return await s.context.storage_state(indexed_db=True)
 
@@ -431,13 +431,37 @@ class BrowserEngine:
             return await s.page.screenshot(type='png', full_page=False, timeout=TIMEOUT_MS)
 
     async def owner_set_private(self, sid: str, enabled: bool) -> dict:
+        """Owner release immediately checkpoints Telegram before MCP can resume.
+
+        The owner must explicitly end private mode; no chat-agent access to
+        private browser state is created by the checkpoint operation.
+        """
         s = self.get(sid, owner=True)
+        profile_saved = False
+        save_error = None
         async with s.lock:
+            if (not enabled and s.private_mode
+                    and urlsplit(s.page.url).hostname == 'web.telegram.org'
+                    and self.profile_save_callback is not None):
+                try:
+                    signed_in = (
+                        await s.page.locator('#column-left').is_visible()
+                        and not await s.page.locator('#auth-pages').is_visible())
+                    if signed_in:
+                        state = await s.context.storage_state(indexed_db=True)
+                        await self.profile_save_callback('telegram', state)
+                        s.profile_name = 'telegram'
+                        profile_saved = True
+                except Exception as exc:
+                    # Never include credentials, pages, URLs or raw exception
+                    # details in the owner-visible error response.
+                    save_error = 'Не удалось сохранить вход (' + type(exc).__name__ + ')'
             s.private_mode = bool(enabled)
             s.pending_click = None
             s.approved_click = None
             s.last_action = ('Личный режим владельца' if enabled else 'Управление ассистента разрешено')
-            return {'private_mode': s.private_mode}
+            return {'private_mode': s.private_mode,
+                    'profile_saved': profile_saved, 'save_error': save_error}
 
     async def owner_approve_click(self, sid: str, request_id: str) -> dict:
         s = self.get(sid, owner=True)
