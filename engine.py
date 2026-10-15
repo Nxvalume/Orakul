@@ -544,6 +544,20 @@ class BrowserEngine:
         if action == 'navigate':
             await asyncio.to_thread(validate_url, url)
         async with s.lock:
+            if (urlsplit(s.page.url).hostname == 'web.telegram.org'
+                    and action in ('click', 'click_element')
+                         or (urlsplit(s.page.url).hostname == 'web.telegram.org'
+                             and action == 'key' and key == 'Enter')):
+                # Never retry Telegram authentication after a flood notice.
+                # Detect the notice locally; do not send the page or credentials
+                # to ChatGPT or application logs.
+                try:
+                    flooded = await s.page.locator('body').evaluate(
+                        """body => body.innerText.includes('PHONE_PASSWORD_FLOOD')""")
+                except Exception:
+                    flooded = False
+                if flooded:
+                    raise ValueError('Telegram ограничил попытки входа (PHONE_PASSWORD_FLOOD). Повторные попытки через MiniFish остановлены. Дождитесь разрешения Telegram.')
             if action == 'click':
                 if (isinstance(x, bool) or isinstance(y, bool)
                         or not isinstance(x, (int, float)) or not isinstance(y, (int, float))):
