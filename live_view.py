@@ -14,7 +14,7 @@ from web_auth import authorized
 
 LOGIN_PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>MiniFish — вход владельца</title><style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{background:#0d121a;color:#eaf3f5;font:16px system-ui;margin:0;padding:22px 16px}main{max-width:460px;margin:8vh auto;background:#151f2b;border:1px solid #304051;border-radius:16px;padding:22px}h1{font-size:24px}label{display:block;margin:16px 0 8px}input,button{font:inherit;min-height:52px;border-radius:11px;width:100%;padding:12px}input{background:#0e1721;color:white;border:1px solid #52697c}button{margin-top:12px;background:#5dd6ba;color:#102019;border:0;font-weight:700}p{color:#bcc9d6;font-size:14px;line-height:1.6}#error{color:#ffae92}</style></head>
-<body><main><h1>MiniFish · Прямой эфир</h1><p>Сначала войди как владелец MiniFish, затем откроется экран Telegram и поля ввода с телефона.</p><label for="ownerPassword">Пароль владельца MiniFish</label><input id="ownerPassword" type="password" autocomplete="current-password" placeholder="Пароль MiniFish"><button id="ownerLogin" type="button">Войти и открыть браузер</button><p id="error" role="status"></p><p>Это пароль MiniFish, не код и не пароль Telegram. Секреты Telegram вводятся на следующем экране.</p></main>
+<body><main><h1>MiniFish · Вход владельца</h1><p>Шаг 1 из 2. Введи пароль самой панели MiniFish. На следующем экране появится браузер Telegram и отдельное поле для авторизации.</p><label for="ownerPassword">Пароль владельца MiniFish</label><input id="ownerPassword" type="password" autocomplete="current-password" placeholder="Пароль MiniFish"><button id="ownerLogin" type="button">Войти и открыть браузер</button><p id="error" role="status"></p><p>Это пароль MiniFish, не код и не пароль Telegram. Секреты Telegram вводятся на следующем экране.</p></main>
 <script>
 document.getElementById('ownerLogin').onclick=async()=>{
  const button=document.getElementById('ownerLogin');button.disabled=true;
@@ -32,16 +32,61 @@ document.getElementById('ownerPassword').onkeydown=e=>{if(e.key==='Enter')docume
 PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="dark"><title>MiniFish — прямой эфир</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}body{background:#0d121a;color:#eaf3f5;font:15px system-ui,sans-serif;margin:0}main{max-width:1050px;margin:auto;padding:16px 12px 36px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}h1{font-size:21px;margin:12px 0}a{color:#5dd6ba;text-decoration:none}.panel{border:1px solid #304051;background:#151f2b;border-radius:15px;padding:14px;margin-top:12px}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.muted{color:#9daec0}.indicator{height:9px;width:9px;border-radius:50%;background:#667788;display:inline-block;margin-right:7px}.indicator.live{background:#5dd6ba;box-shadow:0 0 12px #5dd6ba}select,button{background:#213240;border:1px solid #405568;color:#eef;border-radius:9px;padding:11px;min-height:44px}select{flex:1;min-width:120px}.screen{background:#060a11;border-radius:12px;border:1px solid #304051;overflow:hidden;min-height:200px;display:flex;align-items:center;justify-content:center;position:relative}.screen img{width:100%;height:auto;display:none;object-fit:contain}.screen p{padding:40px 10px;text-align:center;color:#99adbe}.status{overflow-wrap:anywhere;font-size:13px}.hint{font-size:13px;color:#9daec0;line-height:1.5}input{background:#101721;border:1px solid #405568;color:#eef;border-radius:9px;padding:11px;min-height:44px;flex:1;min-width:120px}.small{font-size:13px}.keys{margin-top:9px;display:flex;flex-wrap:wrap;gap:7px}.screen.interactive img{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.tap-layer{position:absolute;inset:0;z-index:5;touch-action:none;cursor:crosshair;display:none}.screen.interactive .tap-layer{display:block}.site-actions{display:flex;flex-wrap:wrap;gap:8px;max-height:190px;overflow-y:auto;padding:8px 0}.site-actions button{max-width:100%;overflow-wrap:anywhere;text-align:left}.browser-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.browser-nav input{min-width:160px;flex:1}.browser-nav button{flex:0 0 auto}.quickpanel{border-color:#5dd6ba}.quickpanel h2{margin:0 0 8px}.quickpanel label{display:block;margin:12px 0 6px;font-weight:600}.quickpanel input,.quickpanel select{width:100%;min-width:0;font-size:17px;min-height:52px}.quickpanel button{font-weight:600}.quickpanel .primary{background:#5dd6ba;border-color:#5dd6ba;color:#0b211b}.quickpanel .row{align-items:stretch}.quickpanel .row button{flex:1}.quickpanel #quickFeedback{min-height:21px}.quickpanel .security{color:#bed1de}.stream-input{margin:12px 0;padding:12px;border:1px solid #5dd6ba;border-radius:12px;background:#18303a}.stream-input label{display:block;font-weight:700;margin-bottom:8px}.stream-input .row{flex-wrap:nowrap}.stream-input input{min-width:0;flex:1;font-size:17px;min-height:52px}.stream-input button{background:#5dd6ba;color:#0b211b;font-weight:700;min-width:104px}.stream-input .hint{margin:8px 0 0}
+.start-panel{border-color:#5dd6ba;background:#102d34}
+.start-panel h2{margin:0 0 6px;font-size:20px}
+.start-panel .primary-start{width:100%;background:#5dd6ba;color:#092621;font-size:17px;font-weight:700;border:0}
+.start-panel .guide-steps{margin:10px 0 4px;padding-left:21px;line-height:1.6;color:#d3e4ec}
+.start-panel .guide-steps li{padding:2px 0}
+#loginPhase{display:inline-block;font-weight:700;color:#5dd6ba;margin:4px 0}
+#telegramSavedStatus{margin:8px 0 0;font-size:13px}
+.advanced{margin-bottom:12px;border:1px solid #304051;border-radius:10px;padding:10px}
+.advanced summary{cursor:pointer;font-weight:600;min-height:36px}
+.advanced[open] summary{margin-bottom:10px}
+.stream-input .input-instructions{margin:4px 0 10px;font-weight:500;color:#d3e4ec}
+.stream-input #streamEntry{width:100%;min-width:0}
+.stream-input #streamInsert,.stream-input #streamNext{width:100%;min-height:52px;font-size:17px}
+.stream-input .row{flex-wrap:wrap}
+.stream-input .flow-caption{margin:14px 0 6px;font-size:14px;font-weight:700}
+#streamInputStatus{font-size:14px;min-height:42px}
+@media(max-width:480px){main{padding:10px 10px 24px}.panel{padding:12px;margin-top:10px}.start-panel .guide-steps{font-size:14px}.top h1{font-size:19px}.stream-input{padding:12px}.screen{min-height:170px}}
 </style></head><body><main><div class="top"><h1>MiniFish · Прямой эфир</h1><a href="/">Панель ↗</a></div>
+<section class="panel start-panel" aria-labelledby="telegramTitle">
+<h2 id="telegramTitle">Вход в Telegram</h2>
+<div id="loginPhase" role="status">Шаг 1 · Открой Telegram</div>
+<button type="button" class="primary-start" id="openTelegram">Открыть Telegram в MiniFish</button>
+<ol class="guide-steps">
+<li>Открой Telegram кнопкой выше.</li>
+<li>Нужное поле выбери под изображением Telegram.</li>
+<li>Введи данные в <strong>одно поле под экраном</strong> и нажми «Вставить в Telegram».</li>
+<li>Нажми «Продолжить» только один раз. Повтори шаги для следующего экрана.</li>
+</ol>
+<p class="hint">Пароль от панели MiniFish и пароль Telegram — разные. Номер, коды и пароль Telegram вводи только на этой защищённой странице, не в чате.</p>
+<p id="quickFeedback" class="status" role="status">Сначала открой Telegram. Если он уже открыт, сразу переходи к экрану ниже.</p>
+<p id="telegramSavedStatus" class="hint" role="status">Состояние Telegram проверяется…</p>
+</section>
 <div class="panel"><div class="row"><span id="led" class="indicator"></span><strong id="state">Ожидаем сессию</strong><select id="sessions" aria-label="Сессия браузера"></select></div><p id="details" class="status muted">Ищу активный браузер…</p></div>
-<div class="panel"><h2 style="margin-top:0">Браузер MiniFish — любой HTTPS-сайт</h2>
+<div class="panel"><h2 style="margin-top:0">Экран браузера</h2>
+<p class="hint">Ниже — настоящая страница Telegram. Нажимай на неё, чтобы выбрать нужный способ входа. Печатать удобнее в отдельном поле сразу под экраном.</p>
+<details class="advanced"><summary>Другие сайты, навигация и дополнительные кнопки</summary>
 <div class="browser-nav"><input id="urlBar" type="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="https://example.com" aria-label="Адрес сайта"><button type="button" id="goUrl">Перейти</button></div>
 <div class="browser-nav"><button id="goBack" type="button">← Назад</button><button id="reloadPage" type="button">↻ Обновить</button><button id="scrollUp" type="button">↑ Прокрутить</button><button id="scrollDown" type="button">↓ Прокрутить</button><button id="closeBrowser" type="button">Закрыть браузер</button></div>
 <div class="row" style="margin-bottom:8px"><button type="button" id="refreshActions">Кнопки сайта · обновить</button><span class="status" id="clickStatus">Нажимай на экран или используй кнопки ниже</span></div>
-<div id="actionButtons" class="site-actions" aria-label="Нажимаемые кнопки текущего сайта"></div>
+<div id="actionButtons" class="site-actions" aria-label="Нажимаемые кнопки текущего сайта"></div></details>
 <div class="row" style="margin-bottom:12px"><button type="button" id="touch" aria-pressed="true">Нажатия включены · Выключить</button><span id="manualStatus" class="status small">Касания по экрану включены</span></div>
 <div class="screen interactive"><p id="placeholder">Пока нет активных страниц. Запусти задачу через ChatGPT и MiniFish.</p><img id="live" alt="Прямая трансляция экрана браузера MiniFish"><div id="tapLayer" class="tap-layer" role="button" aria-label="Нажать на изображение браузера"></div></div>
-<div class="stream-input"><div class="row"><label for="targetField">Поле текущего сайта</label><button type="button" id="fieldRefreshTop">Обновить поля</button></div><select id="targetField" aria-label="Поле ввода на текущем сайте" style="width:100%;margin-bottom:10px"><option value="">Поиск полей…</option></select><label for="streamEntry">ВВОД С ТЕЛЕФОНА — ПЕЧАТАЙ СЮДА</label><div class="row"><input type="text" id="streamEntry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер, сообщение или код"><button id="streamInsert" type="button">Вставить</button></div><div class="row" style="margin-top:8px"><button id="streamNext" type="button" style="width:100%;background:#24619b;color:#fff">Продолжить вход · NEXT</button></div><p id="streamInputStatus" class="hint" role="status">Поле ввода телефона: сначала «Вставить», затем отдельно «Продолжить вход · NEXT». Данные остаются в защищённом MiniFish, не в чате.</p><p class="hint">Если Telegram пишет PHONE_PASSWORD_FLOOD, это временное ограничение самого Telegram. Не повторяй попытки входа.</p></div>
+<section class="stream-input" aria-labelledby="inputTitle">
+<h2 id="inputTitle" style="font-size:19px;margin:0 0 8px">Ввод данных в Telegram</h2>
+<div class="row"><label for="targetField">1. Куда вводить?</label><button type="button" id="fieldRefreshTop">Обновить поля</button></div>
+<select id="targetField" aria-label="Поле ввода на текущем сайте" style="width:100%;margin-bottom:10px"><option value="">Поиск полей…</option></select>
+<p class="input-instructions">Выбери поле из списка. Если нужного нет — нажми «Обновить поля» после загрузки страницы.</p>
+<label id="entryLabel" for="streamEntry">2. Что ввести? Вводи только сюда</label>
+<input type="text" id="streamEntry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер, код или пароль" aria-describedby="streamInputStatus">
+<div class="row" style="margin-top:9px"><button id="streamInsert" type="button">Вставить в Telegram</button></div>
+<p class="flow-caption">3. Подтверди ввод после успешной вставки</p>
+<button id="streamNext" type="button" style="background:#24619b;color:#fff">Продолжить · NEXT</button>
+<p id="streamInputStatus" class="hint" role="status">Поле ввода телефона: сначала «Вставить в Telegram», затем отдельно «Продолжить · NEXT». Пароль не отправляется в ChatGPT.</p>
+<p class="hint">Если Telegram сообщает PHONE_PASSWORD_FLOOD, не повторяй попытки входа до снятия ограничения Telegram.</p>
+</section>
 <p class="hint">Непрерывная трансляция Chromium до 12 кадров/с, без звука и записи. Если WebSocket недоступен, включится резервный режим с редкими кадрами. Экран обновляется во время переходов, прокрутки и нажатий. Сессии исчезают после закрытия или перезапуска сервера.</p></div>
 <div class="panel" style="border-color:#e8bf79"><h2 style="margin-top:0">Безопасное управление</h2>
 <p id="privateState" role="status">Режим доступа ассистента: проверяю…</p>
@@ -51,19 +96,13 @@ PAGE = '''<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name=
 <strong>Подтверждение опасного действия</strong><p id="approvalLabel" class="hint"></p>
 <div class="row"><button id="approveAction" type="button">Разрешить один раз</button><button id="rejectAction" type="button">Отклонить</button></div>
 </div></div>
-<details class="panel"><summary style="font-weight:600;cursor:pointer;min-height:44px">Дополнительно: вход в Telegram</summary><div class="quickpanel"><h2>Ввод в Telegram с телефона</h2><p class="hint">Печатай здесь, а MiniFish вставит данные в поле настоящего Telegram Web. Нажимать на мелкие поля видеотрансляции не нужно.</p>
-<div class="row"><button type="button" id="openTelegram">Открыть Telegram</button><button type="button" id="fieldRefresh">Обновить поля</button></div>
-<p id="telegramSavedStatus" class="hint" role="status">После первого входа Telegram сохранится автоматически. Повторно вводить номер и код обычно не потребуется.</p>
 
-<label for="quickValue">Что ввести</label><input id="quickValue" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Номер телефона или код">
-<div class="row" style="margin-top:12px"><button class="primary" id="quickApply" type="button">Вставить в Telegram</button><button id="quickNext" type="button">Продолжить (NEXT)</button></div>
-<p id="quickFeedback" class="status" role="status">Выбери поле и введи данные.</p><p class="hint security">Номер, коды и пароль не отправляются в ChatGPT. Не пересылай их в чат.</p></div></details>
-<div class="panel"><h2>Управление браузером с телефона</h2><p class="hint">Для входа в сторонний аккаунт открой сайт через MiniFish. Включи клики и нажимай прямо на изображение. Пароль или код вводи здесь — данные передаются в браузер, но не в чат ChatGPT и не отображаются в истории MiniFish.</p>
+<details class="panel"><summary style="font-weight:600;cursor:pointer;min-height:44px">Дополнительно: управление другими сайтами</summary><h2>Дополнительное управление браузером</h2><p class="hint">Для входа в сторонний аккаунт открой сайт через MiniFish. Включи клики и нажимай прямо на изображение. Пароль или код вводи здесь — данные передаются в браузер, но не в чат ChatGPT и не отображаются в истории MiniFish.</p>
 <div class="row" style="margin-top:12px"><input id="profileName" placeholder="Имя профиля, например telegram" maxlength="40" autocapitalize="off" spellcheck="false"><button id="saveProfile" type="button">Сохранить вход</button></div>
 <p id="storageHint" class="hint">Статус постоянного хранения уточняется…</p>
 <div class="row" style="margin-top:12px"><input type="password" id="entry" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Текст, пароль или одноразовый код"><button type="button" id="type">Ввести в браузер</button></div>
 <div class="keys"><button data-key="Tab">Tab</button><button data-key="Enter">Enter</button><button data-key="Backspace">⌫</button><button data-key="Escape">Esc</button><button data-key="ControlOrMeta+A">Выделить всё</button></div>
-<p class="hint">Telegram после успешного входа сохраняется автоматически в зашифрованной базе. Для других сайтов кнопку «Сохранить вход» можно использовать вручную. Активный браузер закрывается при перезапуске сервера, но сохранённый профиль можно восстановить.</p></div>
+<p class="hint">Telegram после успешного входа сохраняется автоматически в зашифрованной базе. Для других сайтов кнопку «Сохранить вход» можно использовать вручную. Активный браузер закрывается при перезапуске сервера, но сохранённый профиль можно восстановить.</p></details>
 </main><script>
 const $=id=>document.getElementById(id);
 let current='',streaming=false,videoSocket=null,frameUrl=null,videoFallback=false;
@@ -196,12 +235,12 @@ $('scrollDown').onclick=()=>ownerAction('scroll',{pixels:550});
 async function refreshFields(){
  const select=$('targetField'), prior=select.value;
  select.replaceChildren();
- if(!current){let o=document.createElement('option');o.value='';o.textContent='Сначала открой сайт';select.append(o);return;}
+ if(!current){let o=document.createElement('option');o.value='';o.textContent='Сначала открой Telegram';select.append(o);return;}
  try{
   const r=await fetch('/live/fields?session_id='+encodeURIComponent(current),{credentials:'same-origin',cache:'no-store'});
   const d=await r.json();if(!r.ok)throw Error(d.error||'Нет связи');
   const fields=d.fields||[];
-  if(!fields.length){let o=document.createElement('option');o.value='';o.textContent='На этой странице нет полей ввода';select.append(o);return;}
+  if(!fields.length){let o=document.createElement('option');o.value='';o.textContent='Полей нет — открой экран входа Telegram';select.append(o);return;}
   for(const f of fields){let o=document.createElement('option');o.value=String(f.index);o.textContent=(f.index+1)+'. '+(f.label||'Поле')+(f.kind==='password'?' (пароль)':'');o.dataset.kind=f.kind||'text';select.append(o);}
   if(fields.some(f=>String(f.index)===prior)){select.value=prior;}
   else {
@@ -209,18 +248,22 @@ async function refreshFields(){
    select.value=String((priority||fields[fields.length-1]).index);
   }
   setQuickInput();
- }catch(e){$('quickFeedback').textContent='Не удалось прочитать поля: '+e.message}
+ }catch(e){$('streamInputStatus').textContent='Не удалось обновить поля: '+e.message}
 }
 function setQuickInput(){
  const item=$('targetField').selectedOptions[0];
  const kind=item?.dataset.kind||'text';
  const label=(item?.textContent||'').toLowerCase();
  const secret=kind==='password'||/password|парол|code|код/i.test(label);
- const entry=$('quickValue');entry.type=secret?'password':'text';
- entry.inputMode=/phone|номер|телефон|код|code/i.test(label)?'tel':'text';
- entry.placeholder=secret?'Код или пароль':'Номер телефона или другой текст';
- const stream=$('streamEntry');stream.type=entry.type;stream.inputMode=entry.inputMode;
- stream.placeholder=entry.placeholder;
+ const stream=$('streamEntry');
+ stream.type=secret?'password':'text';
+ stream.inputMode=/phone|номер|телефон|код|code/i.test(label)?'tel':'text';
+ const isPhone=/phone|номер|телефон|mobile/.test(label);
+ const isPassword=kind==='password'||/password|пароль|парол/.test(label);
+ const isCode=/code|код|otp|verification/.test(label);
+ $('entryLabel').textContent=isPassword?'2. Введи дополнительный пароль Telegram':isCode?'2. Введи код из Telegram':isPhone?'2. Введи номер телефона':'2. Введи данные в выбранное поле';
+ stream.placeholder=isPassword?'Пароль Telegram':isCode?'Код подтверждения':isPhone?'Номер телефона':'Ввод с телефона';
+ $('loginPhase').textContent=isPassword?'Дополнительная защита · пароль Telegram':isCode?'Подтверждение · код Telegram':isPhone?'Авторизация · номер телефона':'Следуй инструкции на экране Telegram';
 }
 $('targetField').onchange=setQuickInput;
 $('fieldRefresh').onclick=refreshFields;
@@ -249,34 +292,24 @@ async function checkTelegramStatus(){
     (privateMode?'Личный режим: после успешного входа проверь сохранение или нажми «Вернуть управление ассистенту».':
                   data.logged_in?'Авторизация активна, но в базе ещё НЕ сохранена.':
                                  'Авторизации в базе нет. После входа проверь подтверждение сохранения.');
+  if(data.logged_in&&data.saved&&data.durable){$('loginPhase').textContent='Вход завершён · сохранено';}
  }catch(e){}
 }
 setInterval(checkTelegramStatus,18000);
-$('quickApply').onclick=async()=>{
- const field=$('targetField').value, entry=$('quickValue');
- if(field===''||!current){$('quickFeedback').textContent='Сначала выбери открытую сессию и поле.';return;}
- if(!entry.value){$('quickFeedback').textContent='Введите данные в поле над кнопкой.';return;}
- const ok=await ownerAction('fill_field',{field_index:Number(field),text:entry.value});
- if(ok){entry.value='';$('quickFeedback').textContent='Поле Telegram заполнено. Нажми «Продолжить (NEXT)», чтобы отправить его на проверку.';await refreshFields();}
- else {$('quickFeedback').textContent=$('manualStatus').textContent;}
-};
-$('quickNext').onclick=async()=>{
- const ok=await ownerAction('telegram_next');
- $('quickFeedback').textContent=ok?'Кнопка NEXT нажата. Ожидай ответ Telegram.':$('manualStatus').textContent;
- if(ok){await new Promise(resolve=>setTimeout(resolve,450));await refreshFields();}
-};
-$('quickValue').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('quickApply').click()}});
 $('streamInsert').onclick=async()=>{
  const input=$('streamEntry'),field=$('targetField').value;
  if(!current||!streaming){$('streamInputStatus').textContent='Сначала открой любой сайт в MiniFish.';return;}
- if(field===''){$('streamInputStatus').textContent='Нажми «Обновить поля» и выбери поле Telegram в списке выше.';return;}
- if(!input.value){$('streamInputStatus').textContent='Сначала введи текст в настоящее поле над этой кнопкой.';input.focus();return;}
+ if(field===''){$('streamInputStatus').textContent='Выбери нужное поле из списка. Если список пуст, нажми «Обновить поля».';return;}
+ if(!input.value){$('streamInputStatus').textContent='Введи номер, код или пароль в поле прямо над кнопкой «Вставить в Telegram».';input.focus();return;}
  const text=input.value;
+ $('streamInsert').disabled=true;
  $('streamInputStatus').textContent='Передаю ввод в защищённый браузер…';
- const ok=await ownerAction('fill_field',{field_index:Number(field),text});
+ let ok=false;
+ try{ok=await ownerAction('fill_field',{field_index:Number(field),text});}
+ finally{$('streamInsert').disabled=false;}
  if(ok)input.value='';
  $('streamInputStatus').textContent=ok?'Ввод подтверждён браузером. Для проверки Telegram нажми «Продолжить вход · NEXT».':'Ввод не подтверждён: '+$('manualStatus').textContent;
- if(ok)await refreshFields();
+ if(ok){$('loginPhase').textContent='Текст вставлен. Нажми «Продолжить» один раз.';await refreshFields();}
 };
 $('streamEntry').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('streamInsert').click();}});
 $('streamNext').onclick=async()=>{
@@ -285,7 +318,7 @@ $('streamNext').onclick=async()=>{
  try{
   const ok=await ownerAction('telegram_next');
   $('streamInputStatus').textContent=ok?'NEXT нажат один раз. Ожидай ответ Telegram; не повторяй попытку при ошибке авторизации.':'Не удалось нажать NEXT: '+$('manualStatus').textContent;
-  if(ok){await new Promise(resolve=>setTimeout(resolve,650));await refreshFields();await checkTelegramStatus();}
+  if(ok){$('loginPhase').textContent='Ожидаем ответ Telegram…';await new Promise(resolve=>setTimeout(resolve,650));await refreshFields();await checkTelegramStatus();}
  }finally{btn.disabled=false;}
 };
 $('privateStart').onclick=async()=>{if(!current)return;await ownerAction('private_mode',{enabled:true})};
