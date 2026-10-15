@@ -155,15 +155,10 @@ function selectSession(id){
 }
 $('sessions').onchange=()=>{deepSession='';stop();current='';selectSession($('sessions').value)};
 $('live').onerror=()=>{if(!videoFallback)setState('Ожидаю следующий кадр…',false)};
-async function update(){try{let res=await fetch('/live/sessions',{cache:'no-store',credentials:'same-origin'});if(res.status===401){stop();setState('Требуется вход',false);$('details').textContent='Войди через главную панель MiniFish.';return}if(!res.ok)throw Error('Ошибка сервера '+res.status);let list=(await res.json()).sessions||[];let wanted=current&&list.some(x=>x.session_id===current)?current:(deepSession&&list.some(x=>x.session_id===deepSession)?deepSession:(list[0]?.session_id||''));let choice=$('sessions');if(choice.options.length!==list.length||Array.from(choice.options).some((o,i)=>o.value!==list[i].session_id)){choice.replaceChildren();for(let s of list){let o=document.createElement('option');o.value=s.session_id;o.textContent=s.site||'Страница';choice.append(o)}}choice.value=wanted; if(!wanted){
+async function update(){try{let res=await fetch('/live/sessions',{cache:'no-store',credentials:'same-origin'});if(res.status===401){stop();setState('Требуется вход',false);$('details').textContent='Войди через главную панель MiniFish.';return}if(!res.ok)throw Error('Ошибка сервера '+res.status);let list=(await res.json()).sessions||[];let telegramSession=list.find(x=>x.site==='web.telegram.org')?.session_id||'';if(launchTelegramIfEmpty){launchTelegramIfEmpty=false;if(!telegramSession){$('details').textContent='Открываю Telegram вместо служебной страницы…';setTimeout(()=>$('openTelegram').click(),80);return;}}let wanted=current&&list.some(x=>x.session_id===current)?current:(deepSession&&list.some(x=>x.session_id===deepSession)?deepSession:(telegramSession||list[0]?.session_id||''));let choice=$('sessions');if(choice.options.length!==list.length||Array.from(choice.options).some((o,i)=>o.value!==list[i].session_id)){choice.replaceChildren();for(let s of list){let o=document.createElement('option');o.value=s.session_id;o.textContent=s.site||'Страница';choice.append(o)}}choice.value=wanted; if(!wanted){
   selectSession('');
   $('details').textContent='Активного браузера нет. Сохранённый профиль Telegram можно восстановить при новом открытии.';
   if(!window.__mfLastEmptyStatus||Date.now()-window.__mfLastEmptyStatus>17000){window.__mfLastEmptyStatus=Date.now();checkTelegramStatus();}
-  if(launchTelegramIfEmpty){
-    launchTelegramIfEmpty=false;
-    $('details').textContent='Открываю Telegram в новой защищённой сессии…';
-    setTimeout(()=>$('openTelegram').click(),80);
-  }
   return
  }if(wanted!==current||!streaming)selectSession(wanted);let item=list.find(s=>s.session_id===wanted);if(item?.viewport?.width>0&&item?.viewport?.height>0)currentViewport=item.viewport;
  privateMode=!!item?.private_mode;pendingClick=item?.pending_click||null;
@@ -171,7 +166,7 @@ async function update(){try{let res=await fetch('/live/sessions',{cache:'no-stor
  $('privateStart').disabled=privateMode;$('privateFinish').disabled=!privateMode;
  $('approvalPanel').style.display=pendingClick&&!privateMode?'block':'none';
  if(pendingClick&&!privateMode)$('approvalLabel').textContent='Сайт: '+new URL(pendingClick.url).hostname+'; действие: '+pendingClick.label;
- $('details').textContent=(item?.site||'Сайт')+' · Последнее действие: '+(item?.action||'Открыта страница');}catch(e){setState('Нет связи',false);$('details').textContent=e.message}}
+ $('details').textContent=item?.site===new URL(location.origin).hostname?'Служебная проверка сервера — нажми «Открыть Telegram» сверху.':(item?.site||'Сайт')+' · Последнее действие: '+(item?.action||'Открыта страница');}catch(e){setState('Нет связи',false);$('details').textContent=e.message}}
 async function refreshActions(){
  if(actionsLoading)return;
  const wrap=$('actionButtons');
