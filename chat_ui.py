@@ -89,8 +89,8 @@ a{color:#93c9ff}
  const SECURE_BASE='https://nxval-minifish-2026.onrender.com/chat/secure/';
  const fallbackLink=$('secureFallbackLink');
  function trustedLoginUrl(){
-  const base='https://nxval-minifish-2026.onrender.com/live';
-  return session?base+'?session_id='+encodeURIComponent(session):base;
+  const base='https://nxval-minifish-2026.onrender.com/live?telegram=1';
+  return session?base+'&session_id='+encodeURIComponent(session):base;
  }
  fallbackLink.href=trustedLoginUrl();
  fallbackLink.onclick=event=>{
