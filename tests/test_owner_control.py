@@ -97,7 +97,7 @@ async def test_owner_mobile_fill_field_never_replies_with_secret():
     engine, page = mock_browser()
     field = SimpleNamespace(
         get_attribute=AsyncMock(return_value='tel'),
-        fill=AsyncMock())
+        fill=AsyncMock(), evaluate=AsyncMock(return_value=True))
     fields = SimpleNamespace(count=AsyncMock(return_value=2),
                              nth=lambda idx: field)
     page.locator = lambda selector: fields
@@ -108,6 +108,7 @@ async def test_owner_mobile_fill_field_never_replies_with_secret():
     assert secret not in str(result)
     assert secret not in engine._sessions['session'].last_action
     field.fill.assert_awaited_once_with(secret, timeout=15000)
+    field.evaluate.assert_awaited_once()
     with pytest.raises(ValueError):
         await engine.owner_control('session', 'fill_field', field_index=-1,
                                    text=secret)
@@ -370,3 +371,54 @@ async def test_tap_rejects_out_of_bounds_positions():
         with pytest.raises(ValueError):
             await engine.tap('session', *xy)
     page.evaluate.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_owner_password_fill_does_not_report_false_success():
+    engine, page = mock_browser()
+    field = SimpleNamespace(
+        get_attribute=AsyncMock(return_value='password'),
+        fill=AsyncMock(), evaluate=AsyncMock(return_value=False))
+    page.locator = lambda selector: SimpleNamespace(
+        count=AsyncMock(return_value=1), nth=lambda index: field)
+    with pytest.raises(ValueError, match='Поле не приняло ввод') as exc:
+        await engine.owner_control('session', 'fill_field',
+                                   field_index=0, text='sample-private-value')
+    assert 'sample-private-value' not in str(exc.value)
+    field.fill.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_owner_telegram_next_click_is_explicit_and_only_for_telegram():
+    engine, page = mock_browser()
+    button = SimpleNamespace(count=AsyncMock(return_value=1), click=AsyncMock())
+    page.get_by_role = lambda role, name, exact: button
+    page.locator = lambda selector: SimpleNamespace(evaluate=AsyncMock(return_value=False))
+    with pytest.raises(ValueError, match='только в Telegram'):
+        await engine.owner_control('session', 'telegram_next')
+    button.click.assert_not_awaited()
+    page.url = 'https://web.telegram.org/k/'
+    result = await engine.owner_control('session', 'telegram_next')
+    assert result['ok'] is True
+    button.click.assert_awaited_once_with(timeout=15000)
+    assert 'парол' not in str(result).lower()
+
+
+@pytest.mark.asyncio
+async def test_owner_telegram_next_refuses_flood_retries():
+    engine, page = mock_browser()
+    page.url = 'https://web.telegram.org/k/'
+    page.locator = lambda selector: SimpleNamespace(evaluate=AsyncMock(return_value=True))
+    button = SimpleNamespace(count=AsyncMock(return_value=1), click=AsyncMock())
+    page.get_by_role = lambda role, name, exact: button
+    with pytest.raises(ValueError, match='PHONE_PASSWORD_FLOOD'):
+        await engine.owner_control('session', 'telegram_next')
+    button.click.assert_not_awaited()
+
+
+def test_mobile_telegram_password_has_explicit_next_button():
+    from live_view import PAGE
+    assert 'id="streamNext"' in PAGE
+    assert "ownerAction('telegram_next')" in PAGE
+    assert "if(ok)input.value='';" in PAGE
+    assert 'Ввод подтверждён браузером' in PAGE
