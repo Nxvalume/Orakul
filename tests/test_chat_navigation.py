@@ -17,8 +17,10 @@ def test_shared_address_bar_uses_same_session_and_private_uses_owner_channel():
     assert "act('browser_goto',{session_id:session,url})" in CHAT_HTML
     assert "secureAction('navigate',{url})" in CHAT_HTML
     assert "if(!secureToken)" in CHAT_HTML
-    assert "cleanSiteUrl($('secureUrl').value)" in CHAT_HTML
-    assert "cleanSiteUrl($('navUrl').value)" in CHAT_HTML
+    assert "resolveOmnibox($('secureUrl').value)" in CHAT_HTML
+    assert "resolveOmnibox($('navUrl').value)" in CHAT_HTML
+    assert 'id="navUrl" type="search" inputmode="search"' in CHAT_HTML
+    assert 'id="secureUrl" type="search" inputmode="search"' in CHAT_HTML
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="Node.js unavailable")
@@ -65,3 +67,45 @@ def test_domain_dns_resolution_must_be_public_even_if_public_https_enabled(monke
                         lambda *a, **k: [(socket.AF_INET,socket.SOCK_STREAM,0,"",("10.0.0.2",443))])
     with pytest.raises(ValueError):
         validate_url("https://example.com/")
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="Node.js unavailable")
+def test_android_omnibox_resolves_russian_queries_and_bare_domains():
+    import json
+    helpers = re.search(
+        r"(?ms)^ function cleanSiteUrl\(raw\)\{.*?^ \}\n"
+        r"^ function resolveOmnibox\(raw\)\{.*?^ \}", CHAT_HTML)
+    assert helpers is not None
+    samples = [
+        ('телеграмм', 'search'),
+        ('как установить телеграмм', 'search'),
+        ('Telegram', 'search'),
+        ('site:telegram.org мессенджер', 'search'),
+        ('foo bar.com', 'search'),
+        ('telegram.org', 'site'),
+        ('www.telegram.org/k/', 'site'),
+        ('https://web.telegram.org/k/', 'site'),
+        ('пример.рф', 'site'),
+    ]
+    js = helpers.group(0) + '''
+const samples = ''' + json.dumps(samples, ensure_ascii=False) + ''';
+for(const [typed,kind] of samples){
+ const url=resolveOmnibox(typed);
+ const parsed=new URL(url);
+ if(kind==='search'){
+  if(parsed.hostname!=='www.bing.com' ||
+     parsed.pathname!=='/search' ||
+     parsed.searchParams.get('q')!==typed ||
+     parsed.searchParams.get('setlang')!=='ru')process.exit(1);
+ }else if(parsed.hostname==='www.bing.com')process.exit(2);
+}
+for(const invalid of ['http://example.com','ftp://example.com',
+  'https://user:pass@example.com','https://example.com:444','https://','']){
+ let failed=false;
+ try{resolveOmnibox(invalid)}catch(e){failed=true}
+ if(!failed)process.exit(3);
+}
+'''
+    result = subprocess.run(['node', '-e', js], capture_output=True,
+                            text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
