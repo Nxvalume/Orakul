@@ -18,7 +18,7 @@ async def test_private_login_blocks_mcp_reads_but_allows_owner_actions():
     page.url = 'https://example.com/'
     page.is_closed.return_value = False
     sid = 'test-private'
-    engine._sessions[sid] = Session(context=None, page=page)
+    engine._sessions[sid] = Session(context=Mock(pages=[page]), page=page)
     result = await engine.owner_set_private(sid, True)
     assert result['private_mode'] is True
     with pytest.raises(PermissionError, match='Личный режим'):
