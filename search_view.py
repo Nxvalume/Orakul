@@ -29,7 +29,8 @@ def _feed_url(query: str) -> str:
 def _get_feed(query: str) -> bytes:
     # The host cannot be controlled by the visitor. Keep bounded network use.
     request = Request(_feed_url(query), headers={
-        "User-Agent": "Mozilla/5.0 (compatible; MiniFishPersonalSearch/1.0)",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
         "Accept": "application/rss+xml,application/xml,text/xml;q=0.9",
     })
     with urlopen(request, timeout=8) as response:
@@ -58,12 +59,16 @@ def _results(raw: bytes) -> list[dict]:
         href = (item.findtext("link") or "").strip()
         if not title or len(href) > 2048:
             continue
-        parsed = urlsplit(href)
+        try:
+            parsed = urlsplit(href)
+            port = parsed.port
+        except ValueError:
+            continue
         # Browser navigation rejects HTTP and private networks. Do not render
         # non-HTTPS links as clickable, even when they came from the feed.
         if (parsed.scheme != "https" or not parsed.hostname or
                 parsed.username or parsed.password or
-                (parsed.port is not None and parsed.port != 443)):
+                (port is not None and port != 443)):
             continue
         results.append({"title": title, "description": description,
                         "href": href, "host": parsed.hostname})
