@@ -45,6 +45,13 @@ input,select{border-radius:8px;border:1px solid #4b657f;background:#101927;color
 form{margin-top:10px;display:grid;gap:8px}
 #actions{margin:9px 0;display:flex;gap:6px;flex-wrap:wrap;max-height:148px;overflow:auto}
 #actions button{font-size:12px;min-height:35px;padding:7px 10px}
+.tabstrip{display:flex;gap:5px;overflow-x:auto;align-items:center;margin:8px 0;padding:3px 0;scrollbar-width:thin}
+.tabpill{display:flex;flex:none;max-width:175px;border:1px solid #52657c;border-radius:9px;overflow:hidden}
+.tabpill.active{border-color:#58acff;background:#213d5c}
+.tabpill button{border:0;border-radius:0;min-height:36px;font-size:12px;padding:7px}
+.tabpill button.tabname{max-width:138px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.tabpill button.tabclose{padding:7px;min-width:30px}
+.tabstrip>button{min-width:39px;flex:none;min-height:36px;padding:7px}
 small{color:var(--muted)}
 a{color:#93c9ff}
 </style></head>
@@ -55,11 +62,13 @@ a{color:#93c9ff}
 <div style="display:flex;gap:7px;align-items:center">
 <input id="navUrl" type="url" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="https://example.com" required>
 <button class="primary" type="submit">Перейти</button></div></form>
+<div id="tabs" class="tabstrip" role="group" aria-label="Вкладки браузера">Загрузка вкладок…</div>
 <div class="screen" id="screen"><canvas id="shot" role="img" aria-label="Интерактивный кадр браузера MiniFish" style="cursor:crosshair"></canvas><span id="noimage" class="status">Загрузка кадра…</span></div>
 <p class="status">Нажимай прямо на экран браузера. Для выбора полей и кнопок используется настоящий курсор Playwright. Изображение обновляется автоматически, пока окно открыто.</p>
 <div class="controls" id="publicControls">
 <button id="refresh" class="primary">Обновить экран</button>
-<button id="back">Назад</button>
+<button id="back">←</button><button id="forward">→</button>
+<button id="reload">Перезагрузить</button>
 <button id="up">↑</button><button id="down">↓</button>
 </div>
 <div id="actions" aria-label="Доступные действия на странице"></div>
@@ -86,11 +95,13 @@ a{color:#93c9ff}
 <div style="display:flex;gap:7px;align-items:center">
 <input id="secureUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://web.telegram.org/k/" required>
 <button class="primary" type="submit">Перейти</button></div></form>
+<div id="secureTabs" class="tabstrip" role="group" aria-label="Личные вкладки">Загрузка вкладок…</div>
 <div class="screen" style="margin-top:8px"><canvas id="secureShot" role="img" aria-label="Защищённый браузер — только владельцу"></canvas></div>
 <div class="controls"><button type="button" id="secureTelegram" class="primary">Открыть Telegram Web</button><button type="button" id="secureRefresh">Кадр</button>
 <button type="button" id="secureBackspace">Backspace</button>
 <button type="button" id="secureEnter">Enter</button>
-<button type="button" id="secureTab">Tab</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
+<button type="button" id="secureTab">Tab ↹</button><button type="button" id="secureBack">←</button>
+<button type="button" id="secureForward">→</button><button type="button" id="secureReload">Обновить страницу</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
 <form id="secureForm"><label for="secureField">Поле страницы</label>
 <select id="secureField"><option value="">Читаю поля…</option></select>
 <input id="secureValue" type="password" autocomplete="off" spellcheck="false" placeholder="Ввод только на сервер MiniFish">
@@ -121,6 +132,7 @@ a{color:#93c9ff}
  };
  function publicView(enabled){
   $('screen').hidden=!enabled;$('publicControls').hidden=!enabled;
+  $('tabs').hidden=!enabled;
   $('navForm').hidden=!enabled;
   $('actions').hidden=!enabled;$('form').hidden=!enabled;
  }
@@ -132,6 +144,39 @@ a{color:#93c9ff}
   status(message||'Личный режим активен. Введите пароль владельца MiniFish для продолжения.');
  }
  function ownerDenied(error){return /Личный режим владельца|доступ MCP временно заблокирован|private.mode|private mode/i.test(String(error?.message||error))}
+ function paintTabs(id,info,doAction){
+  const strip=$(id);
+  if(!info||!Array.isArray(info.tabs))return;
+  strip.replaceChildren();
+  for(const tab of info.tabs){
+   const wrapper=document.createElement('div');wrapper.className='tabpill'+(tab.active?' active':'');
+   const select=document.createElement('button');select.type='button';
+   select.className='tabname';
+   select.textContent=(tab.title||tab.site||'Новая вкладка').slice(0,44);
+   select.title=tab.site||'Новая вкладка';
+   select.onclick=()=>doAction('switch',tab.index);
+   const close=document.createElement('button');close.type='button';
+   close.className='tabclose';close.textContent='×';close.title='Закрыть вкладку';
+   close.setAttribute('aria-label','Закрыть вкладку '+(tab.index+1));
+   close.onclick=()=>doAction('close',tab.index);
+   wrapper.append(select,close);strip.appendChild(wrapper);
+  }
+  const add=document.createElement('button');add.type='button';
+  add.textContent='+';add.title='Новая вкладка';
+  add.setAttribute('aria-label','Новая вкладка');
+  add.disabled=info.tabs.length>=info.max_tabs;
+  add.onclick=()=>doAction('new',-1);
+  strip.appendChild(add);
+ }
+ async function refreshPublicTabs(){
+  try{
+   const tabs=data(await call('browser_tabs',{session_id:session}));
+   paintTabs('tabs',tabs,(action,index)=>act('browser_tab_action',{session_id:session,action,index}));
+  }catch(e){
+   if(ownerDenied(e)){lockPrivateView('Личный режим: вкладки доступны только владельцу MiniFish.');return}
+   $('tabs').textContent='Вкладки недоступны: '+String(e.message||e).slice(0,90);
+  }
+ }
  let bridgeAvailable=true;
  const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Превышено время ожидания')),ms));
  const status=t=>$('status').textContent=t;
@@ -309,7 +354,9 @@ a{color:#93c9ff}
    const result=data(await call('browser_snapshot',{session_id:session}));
    $('site').textContent=(()=>{try{return new URL(result.url).hostname}catch(e){return 'Страница'}})();
    // Update address bar after assistant or owner navigation, not on credentials.
-   if(typeof result.url==='string'&&!result.url.includes('@'))$('navUrl').value=result.url;
+   if(result.url==='about:blank')$('navUrl').value='';
+   else if(typeof result.url==='string'&&!result.url.includes('@'))$('navUrl').value=result.url;
+   await refreshPublicTabs();
    let arr=(result.elements||[]).filter(e=>e?.selector && ['button','a','input','textarea'].includes(e.tag));
    const actions=$('actions');actions.replaceChildren();
    for(const el of arr.filter(e=>e.tag==='button'||e.tag==='a').slice(0,18)){
@@ -366,6 +413,8 @@ a{color:#93c9ff}
     render();
  },4600);
  $('back').onclick=()=>act('browser_back',{session_id:session});
+ $('forward').onclick=()=>act('browser_tab_action',{session_id:session,action:'forward'});
+ $('reload').onclick=()=>act('browser_tab_action',{session_id:session,action:'reload'});
  $('up').onclick=()=>act('browser_scroll',{session_id:session,pixels:-460});
  $('down').onclick=()=>act('browser_scroll',{session_id:session,pixels:460});
  $('form').onsubmit=e=>{
@@ -393,6 +442,25 @@ a{color:#93c9ff}
   return response;
  }
  const secureStatus=t=>$('secureStatus').textContent=t;
+ async function refreshSecureTabs(){
+  if(!secureToken)return;
+  try{
+   const res=await secureRequest('tabs',{});
+   const list=await res.json();
+   paintTabs('secureTabs',list,protectedTabAction);
+  }catch(e){
+   $('secureTabs').textContent='Не удалось прочитать вкладки: '+String(e.message||e).slice(0,100);
+  }
+ }
+ async function protectedTabAction(action,index=-1){
+  if(!secureToken)return;
+  try{
+   secureStatus('Работаю со вкладками…');
+   await secureRequest('tab_action',{action,index});
+   await refreshSecureTabs();await secureFrame();await secureFields();
+   secureStatus('Вкладка открыта');
+  }catch(e){secureStatus('Ошибка вкладки: '+String(e.message||e).slice(0,130))}
+ }
  async function secureFields(){
   try{
    const res=await secureRequest('fields',{});
@@ -431,7 +499,9 @@ a{color:#93c9ff}
    secureStatus('Передаю действие напрямую MiniFish…');
    await (await secureRequest('control',{action,...extra})).json();
    secureStatus('Действие выполнено');await secureFrame();
-   if(['click','key','telegram_open','navigate'].includes(action))await secureFields();
+   if(['click','key','telegram_open','navigate','back','reload'].includes(action)){
+    await secureFields();await refreshSecureTabs();
+   }
   }catch(e){secureStatus('Ошибка: '+String(e.message||e).slice(0,180))}
  }
  $('unlockForm').onsubmit=async e=>{
@@ -448,7 +518,7 @@ a{color:#93c9ff}
    $('unlockForm').hidden=true;$('secureTools').hidden=false;
    publicView(false);
    secureStatus('Защищённый режим. ChatGPT не имеет доступа к полям входа.');
-   await secureFields();await secureFrame();
+   await secureFields();await secureFrame();await refreshSecureTabs();
    if(securePoll)clearInterval(securePoll);
    securePoll=setInterval(secureFrame,3500);
    status('Защищённый ввод активен');
@@ -476,6 +546,9 @@ a{color:#93c9ff}
  $('secureBackspace').onclick=()=>secureAction('key',{key:'Backspace'});
  $('secureEnter').onclick=()=>secureAction('key',{key:'Enter'});
  $('secureTab').onclick=()=>secureAction('key',{key:'Tab'});
+ $('secureBack').onclick=()=>secureAction('back',{});
+ $('secureForward').onclick=()=>protectedTabAction('forward');
+ $('secureReload').onclick=()=>protectedTabAction('reload');
  $('secureUp').onclick=()=>secureAction('scroll',{pixels:-460});
  $('secureDown').onclick=()=>secureAction('scroll',{pixels:460});
  $('secureForm').onsubmit=e=>{
