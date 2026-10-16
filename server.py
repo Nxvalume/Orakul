@@ -16,7 +16,7 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from live_view import live_page, session_api, stream_api, control_api, fields_api, elements_api, owner
 from live_video import screencast_socket
-from chat_ui import CHAT_UI_URI, CHAT_UI_MIME, CHAT_UI_CSP, CHAT_TOOL_META, CHAT_HTML
+from chat_ui import CHAT_UI_URI, CHAT_UI_MIME, CHAT_UI_CSP, CHAT_TOOL_META, CHAT_ACTION_META, CHAT_HTML
 from chat_secure import create_owner_routes, trusted_chat_origin
 from engine import BrowserEngine, allowed_domains, add_allowed_domain, validate_url, unrestricted_public_https
 from state_store import Store
@@ -197,7 +197,7 @@ async def browser_window(session_id: str) -> dict:
             'secrets_in_chat': False}
 
 
-@mcp.tool(meta=CHAT_TOOL_META)
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_open(url: str) -> dict:
     """Open HTTPS websites; Telegram reuses its encrypted login automatically."""
     opened = (await _open_telegram(url) if urlsplit(url).hostname == 'web.telegram.org'
@@ -207,27 +207,27 @@ async def browser_open(url: str) -> dict:
                                  else ('postgres' if store.is_postgres else 'sqlite'))
     return opened
 
-@mcp.tool()
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_goto(session_id: str, url: str) -> dict:
     """Navigate the current session to a new approved HTTPS URL."""
     return await engine.goto(session_id, url)
 
-@mcp.tool()
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_back(session_id: str) -> dict:
     """Go to the previous page."""
     return await engine.back(session_id)
 
-@mcp.tool()
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_snapshot(session_id: str) -> dict:
     """Read title, visible text, and element selectors of the current page."""
     return await engine.snapshot(session_id)
 
-@mcp.tool()
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_click(session_id: str, css_selector: str, confirm_sensitive: bool = False) -> dict:
     """Click an element. Sensitive and submit actions require separate user approval."""
     return await engine.click(session_id, css_selector, confirm_sensitive)
 
-@mcp.tool(meta=CHAT_TOOL_META)
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_tap(session_id: str, x: float, y: float) -> dict:
     """Tap the live browser image at viewport coordinates, like TinyFish.
 
@@ -237,22 +237,22 @@ async def browser_tap(session_id: str, x: float, y: float) -> dict:
     return await engine.tap(session_id, x, y)
 
 
-@mcp.tool()
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_fill(session_id: str, css_selector: str, text: str) -> dict:
     """Fill a form field; credentials, PINs, payment data and secrets are prohibited."""
     return await engine.fill(session_id, css_selector, text)
 
-@mcp.tool()
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_select(session_id: str, css_selector: str, value: str) -> dict:
     """Choose a select option by value."""
     return await engine.select(session_id, css_selector, value)
 
-@mcp.tool()
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_scroll(session_id: str, pixels: int = 650) -> dict:
     """Scroll up or down."""
     return await engine.scroll(session_id, pixels)
 
-@mcp.tool()
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_screenshot(session_id: str) -> Image:
     """Return a PNG of the current browser viewport."""
     return Image(data=await engine.screenshot(session_id), format='png')
