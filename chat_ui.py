@@ -51,6 +51,10 @@ a{color:#93c9ff}
 <body>
 <header><h1>MiniFish · браузер</h1><span id="site" class="status">Подключение…</span></header>
 <p id="status" class="status" role="status">Подключаю интерфейс ChatGPT…</p>
+<form id="navForm"><label for="navUrl">Адрес сайта</label>
+<div style="display:flex;gap:7px;align-items:center">
+<input id="navUrl" type="url" inputmode="url" autocomplete="url" autocapitalize="off" spellcheck="false" placeholder="https://example.com" required>
+<button class="primary" type="submit">Перейти</button></div></form>
 <div class="screen" id="screen"><canvas id="shot" role="img" aria-label="Интерактивный кадр браузера MiniFish" style="cursor:crosshair"></canvas><span id="noimage" class="status">Загрузка кадра…</span></div>
 <p class="status">Нажимай прямо на экран браузера. Для выбора полей и кнопок используется настоящий курсор Playwright. Изображение обновляется автоматически, пока окно открыто.</p>
 <div class="controls" id="publicControls">
@@ -78,6 +82,10 @@ a{color:#93c9ff}
 </div>
 <div id="secureTools" hidden>
 <p id="secureStatus" class="status" role="status">Личный режим включён</p>
+<form id="secureNavForm"><label for="secureUrl">Адрес другого сайта (HTTPS)</label>
+<div style="display:flex;gap:7px;align-items:center">
+<input id="secureUrl" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://web.telegram.org/k/" required>
+<button class="primary" type="submit">Перейти</button></div></form>
 <div class="screen" style="margin-top:8px"><canvas id="secureShot" role="img" aria-label="Защищённый браузер — только владельцу"></canvas></div>
 <div class="controls"><button type="button" id="secureTelegram" class="primary">Открыть Telegram Web</button><button type="button" id="secureRefresh">Кадр</button>
 <button type="button" id="secureBackspace">Backspace</button>
@@ -113,6 +121,7 @@ a{color:#93c9ff}
  };
  function publicView(enabled){
   $('screen').hidden=!enabled;$('publicControls').hidden=!enabled;
+  $('navForm').hidden=!enabled;
   $('actions').hidden=!enabled;$('form').hidden=!enabled;
  }
  function lockPrivateView(message){
@@ -126,6 +135,15 @@ a{color:#93c9ff}
  let bridgeAvailable=true;
  const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Превышено время ожидания')),ms));
  const status=t=>$('status').textContent=t;
+ function cleanSiteUrl(raw){
+  const text=String(raw||'').trim();
+  if(text.length>2048)throw new Error('Слишком длинный адрес');
+  const full=/^https?:\/\//i.test(text)?text:'https://'+text;
+  const u=new URL(full);
+  if(u.protocol!=='https:'||!u.hostname||u.username||u.password||u.port && u.port!=='443')
+   throw new Error('Допустим только публичный HTTPS-адрес без логина и пароля в URL');
+  return u.href;
+ }
  async function drawFrame(canvas,blob){
   // Decoding image bytes into a canvas avoids Android widget CSP blocking
   // data: and blob: image URLs. Never upload frames to external services.
@@ -288,6 +306,8 @@ a{color:#93c9ff}
    }
    const result=data(await call('browser_snapshot',{session_id:session}));
    $('site').textContent=(()=>{try{return new URL(result.url).hostname}catch(e){return 'Страница'}})();
+   // Update address bar after assistant or owner navigation, not on credentials.
+   if(typeof result.url==='string'&&!result.url.includes('@'))$('navUrl').value=result.url;
    let arr=(result.elements||[]).filter(e=>e?.selector && ['button','a','input','textarea'].includes(e.tag));
    const actions=$('actions');actions.replaceChildren();
    for(const el of arr.filter(e=>e.tag==='button'||e.tag==='a').slice(0,18)){
@@ -326,6 +346,13 @@ a{color:#93c9ff}
    else if(!secureToken&&!privateLocked)status('Ошибка: '+String(e.message||e).slice(0,140))}
  }
  $('refresh').onclick=()=>session?render():attachExisting();
+ $('navForm').onsubmit=e=>{
+  e.preventDefault();
+  if(!session||privateLocked||secureToken){status('Перейдите в защищённый режим либо откройте браузер');return}
+  try{const url=cleanSiteUrl($('navUrl').value);
+   act('browser_goto',{session_id:session,url});
+  }catch(error){status('Ошибка адреса: '+String(error.message||error).slice(0,110))}
+ };
  $('shot').onclick=e=>{
   if(!session||busy||secureToken)return;
   const p=positionOnCanvas($('shot'),e);
@@ -402,7 +429,7 @@ a{color:#93c9ff}
    secureStatus('Передаю действие напрямую MiniFish…');
    await (await secureRequest('control',{action,...extra})).json();
    secureStatus('Действие выполнено');await secureFrame();
-   if(action==='click'||action==='key'||action==='telegram_open')await secureFields();
+   if(['click','key','telegram_open','navigate'].includes(action))await secureFields();
   }catch(e){secureStatus('Ошибка: '+String(e.message||e).slice(0,180))}
  }
  $('unlockForm').onsubmit=async e=>{
@@ -436,6 +463,14 @@ a{color:#93c9ff}
  };
  $('secureRefresh').onclick=()=>{secureFrame();secureFields()};
  $('secureTelegram').onclick=()=>secureAction('telegram_open',{});
+ $('secureNavForm').onsubmit=e=>{
+  e.preventDefault();
+  if(!secureToken){secureStatus('Сначала войдите в защищённый режим MiniFish');return}
+  try{
+   const url=cleanSiteUrl($('secureUrl').value);
+   secureAction('navigate',{url});
+  }catch(error){secureStatus('Ошибка адреса: '+String(error.message||error).slice(0,100))}
+ };
  $('secureBackspace').onclick=()=>secureAction('key',{key:'Backspace'});
  $('secureEnter').onclick=()=>secureAction('key',{key:'Enter'});
  $('secureTab').onclick=()=>secureAction('key',{key:'Tab'});
