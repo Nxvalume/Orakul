@@ -525,63 +525,73 @@ class BrowserEngine:
                            'pending_click': (s.pending_click if s.pending_click and s.pending_click['expires'] > now else None)})
         return result
 
+    def _telegram_pages(self, session: Session) -> list:
+        """Locate Telegram regardless of which tab currently has focus."""
+        return [page for page in self._tab_pages(session)
+                if urlsplit(page.url).hostname == 'web.telegram.org']
+
     def telegram_session_id(self) -> str | None:
-        """Existing live Telegram session, regardless of its saved profile."""
+        """Existing live Telegram tab, including background tabs in one context."""
         now = time.monotonic()
         for sid, session in reversed(list(self._sessions.items())):
-            if (now-session.touched < session_idle_limit(session) and not session.page.is_closed()
-                    and urlsplit(session.page.url).hostname == 'web.telegram.org'):
+            if (now-session.touched < session_idle_limit(session) and
+                    self._telegram_pages(session)):
                 return sid
         return None
 
     async def telegram_logged_in(self, sid: str) -> bool:
-        """Only persist Telegram after the chat UI has replaced its login page."""
+        """Check login state without switching the user's active tab."""
         session = self._sessions.get(sid)
-        if (session is None or session.page.is_closed() or session.private_mode
-                or time.monotonic()-session.touched >= session_idle_limit(session)):
+        if (session is None or session.private_mode or
+                time.monotonic()-session.touched >= session_idle_limit(session)):
             return False
         async with session.lock:
-            if urlsplit(session.page.url).hostname != 'web.telegram.org':
-                return False
-            # Telegram Web K: the left chat sidebar is visible after login.
-            # An auth form or a loading screen is never treated as logged in.
-            try:
-                chat_list = await session.page.locator('#column-left').is_visible()
-                auth_form = await session.page.locator('#auth-pages').is_visible()
-                return bool(chat_list and not auth_form)
-            except Exception:
-                return False
+            for page in self._telegram_pages(session):
+                try:
+                    if (await page.locator('#column-left').is_visible() and
+                            not await page.locator('#auth-pages').is_visible()):
+                        return True
+                except Exception:
+                    continue
+            return False
 
     async def telegram_authenticated_state(self, sid: str) -> dict | None:
-        """Secret browser state for server-side encryption only; no idle-TTL renewal."""
+        """Export signed-in Telegram state only for encrypted server-side saving."""
         session = self._sessions.get(sid)
-        if (session is None or session.page.is_closed()
-                or time.monotonic()-session.touched >= session_idle_limit(session)
-                or urlsplit(session.page.url).hostname != 'web.telegram.org'):
+        if (session is None or
+                time.monotonic()-session.touched >= session_idle_limit(session)):
             return None
         async with session.lock:
-            if not (await session.page.locator('#column-left').is_visible()):
-                return None
-            if await session.page.locator('#auth-pages').is_visible():
-                return None
-            return await session.context.storage_state(indexed_db=True)
+            for page in self._telegram_pages(session):
+                try:
+                    if (await page.locator('#column-left').is_visible() and
+                            not await page.locator('#auth-pages').is_visible()):
+                        return await session.context.storage_state(indexed_db=True)
+                except Exception:
+                    continue
+            return None
 
     async def release_verified_telegram_login(self, sid: str) -> bool:
-        """Return control to chat only after authenticated UI was safely persisted."""
+        """Release a private, verified saved Telegram session without tab switch."""
         session = self._sessions.get(sid)
-        if session is None or session.page.is_closed():
+        if session is None:
             return False
         async with session.lock:
-            if (session.private_mode
-                    and urlsplit(session.page.url).hostname == 'web.telegram.org'
-                    and await session.page.locator('#column-left').is_visible()
-                    and not await session.page.locator('#auth-pages').is_visible()):
-                session.profile_name = 'telegram'
-                session.private_mode = False
-                session.pending_click = None
-                session.approved_click = None
-                session.last_action = 'Telegram: вход сохранён, управление возвращено ассистенту'
-                return True
+            if not session.private_mode:
+                return False
+            for page in self._telegram_pages(session):
+                try:
+                    signed_in = (await page.locator('#column-left').is_visible() and
+                                 not await page.locator('#auth-pages').is_visible())
+                except Exception:
+                    signed_in = False
+                if signed_in:
+                    session.profile_name = 'telegram'
+                    session.private_mode = False
+                    session.pending_click = None
+                    session.approved_click = None
+                    session.last_action = 'Telegram: вход сохранён, управление возвращено ассистенту'
+                    return True
             return False
 
     async def live_jpeg(self, sid: str) -> bytes:
