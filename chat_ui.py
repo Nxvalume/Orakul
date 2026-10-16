@@ -201,7 +201,7 @@ a{color:#93c9ff}
   // A bare domain with optional path opens directly, a word or phrase searches.
   if(!/\s/u.test(text)&&/^[^\s/:?#@]+\.[^\s/:?#@]+(?::\d+)?(?:[/?#].*)?$/u.test(text))
    return cleanSiteUrl(text);
-  return 'https://www.bing.com/search?q='+encodeURIComponent(text)+'&setlang=ru';
+  return 'https://nxval-minifish-2026.onrender.com/search?q='+encodeURIComponent(text);
  }
  async function drawFrame(canvas,blob){
   // Decoding image bytes into a canvas avoids Android widget CSP blocking
