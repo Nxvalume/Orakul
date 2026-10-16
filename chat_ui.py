@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v4.html"
+CHAT_UI_URI = "ui://minifish/browser-v5.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -36,7 +36,7 @@ header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:s
 h1{font-size:18px;margin:0}.status{font-size:12px;color:var(--muted);margin:7px 0}
 aside{font-size:12px;color:#ffd5a4;margin:6px 0}
 .screen{position:relative;background:#0c121d;min-height:160px;border-radius:12px;overflow:hidden;display:grid;place-items:center}
-.screen img{display:block;width:100%;height:auto;max-height:420px;object-fit:contain}
+.screen canvas{display:block;width:100%;height:auto;max-height:420px;object-fit:contain;touch-action:manipulation}
 .controls{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
 button{background:var(--panel);color:var(--fg);border:1px solid #52657c;border-radius:9px;padding:10px 12px;min-height:42px;font:inherit;cursor:pointer}
 button.primary{background:#24619b}
@@ -51,7 +51,7 @@ a{color:#93c9ff}
 <body>
 <header><h1>MiniFish · браузер</h1><span id="site" class="status">Подключение…</span></header>
 <p id="status" class="status" role="status">Подключаю интерфейс ChatGPT…</p>
-<div class="screen" id="screen"><img id="shot" alt="Интерактивный кадр браузера MiniFish — нажимайте на кнопки и поля" style="cursor:crosshair;touch-action:manipulation"><span id="noimage" class="status">Загрузка кадра…</span></div>
+<div class="screen" id="screen"><canvas id="shot" role="img" aria-label="Интерактивный кадр браузера MiniFish" style="cursor:crosshair"></canvas><span id="noimage" class="status">Загрузка кадра…</span></div>
 <p class="status">Нажимай прямо на экран браузера. Для выбора полей и кнопок используется настоящий курсор Playwright. Изображение обновляется автоматически, пока окно открыто.</p>
 <div class="controls" id="publicControls">
 <button id="refresh" class="primary">Обновить экран</button>
@@ -78,8 +78,8 @@ a{color:#93c9ff}
 </div>
 <div id="secureTools" hidden>
 <p id="secureStatus" class="status" role="status">Личный режим включён</p>
-<div class="screen" style="margin-top:8px"><img id="secureShot" alt="Защищённый браузер — только владельцу" style="touch-action:manipulation"></div>
-<div class="controls"><button type="button" id="secureRefresh">Кадр</button>
+<div class="screen" style="margin-top:8px"><canvas id="secureShot" role="img" aria-label="Защищённый браузер — только владельцу"></canvas></div>
+<div class="controls"><button type="button" id="secureTelegram" class="primary">Открыть Telegram Web</button><button type="button" id="secureRefresh">Кадр</button>
 <button type="button" id="secureBackspace">Backspace</button>
 <button type="button" id="secureEnter">Enter</button>
 <button type="button" id="secureTab">Tab</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
@@ -126,6 +126,28 @@ a{color:#93c9ff}
  let bridgeAvailable=true;
  const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Превышено время ожидания')),ms));
  const status=t=>$('status').textContent=t;
+ async function drawFrame(canvas,blob){
+  // Decoding image bytes into a canvas avoids Android widget CSP blocking
+  // data: and blob: image URLs. Never upload frames to external services.
+  if(typeof createImageBitmap!=='function')throw new Error('Системный браузер не поддерживает декодирование кадров');
+  const bitmap=await createImageBitmap(blob);
+  try{
+   canvas.width=bitmap.width;canvas.height=bitmap.height;
+   const ctx=canvas.getContext('2d');
+   if(!ctx)throw new Error('Клиент не предоставил Canvas 2D');
+   ctx.drawImage(bitmap,0,0);
+  }finally{bitmap.close?.()}
+ }
+ function positionOnCanvas(canvas,event){
+  const r=canvas.getBoundingClientRect();
+  if(!canvas.width||!canvas.height||!r.width||!r.height)return null;
+  const scale=Math.min(r.width/canvas.width,r.height/canvas.height);
+  const w=canvas.width*scale,h=canvas.height*scale;
+  const left=r.left+(r.width-w)/2,top=r.top+(r.height-h)/2;
+  const x=(event.clientX-left)/w*canvas.width;
+  const y=(event.clientY-top)/h*canvas.height;
+  return x>=0&&y>=0&&x<canvas.width&&y<canvas.height?{x,y}:null;
+ }
  function bridge(method,params){
   const id=nextId++;return Promise.race([new Promise((resolve,reject)=>{
    pending.set(id,{resolve,reject});
@@ -239,7 +261,7 @@ a{color:#93c9ff}
    const info=data(await call('browser_attach',{}));
    if(!info.attached||!info.session_id)
     throw new Error(info.reason==='private_mode'?
-      'Защищённый сеанс: доступ только владельцу':
+      'Защищённый сеанс активен: вернись в первоначальное окно MiniFish с открытой сессией':
       'Открытый сеанс пока не найден');
    inputFrom(info);
   }catch(e){
@@ -257,8 +279,9 @@ a{color:#93c9ff}
     (Array.isArray(sr?.content_items)?sr.content_items:[]);
    const im=images.find(i=>i.type==='image');
    if(im?.data && /^(image\/png|image\/jpeg)$/.test(im.mimeType||'')){
-    $('shot').onerror=()=>{ $('noimage').hidden=false;status('ChatGPT не смог отобразить кадр браузера') };
-    $('shot').src='data:'+im.mimeType+';base64,'+im.data;
+    const raw=atob(im.data),bytes=new Uint8Array(raw.length);
+    for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+    await drawFrame($('shot'),new Blob([bytes],{type:im.mimeType}));
     $('noimage').hidden=true;
    }else{
     throw new Error('ChatGPT не передал изображение браузера');
@@ -305,12 +328,9 @@ a{color:#93c9ff}
  $('refresh').onclick=()=>session?render():attachExisting();
  $('shot').onclick=e=>{
   if(!session||busy||secureToken)return;
-  const img=$('shot'),box=img.getBoundingClientRect();
-  if(!img.naturalWidth||!img.naturalHeight||!box.width||!box.height)return;
-  const x=(e.clientX-box.left)/box.width*img.naturalWidth;
-  const y=(e.clientY-box.top)/box.height*img.naturalHeight;
-  if(x<0||y<0||x>=img.naturalWidth||y>=img.naturalHeight)return;
-  act('browser_tap',{session_id:session,x:Math.floor(x),y:Math.floor(y)});
+  const p=positionOnCanvas($('shot'),e);
+  if(!p)return;
+  act('browser_tap',{session_id:session,x:Math.floor(p.x),y:Math.floor(p.y)});
  };
  setInterval(()=>{
   if(session&&!busy&&!secureToken&&!privateLocked&&document.visibilityState!=='hidden')
@@ -367,16 +387,9 @@ a{color:#93c9ff}
    const res=await secureRequest('frame',null,'GET');
    const blob=await res.blob();
    if(!blob.type.startsWith('image/'))throw new Error('Получен некорректный кадр');
-   // Android MCP Apps CSP may reject blob: URLs. Render a safe data: image
-   // without putting the owner's capability in a URL or MCP tool result.
-   const src=await new Promise((resolve,reject)=>{
-    const reader=new FileReader();
-    reader.onload=()=>resolve(reader.result);
-    reader.onerror=()=>reject(new Error('Ошибка декодирования кадра'));
-    reader.readAsDataURL(blob);
-   });
-   $('secureShot').onerror=()=>secureStatus('Клиент ChatGPT заблокировал изображение защищённого браузера.');
-   $('secureShot').src=src;
+   // The private frame never enters MCP or model-visible tool responses.
+   // Canvas draw is not subject to img-src data:/blob: restrictions.
+   await drawFrame($('secureShot'),blob);
   }catch(e){
    if(/Защищённый доступ истёк|Требуется приватный вход|HTTP 401/i.test(String(e.message||e)))
     lockPrivateView('Защищённый доступ истёк. Введите пароль владельца MiniFish ещё раз.');
@@ -389,7 +402,7 @@ a{color:#93c9ff}
    secureStatus('Передаю действие напрямую MiniFish…');
    await (await secureRequest('control',{action,...extra})).json();
    secureStatus('Действие выполнено');await secureFrame();
-   if(action==='click'||action==='key')await secureFields();
+   if(action==='click'||action==='key'||action==='telegram_open')await secureFields();
   }catch(e){secureStatus('Ошибка: '+String(e.message||e).slice(0,180))}
  }
  $('unlockForm').onsubmit=async e=>{
@@ -422,6 +435,7 @@ a{color:#93c9ff}
   }
  };
  $('secureRefresh').onclick=()=>{secureFrame();secureFields()};
+ $('secureTelegram').onclick=()=>secureAction('telegram_open',{});
  $('secureBackspace').onclick=()=>secureAction('key',{key:'Backspace'});
  $('secureEnter').onclick=()=>secureAction('key',{key:'Enter'});
  $('secureTab').onclick=()=>secureAction('key',{key:'Tab'});
@@ -436,16 +450,12 @@ a{color:#93c9ff}
  };
  $('secureShot').onclick=e=>{
   if(!secureToken)return;
-  const img=$('secureShot'),r=img.getBoundingClientRect();
-  const iw=img.naturalWidth,ih=img.naturalHeight;
-  if(!iw||!ih)return;
-  const scale=Math.min(r.width/iw,r.height/ih);
-  const drawW=iw*scale,drawH=ih*scale;
-  const offsetX=r.left+(r.width-drawW)/2,offsetY=r.top+(r.height-drawH)/2;
-  const x=(e.clientX-offsetX)/drawW*secureViewport.width;
-  const y=(e.clientY-offsetY)/drawH*secureViewport.height;
-  if(x>=0&&x<secureViewport.width&&y>=0&&y<secureViewport.height)
-    secureAction('click',{x,y});
+  const p=positionOnCanvas($('secureShot'),e);
+  if(!p)return;
+  const canvas=$('secureShot');
+  const x=p.x/canvas.width*secureViewport.width;
+  const y=p.y/canvas.height*secureViewport.height;
+  secureAction('click',{x,y});
  };
  $('secureFinish').onclick=async()=>{
   if(!secureToken)return;
