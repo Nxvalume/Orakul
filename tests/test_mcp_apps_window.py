@@ -10,7 +10,8 @@ async def test_chat_window_is_discoverable_as_mcp_app():
     tools = await mcp.list_tools()
     opened = next(tool for tool in tools if tool.name == 'browser_open')
     viewer = next(tool for tool in tools if tool.name == 'browser_window')
-    assert opened.meta['ui']['resourceUri'] == CHAT_UI_URI
+    assert opened.meta['openai/widgetAccessible'] is True
+    assert 'resourceUri' not in opened.meta['ui']  # opening a site must not spawn a second window
     assert viewer.meta['ui']['resourceUri'] == CHAT_UI_URI
 
     resources = await mcp.list_resources()
@@ -71,7 +72,8 @@ async def test_mcp_v3_browser_tap_metadata_and_fullscreen():
     tapped = next(tool for tool in tools if tool.name == 'browser_tap')
     assert opened.meta['openai/widgetAccessible'] is True
     assert opened.meta['ui']['visibility'] == ['model', 'app']
-    assert tapped.meta['ui']['resourceUri'] == CHAT_UI_URI
+    assert tapped.meta['openai/widgetAccessible'] is True
+    assert 'resourceUri' not in tapped.meta['ui']  # tapping should update current window
     assert CHAT_UI_URI.endswith('browser-v4.html')
     resources = await mcp.list_resources()
     window = next(resource for resource in resources if str(resource.uri) == CHAT_UI_URI)
@@ -96,3 +98,25 @@ def test_unavailable_mcp_host_fails_fast_instead_of_waiting_on_tool_calls():
     assert 'let bridgeAvailable=true;' in CHAT_HTML
     assert 'bridgeAvailable=false;' in CHAT_HTML
     assert "if(!bridgeAvailable)throw new Error" in CHAT_HTML
+
+
+@pytest.mark.asyncio
+async def test_widget_helpers_are_accessible_without_opening_duplicate_windows():
+    from server import mcp
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+    viewer = tools['browser_window']
+    assert viewer.meta['ui']['resourceUri'] == CHAT_UI_URI
+    for name in ('browser_open', 'browser_snapshot', 'browser_screenshot',
+                 'browser_tap', 'browser_click', 'browser_fill',
+                 'browser_scroll', 'browser_back', 'browser_goto',
+                 'browser_select'):
+        meta = tools[name].meta
+        assert meta['openai/widgetAccessible'] is True, name
+        assert 'resourceUri' not in meta.get('ui', {}), name
+
+
+def test_widget_stalled_image_reports_timeout_instead_of_infinite_spinner():
+    from chat_ui import CHAT_HTML
+    assert 'timeout(16000)' in CHAT_HTML
+    assert 'Кадр не загрузился' in CHAT_HTML
+    assert 'Нет соединения с сеансом' in CHAT_HTML
