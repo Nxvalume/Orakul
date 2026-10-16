@@ -18,6 +18,7 @@ import pytest
 async def test_telegram_reuses_live_owner_context_even_with_stored_profile(monkeypatch, logged_in, profile):
     import server
 
+    monkeypatch.setattr(server, "validate_url", lambda url: url)
     url = "https://web.telegram.org/k/"
     page = SimpleNamespace(
         url=url,
@@ -51,6 +52,7 @@ async def test_telegram_reuses_live_owner_context_even_with_stored_profile(monke
 async def test_telegram_owner_private_login_cannot_be_attached_by_mcp(monkeypatch):
     import server
 
+    monkeypatch.setattr(server, "validate_url", lambda url: url)
     url = "https://web.telegram.org/k/"
     private = SimpleNamespace(
         page=SimpleNamespace(url=url, is_closed=lambda: False),
@@ -72,6 +74,7 @@ async def test_telegram_owner_private_login_cannot_be_attached_by_mcp(monkeypatc
 async def test_telegram_restores_saved_state_only_after_live_context_disappears(monkeypatch):
     import server
 
+    monkeypatch.setattr(server, "validate_url", lambda url: url)
     url = "https://web.telegram.org/k/"
     state = {"cookies": [], "origins": []}
     monkeypatch.setattr(server.engine, "_sessions", {})
