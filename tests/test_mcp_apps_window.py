@@ -120,3 +120,40 @@ def test_widget_stalled_image_reports_timeout_instead_of_infinite_spinner():
     assert 'timeout(16000)' in CHAT_HTML
     assert 'Кадр не загрузился' in CHAT_HTML
     assert 'Нет соединения с сеансом' in CHAT_HTML
+
+
+@pytest.mark.asyncio
+async def test_android_widget_can_attach_one_existing_public_session(monkeypatch):
+    import server
+    monkeypatch.setattr(server.engine, 'live_sessions', lambda: [
+        {'session_id': 'existing-123', 'site': 'example.com', 'private_mode': False}
+    ])
+    monkeypatch.setattr(server.engine, 'get', lambda sid: sid)
+    result = await server.browser_attach()
+    assert result == {'attached': True, 'session_id': 'existing-123',
+                      'site': 'example.com'}
+
+
+@pytest.mark.asyncio
+async def test_android_widget_attach_never_exposes_private_or_ambiguous_sessions(monkeypatch):
+    import server
+    def prohibit_get(sid):
+        raise AssertionError('Owner-private session must never be queried')
+    monkeypatch.setattr(server.engine, 'get', prohibit_get)
+    monkeypatch.setattr(server.engine, 'live_sessions', lambda: [])
+    assert await server.browser_attach() == {'attached': False, 'reason': 'not_open'}
+    private = {'session_id': 'private-123', 'site': 'web.telegram.org',
+               'private_mode': True}
+    monkeypatch.setattr(server.engine, 'live_sessions', lambda: [private])
+    assert await server.browser_attach() == {'attached': False, 'reason': 'private_mode'}
+    monkeypatch.setattr(server.engine, 'live_sessions', lambda: [private, private])
+    assert await server.browser_attach() == {'attached': False, 'reason': 'ambiguous'}
+
+
+def test_android_ui_auto_recovers_missing_tool_input_without_new_session():
+    from chat_ui import CHAT_HTML
+    assert "call('browser_attach',{})" in CHAT_HTML
+    assert 'setTimeout(()=>{if(!session)attachExisting()},600)' in CHAT_HTML
+    assert "session?render():attachExisting()" in CHAT_HTML
+    assert 'window.openai?.toolInput' in CHAT_HTML
+    assert "call('browser_open'" not in CHAT_HTML
