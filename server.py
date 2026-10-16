@@ -182,6 +182,30 @@ async def browser_telegram_status() -> dict:
             'storage': storage_status, 'session_id': sid}
 
 
+@mcp.tool(meta=CHAT_ACTION_META)
+async def browser_attach() -> dict:
+    """Reconnect the Android embedded widget to the ONE existing browser.
+
+    ChatGPT Android may display an MCP App without forwarding browser_window's
+    tool arguments or output into the iframe. Attach only when there is
+    exactly one active, non-private session; NEVER create a new context,
+    navigate, or expose any owner-private Telegram login.
+    """
+    sessions = engine.live_sessions()
+    if len(sessions) != 1:
+        return {'attached': False,
+                'reason': 'not_open' if not sessions else 'ambiguous'}
+    entry = sessions[0]
+    if entry['private_mode']:
+        return {'attached': False, 'reason': 'private_mode'}
+    try:
+        engine.get(entry['session_id'])
+    except (ValueError, PermissionError):
+        return {'attached': False, 'reason': 'expired'}
+    return {'attached': True, 'session_id': entry['session_id'],
+            'site': entry['site']}
+
+
 @mcp.tool(meta=CHAT_TOOL_META)
 async def browser_window(session_id: str) -> dict:
     """Show the current MiniFish browser inside the ChatGPT conversation.
