@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v6.html"
+CHAT_UI_URI = "ui://minifish/browser-v7.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -337,6 +337,10 @@ a{color:#93c9ff}
  async function render(){
   if(!session||busy||secureToken||privateLocked)return;
   busy=true;status('Читаю страницу…');
+  // Draw tabs independently of the page snapshot, which can be slow on
+  // JavaScript-heavy pages and must not block tab switching on Android.
+  void refreshPublicTabs();
+  let frameReady=false;
   try{
    const shot=await call('browser_screenshot',{session_id:session});
    const sr=shot?.result||shot;
@@ -348,6 +352,8 @@ a{color:#93c9ff}
     for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
     await drawFrame($('shot'),new Blob([bytes],{type:im.mimeType}));
     $('noimage').hidden=true;
+    frameReady=true;
+    status('Экран загружен · получаю элементы страницы…');
    }else{
     throw new Error('ChatGPT не передал изображение браузера');
    }
@@ -356,7 +362,6 @@ a{color:#93c9ff}
    // Update address bar after assistant or owner navigation, not on credentials.
    if(result.url==='about:blank')$('navUrl').value='';
    else if(typeof result.url==='string'&&!result.url.includes('@'))$('navUrl').value=result.url;
-   await refreshPublicTabs();
    let arr=(result.elements||[]).filter(e=>e?.selector && ['button','a','input','textarea'].includes(e.tag));
    const actions=$('actions');actions.replaceChildren();
    for(const el of arr.filter(e=>e.tag==='button'||e.tag==='a').slice(0,18)){
@@ -379,9 +384,11 @@ a{color:#93c9ff}
   }catch(e){
    if(ownerDenied(e)){lockPrivateView('Личный режим активен — просмотр только после входа владельца MiniFish.');}
    else if(!secureToken&&!privateLocked){
-    $('noimage').hidden=false;
-    $('noimage').textContent='Кадр не загрузился. Нажми «Обновить экран».';
-    status('Ошибка загрузки: '+String(e.message||e).slice(0,120));
+    if(!frameReady){
+     $('noimage').hidden=false;
+     $('noimage').textContent='Кадр не загрузился. Нажми «Обновить экран».';
+    }
+    status((frameReady?'Экран готов; элементы страницы временно недоступны: ':'Ошибка загрузки: ')+String(e.message||e).slice(0,120));
    }
   }
   finally{busy=false}
