@@ -20,8 +20,15 @@ def test_protected_mode_hides_public_controls_and_restores_only_after_release():
 
 
 def test_private_frame_does_not_embed_owner_token_in_image_url_or_mcp():
-    assert "reader.readAsDataURL(blob)" in CHAT_HTML
+    assert "await drawFrame($('secureShot'),blob)" in CHAT_HTML
+    assert "await drawFrame($('shot'),new Blob(" in CHAT_HTML
+    assert "createImageBitmap(blob)" in CHAT_HTML
+    assert "ctx.drawImage(bitmap,0,0)" in CHAT_HTML
     assert "URL.createObjectURL(blob)" not in CHAT_HTML
+    assert "reader.readAsDataURL(blob)" not in CHAT_HTML
+    assert '<canvas id="shot"' in CHAT_HTML
+    assert '<canvas id="secureShot"' in CHAT_HTML
+    assert "secureAction('telegram_open',{})" in CHAT_HTML
     assert "secureRequest('frame',null,'GET')" in CHAT_HTML
     assert "headers['X-MiniFish-Owner']=secureToken" in CHAT_HTML
     assert "bridge('tools/call',{name,arguments:args})" in CHAT_HTML
