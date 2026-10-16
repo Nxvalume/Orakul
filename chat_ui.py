@@ -158,7 +158,8 @@ a{color:#93c9ff}
   if(securePoll){clearInterval(securePoll);securePoll=null}
   publicView(false);$('securePanel').open=true;
   $('unlockForm').hidden=false;$('secureTools').hidden=true;
-  status(message||'Личный режим активен. Введите пароль владельца MiniFish для продолжения.');
+  status(message||'Личный режим активен. Открываю защищённый экран…');
+  if(rememberedOwner())void tryResume();
  }
  function ownerDenied(error){return /Личный режим владельца|доступ MCP временно заблокирован|private.mode|private mode/i.test(String(error?.message||error))}
  function paintTabs(id,info,doAction){
@@ -549,7 +550,8 @@ a{color:#93c9ff}
   }catch(e){secureStatus('Ошибка полей: '+String(e.message||e).slice(0,140))}
  }
  async function secureFrame(){
-  if(!secureToken||document.visibilityState==='hidden')return;
+  if(!secureToken||document.visibilityState==='hidden'||secureFrameBusy)return;
+  secureFrameBusy=true;
   try{
    const res=await secureRequest('frame',null,'GET');
    const blob=await res.blob();
@@ -560,24 +562,60 @@ a{color:#93c9ff}
   }catch(e){
    if(/Защищённый доступ истёк|Требуется приватный вход|HTTP 401/i.test(String(e.message||e)))
     lockPrivateView('Защищённый доступ истёк. Введите пароль владельца MiniFish ещё раз.');
-   else secureStatus('Не удалось показать кадр: '+String(e.message||e).slice(0,120));
-  }
+   else if(!/Кадр временно недоступен|Страница занята|TimeoutError/i.test(String(e.message||e)))
+    secureStatus('Не удалось показать кадр: '+String(e.message||e).slice(0,120));
+  }finally{secureFrameBusy=false}
  }
  async function secureAction(action,extra){
   if(!secureToken)return;
   try{
    secureStatus('Передаю действие напрямую MiniFish…');
    await (await secureRequest('control',{action,...extra})).json();
-   secureStatus('Действие выполнено');await secureFrame();
-   if(['click','key','telegram_open','navigate','back','reload'].includes(action)){
-    await secureFields();await refreshSecureTabs();
-   }
+   secureStatus('Действие выполнено · обновляю изображение…');
+   // The frame is the priority on Android. Do not block it behind field
+   // enumeration and titles, which can be expensive on Telegram Web.
+   if(['click','key','telegram_open','navigate','back','reload'].includes(action))
+    void Promise.allSettled([secureFields(),refreshSecureTabs()]);
+   await secureFrame();
   }catch(e){secureStatus('Ошибка: '+String(e.message||e).slice(0,180))}
  }
  // While the owner capability is active, never let collapsing <details>
  // make the only accessible browser viewport disappear from Android.
+ async function activatePrivate(token){
+  secureToken=token;privateLocked=false;
+  $('unlockForm').hidden=true;$('secureTools').hidden=false;
+  publicView(false);
+  $('securePanel').open=true;
+  $('securePanel').scrollIntoView({block:'start',behavior:'auto'});
+  secureStatus('Защищённый режим: кадр и ввод доступны только владельцу.');
+  status('Защищённый браузер открыт · обновляю изображение…');
+  if(securePoll)clearInterval(securePoll);
+  // 1.2-second non-overlapping frames replace the 3.5s fixed wait.
+  securePoll=setInterval(()=>{void secureFrame()},1200);
+  void Promise.allSettled([secureFields(),refreshSecureTabs()]);
+  await secureFrame();
+  status('Защищённый ввод активен');
+ }
+ async function tryResume(){
+  if(resuming||secureToken||!session||!rememberedOwner())return false;
+  resuming=true;
+  try{
+   status('Восстанавливаю доступ доверенного телефона…');
+   const body=await (await secureRequest('resume',{})).json();
+   if(!body.token)throw new Error('Нет действующего доступа');
+   await activatePrivate(body.token);
+   return true;
+  }catch(e){
+   if(/Доверие устройства истекло|HTTP 401/i.test(String(e.message||e))){
+    forgetOwner();
+    status('Доверие телефона истекло. Требуется однократный пароль владельца.');
+   }else status('Автоматический вход недоступен. Введите пароль владельца один раз.');
+   return false;
+  }finally{resuming=false}
+ }
  $('securePanel').addEventListener('toggle',()=>{
   if(secureToken && !$('securePanel').open) $('securePanel').open=true;
+  else if($('securePanel').open&&!secureToken)void tryResume();
  });
  $('unlockForm').onsubmit=async e=>{
   e.preventDefault();
@@ -587,20 +625,12 @@ a{color:#93c9ff}
   if(!password)return;
   try{
    status('Проверяю владельца напрямую по HTTPS…');
-   const res=await secureRequest('unlock',{owner_password:password});
+   const res=await secureRequest('unlock',{owner_password:password,
+    remember_device:$('rememberOwner').checked});
    const body=await res.json();
-   secureToken=body.token;privateLocked=false;
-   $('unlockForm').hidden=true;$('secureTools').hidden=false;
-   publicView(false);
-   // The browser frame lives inside <details>. Without opening it, Android
-   // hides the ENTIRE private viewport although unlock succeeded.
-   $('securePanel').open=true;
-   $('securePanel').scrollIntoView({block:'start',behavior:'auto'});
-   secureStatus('Защищённый режим. ChatGPT не имеет доступа к полям входа.');
-   await secureFields();await secureFrame();await refreshSecureTabs();
-   if(securePoll)clearInterval(securePoll);
-   securePoll=setInterval(secureFrame,3500);
-   status('Защищённый ввод активен');
+   if(body.remember_token && !storeOwner(body.remember_token))
+    secureStatus('Android не разрешил сохранять доверие телефона.');
+   await activatePrivate(body.token);
   }catch(e){
    const msg=String(e.message||e);
    if(/Failed to fetch|Load failed|NetworkError|connection|соединение|CORS|fetch/i.test(msg)){
