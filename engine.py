@@ -475,7 +475,7 @@ class BrowserEngine:
     async def live_jpeg(self, sid: str) -> bytes:
         """Read-only low-bandwidth frame that does not keep a session alive."""
         s = self._sessions.get(sid)
-        if not s or time.monotonic()-s.touched >= TTL_SECONDS or s.page.is_closed():
+        if not s or time.monotonic()-s.touched >= session_idle_limit(s) or s.page.is_closed():
             raise ValueError('Сессия недоступна')
         # Owner-only live video stays available during private mode; MCP screenshot
         # and snapshots go through get(), which blocks them.
@@ -534,6 +534,13 @@ class BrowserEngine:
                     # Never include credentials, pages, URLs or raw exception
                     # details in the owner-visible error response.
                     save_error = 'Не удалось сохранить вход (' + type(exc).__name__ + ')'
+            # A failed checkpoint must never silently hand authenticated
+            # Telegram control back to MCP. Keep the same Chromium context
+            # and allow the owner to retry without a second login.
+            if save_error:
+                s.last_action = 'Telegram: вход пока не сохранён; личный режим включён'
+                return {'private_mode': True,
+                        'profile_saved': False, 'save_error': save_error}
             s.private_mode = bool(enabled)
             s.pending_click = None
             s.approved_click = None
