@@ -89,3 +89,10 @@ def test_search_failure_returns_useful_page_without_leaking_backend_error(monkey
     assert response.status_code == 200
     assert 'Поиск временно недоступен' in response.text
     assert 'SENSITIVE_INTERNAL_MESSAGE' not in response.text
+
+
+def test_search_module_is_included_in_render_docker_image():
+    from pathlib import Path
+    dockerfile = (Path(__file__).resolve().parents[1] / 'Dockerfile').read_text()
+    assert dockerfile.count('search_view.py') >= 2
+    assert 'COPY engine.py server.py' in dockerfile
