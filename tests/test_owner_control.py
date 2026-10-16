@@ -96,14 +96,13 @@ async def test_storage_error_does_not_leave_browser_open():
 async def test_owner_mobile_fill_field_never_replies_with_secret():
     engine, page = mock_browser()
     field = SimpleNamespace(
+        count=AsyncMock(return_value=1),
         get_attribute=AsyncMock(return_value='tel'),
         fill=AsyncMock(), evaluate=AsyncMock(return_value=True))
-    fields = SimpleNamespace(count=AsyncMock(return_value=2),
-                             nth=lambda idx: field)
-    page.locator = lambda selector: fields
+    page.locator = lambda selector: field
     secret = 'not-a-real-phone-number-1234'
     result = await engine.owner_control('session', 'fill_field',
-                                        field_index=1, text=secret)
+                                        field_ref='field-phone-ref-123456', text=secret)
     assert result['ok'] is True
     assert secret not in str(result)
     assert secret not in engine._sessions['session'].last_action
@@ -382,11 +381,12 @@ async def test_owner_password_fill_does_not_report_false_success():
     field = SimpleNamespace(
         get_attribute=AsyncMock(return_value='password'),
         fill=AsyncMock(), evaluate=AsyncMock(return_value=False))
-    page.locator = lambda selector: SimpleNamespace(
-        count=AsyncMock(return_value=1), nth=lambda index: field)
+    field.count = AsyncMock(return_value=1)
+    page.locator = lambda selector: field
     with pytest.raises(ValueError, match='Поле не приняло ввод') as exc:
         await engine.owner_control('session', 'fill_field',
-                                   field_index=0, text='sample-private-value')
+                                   field_ref='field-password-ref-1234',
+                                   text='sample-private-value')
     assert 'sample-private-value' not in str(exc.value)
     field.fill.assert_awaited_once()
 
