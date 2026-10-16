@@ -252,6 +252,20 @@ def browser_chat_app_v11() -> str:
     return CHAT_HTML
 
 
+@mcp.resource("ui://minifish/browser-v12.html", name="minifish-chat-browser-v12",
+              mime_type=CHAT_UI_MIME,
+              meta={"ui": {"csp": CHAT_UI_CSP, "prefersBorder": True},
+                    "openai/ui": {"availableDisplayModes": ["inline", "fullscreen"]},
+                    "openai/widgetCSP": {"connect_domains":
+                        ["https://nxval-minifish-2026.onrender.com"],
+                        "redirect_domains":
+                        ["https://nxval-minifish-2026.onrender.com"]},
+                    "openai/widgetPrefersBorder": True})
+def browser_chat_app_v12() -> str:
+    """Serve latest responsive private browser to cached v12 Android clients."""
+    return CHAT_HTML
+
+
 @mcp.tool()
 async def browser_telegram_status() -> dict:
     """Check Telegram authorization in the existing browser WITHOUT viewing credentials.
