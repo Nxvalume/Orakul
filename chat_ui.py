@@ -115,6 +115,7 @@ a{color:#93c9ff}
 (()=>{
  const $=id=>document.getElementById(id);
  const pending=new Map();let nextId=1,session='',busy=false,ready=null,attaching=false;
+ let queuedAction=null;
  let secureToken='',secureViewport={width:960,height:675},securePoll=null,privateLocked=false;
  const SECURE_BASE='https://nxval-minifish-2026.onrender.com/chat/secure/';
  const fallbackLink=$('secureFallbackLink');
@@ -137,7 +138,7 @@ a{color:#93c9ff}
   $('actions').hidden=!enabled;$('form').hidden=!enabled;
  }
  function lockPrivateView(message){
-  privateLocked=true;secureToken='';
+  privateLocked=true;secureToken='';queuedAction=null;
   if(securePoll){clearInterval(securePoll);securePoll=null}
   publicView(false);$('securePanel').open=true;
   $('unlockForm').hidden=false;$('secureTools').hidden=true;
@@ -391,10 +392,23 @@ a{color:#93c9ff}
     status((frameReady?'Экран готов; элементы страницы временно недоступны: ':'Ошибка загрузки: ')+String(e.message||e).slice(0,120));
    }
   }
-  finally{busy=false}
+  finally{
+   busy=false;
+   // A user can tap a tab while screenshot/DOM is still rendering.
+   // Execute the last queued action once render completes; do not discard it.
+   if(queuedAction&&!secureToken&&!privateLocked){
+    const next=queuedAction;queuedAction=null;
+    void act(next.name,next.args);
+   }
+  }
  }
  async function act(name,args){
-  if(!session||busy||secureToken||privateLocked)return;
+  if(!session||secureToken||privateLocked)return;
+  if(busy){
+   queuedAction={name,args};
+   status('Команда принята · выполняю после загрузки страницы…');
+   return;
+  }
   busy=true;status('Выполняю действие…');
   try{
    await call(name,args);status('Выполнено');busy=false;await render();
