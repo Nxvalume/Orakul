@@ -95,7 +95,7 @@ a{color:#93c9ff}
 <script>
 (()=>{
  const $=id=>document.getElementById(id);
- const pending=new Map();let nextId=1,session='',busy=false,ready=null;
+ const pending=new Map();let nextId=1,session='',busy=false,ready=null,attaching=false;
  const SECURE_BASE='https://nxval-minifish-2026.onrender.com/chat/secure/';
  const fallbackLink=$('secureFallbackLink');
  function trustedLoginUrl(){
@@ -216,6 +216,25 @@ a{color:#93c9ff}
   if(globals.toolInput!==undefined)inputFrom(globals.toolInput);
   if(globals.toolOutput!==undefined)inputFrom(globals.toolOutput);
  });
+ async function attachExisting(){
+  // Some Android ChatGPT hosts display the iframe without providing
+  // browser_window's toolInput / toolOutput. Reattach via the authorized
+  // MCP bridge to the *existing* session; do not open another browser.
+  if(session||attaching)return;
+  attaching=true;
+  status('Подключаюсь к открытому браузеру…');
+  try{
+   const info=data(await call('browser_attach',{}));
+   if(!info.attached||!info.session_id)
+    throw new Error(info.reason==='private_mode'?
+      'Защищённый сеанс: доступ только владельцу':
+      'Открытый сеанс пока не найден');
+   inputFrom(info);
+  }catch(e){
+   status('Не удалось подключить браузер: '+String(e.message||e).slice(0,130));
+   $('noimage').textContent='Нажми «Обновить экран» для повторного подключения.';
+  }finally{attaching=false}
+ }
  async function render(){
   if(!session||busy)return;
   busy=true;status('Читаю страницу…');
@@ -267,7 +286,7 @@ a{color:#93c9ff}
    await call(name,args);status('Выполнено');busy=false;await render();
   }catch(e){busy=false;status('Ошибка: '+String(e.message||e).slice(0,140))}
  }
- $('refresh').onclick=()=>render();
+ $('refresh').onclick=()=>session?render():attachExisting();
  $('shot').onclick=e=>{
   if(!session||busy||secureToken)return;
   const img=$('shot'),box=img.getBoundingClientRect();
@@ -413,11 +432,14 @@ a{color:#93c9ff}
   }catch(e){secureStatus('Ошибка завершения: '+String(e.message||e).slice(0,140))}
  };
  
- if(!session)status('Ожидаю сеанс MiniFish от ChatGPT…');
+ if(!session){
+  status('Ожидаю сеанс MiniFish от ChatGPT…');
+  setTimeout(()=>{if(!session)attachExisting()},600);
+ }
  setTimeout(()=>{
-  if(!session){
-   status('ChatGPT не передал ID браузера. Открой MiniFish повторно.');
-   $('noimage').textContent='Нет соединения с сеансом. Повтори открытие окна.';
+  if(!session && !attaching){
+   status('Не получен ID браузера. Нажми «Обновить экран» для повторного подключения.');
+   $('noimage').textContent='Нет соединения с сеансом. Используй кнопку «Обновить экран».';
   }
  },12000);
 })();
