@@ -89,3 +89,20 @@
 **Фактический deploy Render:** `dep-db96fvcs728c73fbkpn0`, `live`, commit `0807ab8bd416eac9c39fe38a6a59985f0dbef032`. После deploy подключённый MCP `browser_open('https://example.com')` выдал session `ceb66c5c-0efa-43da-935c-00cce040f38e`, `browser_snapshot` выдал текст страницы, `browser_screenshot` — реальный PNG, `browser_scroll(pixels=250)` успешно исполнился; tool browser_open инициировал UI в чате, поэтому дополнительных `browser_window` не вызывали ради предотвращения дублированных окон.
 
 **Строго не подтверждено:** отображение нового приватного кадра и корректная работа тапов/текстового ввода непосредственно на Android, реальный Telegram login и durable recovery после рестарта Render. Никакой owner password/Telegram OTP не запрашивался в чат. Без отдельной обратной связи нельзя назвать задачу завершённой.
+
+
+## 2026-10-16 21:30 МСК — MiniFish: общий браузер на разных HTTPS-сайтах и Telegram smoke
+
+**Запрос владельца:** MiniFish должен быть универсальным совместным браузером ChatGPT+Android для разных сайтов, Telegram — лишь один тест. Не создавать новую Chromium-сессию для каждого сайта, не требовать ручного allowlist и не открывать приватные данные для model MCP.
+
+**Реализовано:**
+- `chat_ui.py`: адресные строки `navForm` (общее управление через `browser_goto(session_id,url)`) и `secureNavForm` (прямой owner-only HTTPS `secureAction('navigate',{url})`); валидация URL, `https:` без встроенного логина/пароля, запрет других схем/портов. Обе формы работают в одной Chromium-сессии, общая скрывается при owner-private mode. Canvas отображение не менялось относительно предыдущей версии.
+- `chat_secure.py`: существующий owner-only control расширен `navigate` с передачей `url` в `engine.owner_control`, который вызывает `validate_url` (проверка публичного DNS/IP/HTTPS), разрешение и session HMAC проверяются ранее. Это не MCP инструмент. Коммит `4b9b0651`.
+- Render: merge update только `MINIFISH_ALLOW_ANY_PUBLIC_HTTPS=1`; запрещённые private/link-local/loopback адреса, DNS, схемы кроме HTTPS, нестандартные порты остаются закрыты сервером; прочие environment vars сохранены.
+- URL UI коммит `37505850`, regression/SSRF tests `f9de1834`, фиксы проверки протокола `384b32da`, `3f028fc1ea2b8a609ddc339653f87510a07da1a4`.
+
+**CI:** все три GitHub Actions workflows по SHA `3f028fc1` завершились success, включая Node JS/Canvas/URL tests и отрицательные тесты для внутренней сети. **Render:** `dep-db96os6i0phs73fojbk0` в статусе live, commit `3f028fc1`.
+
+**Реальная проверка MCP после деплоя:** `browser_open('https://example.com')` вернул session_id `b233e13e-4b6a-404f-a4a8-ee6ee5d4fae3`, title `Example Domain`. `browser_goto(same_session,'https://example.org/')` успешен. `browser_goto(same_session,'https://web.telegram.org/k/')` успешен, title `Telegram Web`. `browser_telegram_status` показал `phase=login_required,logged_in=false,saved=false,storage=ok`. `browser_snapshot` показал QR login с переключателем `LOG IN BY PHONE NUMBER`; `browser_click` по его selector выполнился, следующий snapshot подтвердил форму `Phone Number`, `NEXT`, переключатели QR/Passkey. Паролей, телефонов и кодов не вводили; Telegram аккаунт НЕ авторизован. MCP `browser_open` показал embedded UI в диалоге. Повторный `browser_window` не запускали во избежание дубликатов.
+
+**Остаётся неподтверждённым:** фактическое Android отображение canvas и адресной строки после последнего релиза, пользовательские тап и ввод, owner-only protected HTTPS control (потребует владельца с локальным паролем), сохранение авторизованной Telegram сессии после restart. Не объявлять всё готовым только по CI/backend smoke. `main` не изменялась; доп. платные ресурсы не создавались.
