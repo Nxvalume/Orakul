@@ -169,3 +169,32 @@ async def test_private_telegram_tab_cannot_be_closed_before_finishing_signin():
             assert not telegram.is_closed()
         finally:
             await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_background_telegram_tab_still_reports_login_and_storage_without_switch():
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True, args=['--disable-dev-shm-usage'])
+        try:
+            context = await browser.new_context()
+            await context.route('https://web.telegram.org/**', lambda route: route.fulfill(
+                status=200, content_type='text/html',
+                body="<title>Telegram test</title><aside id='column-left'>Test only</aside>"))
+            telegram = await context.new_page()
+            await telegram.goto('https://web.telegram.org/k/')
+            other = await context.new_page()
+            await other.set_content('<title>Other tab</title>')
+            eng = BrowserEngine()
+            sid = 'background-status-test'
+            eng._sessions[sid] = Session(context=context, page=other)
+            assert eng.telegram_session_id() == sid
+            assert await eng.telegram_logged_in(sid) is True
+            state = await eng.telegram_authenticated_state(sid)
+            assert isinstance(state, dict)
+            assert eng.get(sid).page is other
+            eng._sessions[sid].private_mode = True
+            assert await eng.telegram_logged_in(sid) is False
+            with pytest.raises(PermissionError):
+                await eng.tab_list(sid)
+        finally:
+            await browser.close()
