@@ -140,7 +140,7 @@ a{color:#93c9ff}
   if(text.length>2048)throw new Error('Слишком длинный адрес');
   if(/^[a-z][a-z0-9+.-]*:\/\//i.test(text)&&!/^https:\/\//i.test(text))
    throw new Error('Разрешён только HTTPS');
-  const full=text.startsWith('https://')||text.startsWith('HTTPS://')?text:'https://'+text;
+  const full=/^https:\/\//i.test(text)?text:'https://'+text;
   const u=new URL(full);
   if(u.protocol!=='https:'||!u.hostname||u.username||u.password||u.port && u.port!=='443')
    throw new Error('Допустим только публичный HTTPS-адрес без логина и пароля в URL');
