@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v8.html"
+CHAT_UI_URI = "ui://minifish/browser-v9.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -38,6 +38,8 @@ aside{font-size:12px;color:#ffd5a4;margin:6px 0}
 .screen{position:relative;background:#0c121d;min-height:160px;border-radius:12px;overflow:hidden;display:grid;place-items:center}
 .screen canvas{display:block;width:100%;height:auto;max-height:420px;object-fit:contain;touch-action:manipulation}
 .controls{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.navtools{display:flex;gap:8px;margin:10px 0 2px}
+.navtools button{min-height:46px;flex:1;font-weight:600}
 button{background:var(--panel);color:var(--fg);border:1px solid #52657c;border-radius:9px;padding:10px 12px;min-height:42px;font:inherit;cursor:pointer}
 button.primary{background:#24619b}
 button:disabled{opacity:.55;cursor:wait}
@@ -58,6 +60,10 @@ a{color:#93c9ff}
 <body>
 <header><h1>MiniFish · браузер</h1><span id="site" class="status">Подключение…</span></header>
 <p id="status" class="status" role="status">Подключаю интерфейс ChatGPT…</p>
+<nav id="navigationBar" class="navtools" aria-label="История посещений">
+<button id="back" type="button" aria-label="Назад на предыдущую страницу">← Назад</button>
+<button id="forward" type="button" aria-label="Вперёд на следующую страницу">Вперёд →</button>
+</nav>
 <form id="navForm"><label for="navUrl">Поиск или адрес сайта</label>
 <div style="display:flex;gap:7px;align-items:center">
 <input id="navUrl" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Поиск, например: телеграмм" required>
@@ -67,7 +73,6 @@ a{color:#93c9ff}
 <p class="status">Нажимай прямо на экран браузера. Для выбора полей и кнопок используется настоящий курсор Playwright. Изображение обновляется автоматически, пока окно открыто.</p>
 <div class="controls" id="publicControls">
 <button id="refresh" class="primary">Обновить экран</button>
-<button id="back">←</button><button id="forward">→</button>
 <button id="reload">Перезагрузить</button>
 <button id="up">↑</button><button id="down">↓</button>
 </div>
@@ -91,6 +96,10 @@ a{color:#93c9ff}
 </div>
 <div id="secureTools" hidden>
 <p id="secureStatus" class="status" role="status">Личный режим включён</p>
+<nav id="secureNavigationBar" class="navtools" aria-label="История личного браузера">
+<button id="secureBack" type="button" aria-label="Назад на предыдущую страницу">← Назад</button>
+<button id="secureForward" type="button" aria-label="Вперёд на следующую страницу">Вперёд →</button>
+</nav>
 <form id="secureNavForm"><label for="secureUrl">Поиск или адрес сайта (HTTPS)</label>
 <div style="display:flex;gap:7px;align-items:center">
 <input id="secureUrl" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Поиск или адрес сайта" required>
@@ -100,8 +109,7 @@ a{color:#93c9ff}
 <div class="controls"><button type="button" id="secureTelegram" class="primary">Открыть Telegram Web</button><button type="button" id="secureRefresh">Кадр</button>
 <button type="button" id="secureBackspace">Backspace</button>
 <button type="button" id="secureEnter">Enter</button>
-<button type="button" id="secureTab">Tab ↹</button><button type="button" id="secureBack">←</button>
-<button type="button" id="secureForward">→</button><button type="button" id="secureReload">Обновить страницу</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
+<button type="button" id="secureTab">Tab ↹</button><button type="button" id="secureReload">Обновить страницу</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
 <form id="secureForm"><label for="secureField">Поле страницы</label>
 <select id="secureField"><option value="">Читаю поля…</option></select>
 <input id="secureValue" type="password" autocomplete="off" spellcheck="false" placeholder="Ввод только на сервер MiniFish">
@@ -134,6 +142,7 @@ a{color:#93c9ff}
  function publicView(enabled){
   $('screen').hidden=!enabled;$('publicControls').hidden=!enabled;
   $('tabs').hidden=!enabled;
+  $('navigationBar').hidden=!enabled;
   $('navForm').hidden=!enabled;
   $('actions').hidden=!enabled;$('form').hidden=!enabled;
  }
