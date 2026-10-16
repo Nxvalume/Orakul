@@ -22,6 +22,8 @@ async def test_chat_window_is_discoverable_as_mcp_app():
     assert legacy.mimeType == CHAT_UI_MIME
     legacy_v5 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v5.html')
     assert legacy_v5.mimeType == CHAT_UI_MIME
+    legacy_v6 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v6.html')
+    assert legacy_v6.mimeType == CHAT_UI_MIME
     html = await mcp.read_resource(CHAT_UI_URI)
     assert 'ui/notifications/initialized' in str(html)
     assert 'tools/call' in str(html)
@@ -79,7 +81,7 @@ async def test_mcp_v3_browser_tap_metadata_and_fullscreen():
     assert opened.meta['ui']['visibility'] == ['model', 'app']
     assert tapped.meta['openai/widgetAccessible'] is True
     assert 'resourceUri' not in tapped.meta['ui']  # tapping should update current window
-    assert CHAT_UI_URI.endswith('browser-v6.html')
+    assert CHAT_UI_URI.endswith('browser-v7.html')
     resources = await mcp.list_resources()
     window = next(resource for resource in resources if str(resource.uri) == CHAT_UI_URI)
     assert window.meta['openai/ui']['availableDisplayModes'] == ['inline', 'fullscreen']
@@ -162,3 +164,16 @@ def test_android_ui_auto_recovers_missing_tool_input_without_new_session():
     assert "session?render():attachExisting()" in CHAT_HTML
     assert 'window.openai?.toolInput' in CHAT_HTML
     assert "call('browser_open'" not in CHAT_HTML
+
+
+def test_mobile_tabs_load_independently_of_slow_page_snapshot():
+    from chat_ui import CHAT_HTML
+    start = CHAT_HTML.index('async function render(){')
+    end = CHAT_HTML.index('async function act(', start)
+    renderer = CHAT_HTML[start:end]
+    assert renderer.index('void refreshPublicTabs();') < renderer.index("call('browser_screenshot'")
+    assert renderer.index('void refreshPublicTabs();') < renderer.index("call('browser_snapshot'")
+    assert 'let frameReady=false;' in renderer
+    assert "Экран готов; элементы страницы временно недоступны:" in renderer
+    # The DOM snapshot must never be required before tabs can load.
+    assert "await refreshPublicTabs();" not in renderer
