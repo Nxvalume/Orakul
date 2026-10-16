@@ -313,6 +313,11 @@ class BrowserEngine:
                 await session.page.bring_to_front()
             elif action == 'close':
                 to_close = pages[index]
+                if (session.private_mode and
+                        urlsplit(to_close.url).hostname == 'web.telegram.org'):
+                    # The owner must finish checkpointing an authenticated
+                    # Telegram profile before the login tab can disappear.
+                    raise PermissionError('Сначала завершите защищённый вход Telegram и сохраните профиль')
                 was_active = to_close is session.page
                 if len(pages) == 1:
                     # Keep the same context/owner capability and a usable
@@ -617,22 +622,28 @@ class BrowserEngine:
         profile_saved = False
         save_error = None
         async with s.lock:
-            if (not enabled and s.private_mode
-                    and urlsplit(s.page.url).hostname == 'web.telegram.org'
-                    and self.profile_save_callback is not None):
-                try:
-                    signed_in = (
-                        await s.page.locator('#column-left').is_visible()
-                        and not await s.page.locator('#auth-pages').is_visible())
-                    if signed_in:
-                        state = await s.context.storage_state(indexed_db=True)
-                        await self.profile_save_callback('telegram', state)
-                        s.profile_name = 'telegram'
-                        profile_saved = True
-                except Exception as exc:
-                    # Never include credentials, pages, URLs or raw exception
-                    # details in the owner-visible error response.
-                    save_error = 'Не удалось сохранить вход (' + type(exc).__name__ + ')'
+            if not enabled and s.private_mode:
+                # A signed-in Telegram tab can be in the background. Never
+                # accidentally release it without checkpointing its context.
+                telegram_pages = [page for page in self._tab_pages(s)
+                                  if urlsplit(page.url).hostname == 'web.telegram.org']
+                for telegram_page in telegram_pages:
+                    try:
+                        signed_in = (
+                            await telegram_page.locator('#column-left').is_visible()
+                            and not await telegram_page.locator('#auth-pages').is_visible())
+                        if signed_in:
+                            if self.profile_save_callback is None:
+                                raise RuntimeError('Постоянное хранилище недоступно')
+                            state = await s.context.storage_state(indexed_db=True)
+                            await self.profile_save_callback('telegram', state)
+                            s.profile_name = 'telegram'
+                            profile_saved = True
+                            break
+                    except Exception as exc:
+                        # No secret state, page URL or account identifier in errors.
+                        save_error = 'Не удалось сохранить вход (' + type(exc).__name__ + ')'
+                        break
             # A failed checkpoint must never silently hand authenticated
             # Telegram control back to MCP. Keep the same Chromium context
             # and allow the owner to retry without a second login.
