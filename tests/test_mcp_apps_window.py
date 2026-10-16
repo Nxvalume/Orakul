@@ -26,6 +26,8 @@ async def test_chat_window_is_discoverable_as_mcp_app():
     assert legacy_v6.mimeType == CHAT_UI_MIME
     legacy_v7 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v7.html')
     assert legacy_v7.mimeType == CHAT_UI_MIME
+    legacy_v8 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v8.html')
+    assert legacy_v8.mimeType == CHAT_UI_MIME
     html = await mcp.read_resource(CHAT_UI_URI)
     assert 'ui/notifications/initialized' in str(html)
     assert 'tools/call' in str(html)
@@ -83,7 +85,7 @@ async def test_mcp_v3_browser_tap_metadata_and_fullscreen():
     assert opened.meta['ui']['visibility'] == ['model', 'app']
     assert tapped.meta['openai/widgetAccessible'] is True
     assert 'resourceUri' not in tapped.meta['ui']  # tapping should update current window
-    assert CHAT_UI_URI.endswith('browser-v8.html')
+    assert CHAT_UI_URI.endswith('browser-v9.html')
     resources = await mcp.list_resources()
     window = next(resource for resource in resources if str(resource.uri) == CHAT_UI_URI)
     assert window.meta['openai/ui']['availableDisplayModes'] == ['inline', 'fullscreen']
@@ -204,3 +206,20 @@ def test_android_omnibox_shows_search_keyboard_and_search_placeholder():
     assert "https://nxval-minifish-2026.onrender.com/search?q=" in CHAT_HTML
     assert "resolveOmnibox($('navUrl').value)" in CHAT_HTML
     assert "resolveOmnibox($('secureUrl').value)" in CHAT_HTML
+
+
+def test_mobile_page_back_is_labeled_and_always_above_the_page_frame():
+    from chat_ui import CHAT_HTML
+    assert CHAT_HTML.count('id="back"') == 1
+    assert CHAT_HTML.count('id="forward"') == 1
+    assert CHAT_HTML.count('id="secureBack"') == 1
+    assert CHAT_HTML.count('id="secureForward"') == 1
+    assert CHAT_HTML.index('id="navigationBar"') < CHAT_HTML.index('id="navForm"')
+    assert CHAT_HTML.index('id="navigationBar"') < CHAT_HTML.index('id="shot"')
+    assert CHAT_HTML.index('id="secureNavigationBar"') < CHAT_HTML.index('id="secureNavForm"')
+    assert CHAT_HTML.index('id="secureNavigationBar"') < CHAT_HTML.index('id="secureShot"')
+    assert '>← Назад</button>' in CHAT_HTML
+    assert 'aria-label="Назад на предыдущую страницу"' in CHAT_HTML
+    assert "$('back').onclick=()=>act('browser_back',{session_id:session});" in CHAT_HTML
+    assert "$('secureBack').onclick=()=>secureAction('back',{});" in CHAT_HTML
+    assert "$('navigationBar').hidden=!enabled;" in CHAT_HTML
