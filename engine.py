@@ -741,7 +741,7 @@ class BrowserEngine:
                 })""")
             return {'fields': fields, 'site': urlsplit(s.page.url).hostname or ''}
 
-    async def owner_control(self, sid: str, action: str, *, x=None, y=None, text=None, key=None, field_index=None, field_ref=None, element_index=None, pixels=None, url=None) -> dict:
+    async def owner_control(self, sid: str, action: str, *, x=None, y=None, text=None, key=None, field_index=None, field_ref=None, element_index=None, pixels=None, axis='vertical', url=None) -> dict:
         """Owner-only manual handoff. Do not expose as an MCP tool.
 
         Owner may type into the browser directly (including login forms) without
@@ -802,7 +802,10 @@ class BrowserEngine:
             elif action == 'scroll':
                 if (type(pixels) is not int or not -3000 <= pixels <= 3000):
                     raise ValueError('Некорректная прокрутка')
-                await s.page.mouse.wheel(0, pixels)
+                if axis not in ('horizontal', 'vertical'):
+                    raise ValueError('Неизвестное направление прокрутки')
+                await s.page.mouse.wheel(pixels if axis == 'horizontal' else 0,
+                                         pixels if axis == 'vertical' else 0)
                 s.last_action = 'Владелец прокрутил страницу'
             elif action == 'type':
                 if not isinstance(text, str) or not 0 < len(text) <= 1000:
@@ -857,13 +860,16 @@ class BrowserEngine:
                 s.page = popups[-1]
             return {'ok': True, 'site': urlsplit(s.page.url).hostname or ''}
 
-    async def scroll(self, sid: str, pixels: int = 650) -> dict:
+    async def scroll(self, sid: str, pixels: int = 650, axis: str = 'vertical') -> dict:
         s = self.get(sid)
+        if axis not in ('vertical', 'horizontal'):
+            raise ValueError('Неизвестное направление прокрутки')
         pixels = max(-1500, min(1500, int(pixels)))
         async with s.lock:
-            await s.page.mouse.wheel(0, pixels)
+            await s.page.mouse.wheel(pixels if axis == 'horizontal' else 0,
+                                     pixels if axis == 'vertical' else 0)
             s.last_action = 'Прокрутка страницы'
-            return {'scroll_pixels': pixels, 'url': s.page.url}
+            return {'scroll_pixels': pixels, 'axis': axis, 'url': s.page.url}
 
     async def _close_session_context(self, session: Session) -> dict:
         updated = False
