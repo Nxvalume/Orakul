@@ -304,6 +304,8 @@ class BrowserEngine:
                     if url:
                         await page.goto(url, timeout=TIMEOUT_MS,
                                         wait_until='domcontentloaded')
+                    else:
+                        await page.set_content('<!doctype html><title>Новая вкладка</title><main><h1>Новая вкладка</h1><p>Введите HTTPS-адрес в строке MiniFish.</p></main>')
                     session.page = page
                 except Exception:
                     await page.close()
@@ -323,6 +325,7 @@ class BrowserEngine:
                     # Keep the same context/owner capability and a usable
                     # blank page, even after closing the last tab.
                     replacement = await session.context.new_page()
+                    await replacement.set_content('<!doctype html><title>Новая вкладка</title><main><h1>Новая вкладка</h1><p>Введите HTTPS-адрес в строке MiniFish.</p></main>')
                     session.page = replacement
                 elif was_active:
                     session.page = pages[min(index + 1, len(pages) - 1)
