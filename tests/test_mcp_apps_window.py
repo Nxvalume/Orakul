@@ -28,6 +28,8 @@ async def test_chat_window_is_discoverable_as_mcp_app():
     assert legacy_v7.mimeType == CHAT_UI_MIME
     legacy_v8 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v8.html')
     assert legacy_v8.mimeType == CHAT_UI_MIME
+    legacy_v9 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v9.html')
+    assert legacy_v9.mimeType == CHAT_UI_MIME
     html = await mcp.read_resource(CHAT_UI_URI)
     assert 'ui/notifications/initialized' in str(html)
     assert 'tools/call' in str(html)
@@ -85,7 +87,7 @@ async def test_mcp_v3_browser_tap_metadata_and_fullscreen():
     assert opened.meta['ui']['visibility'] == ['model', 'app']
     assert tapped.meta['openai/widgetAccessible'] is True
     assert 'resourceUri' not in tapped.meta['ui']  # tapping should update current window
-    assert CHAT_UI_URI.endswith('browser-v9.html')
+    assert CHAT_UI_URI.endswith('browser-v10.html')
     resources = await mcp.list_resources()
     window = next(resource for resource in resources if str(resource.uri) == CHAT_UI_URI)
     assert window.meta['openai/ui']['availableDisplayModes'] == ['inline', 'fullscreen']
@@ -223,3 +225,15 @@ def test_mobile_page_back_is_labeled_and_always_above_the_page_frame():
     assert "$('back').onclick=()=>act('browser_back',{session_id:session});" in CHAT_HTML
     assert "$('secureBack').onclick=()=>secureAction('back',{});" in CHAT_HTML
     assert "$('navigationBar').hidden=!enabled;" in CHAT_HTML
+
+
+def test_mobile_omnibox_is_single_search_field_above_results_viewport():
+    from chat_ui import CHAT_HTML
+    assert CHAT_HTML.index('id="navUrl"') < CHAT_HTML.index('id="shot"')
+    assert '<button class="primary" type="submit">Найти</button>' in CHAT_HTML
+    assert "const url=resolveOmnibox($('navUrl').value);" in CHAT_HTML
+    assert "act('browser_goto',{session_id:session,url});" in CHAT_HTML
+    assert "if(document.activeElement!==$('navUrl')" in CHAT_HTML
+    assert "$('navUrl').value=displayAddressOrQuery(result.url);" in CHAT_HTML
+    assert "u.searchParams.get('q')" in CHAT_HTML
+    assert "status('Открываю страницу или результаты поиска…')" in CHAT_HTML
