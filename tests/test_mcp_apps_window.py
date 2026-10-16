@@ -177,3 +177,18 @@ def test_mobile_tabs_load_independently_of_slow_page_snapshot():
     assert "Экран готов; элементы страницы временно недоступны:" in renderer
     # The DOM snapshot must never be required before tabs can load.
     assert "await refreshPublicTabs();" not in renderer
+
+
+def test_tab_click_while_page_loading_is_queued_not_silently_dropped():
+    from chat_ui import CHAT_HTML
+    start = CHAT_HTML.index('async function act(')
+    end = CHAT_HTML.index("$('refresh').onclick", start)
+    action = CHAT_HTML[start:end]
+    assert 'queuedAction={name,args};' in action
+    assert 'if(!session||busy||secureToken||privateLocked)return;' not in action
+    start = CHAT_HTML.index('async function render(){')
+    end = CHAT_HTML.index('async function act(', start)
+    renderer = CHAT_HTML[start:end]
+    assert 'if(queuedAction&&!secureToken&&!privateLocked)' in renderer
+    assert 'void act(next.name,next.args);' in renderer
+    assert 'privateLocked=true;secureToken=\'\';queuedAction=null;' in CHAT_HTML
