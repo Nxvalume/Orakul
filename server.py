@@ -23,6 +23,7 @@ from state_store import Store
 from remote_store import RemoteStore
 from jobs import JobRunner
 from dashboard import PAGE
+from search_view import search_page
 from web_auth import authorized, make_cookie, verify_password, allowed_attempt
 from oauth_server import (protected_resource, oauth_metadata, register, authorize_get, authorize_post, token, authorized_access, CHALLENGE)
 
@@ -573,6 +574,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
 app=mcp.streamable_http_app()
 app.add_route('/',homepage,methods=['GET'])
+app.add_route('/search',search_page,methods=['GET'])
 app.add_route('/healthz',health,methods=['GET'])
 app.add_route('/live',live_page,methods=['GET'])
 app.add_route('/live/sessions',session_api(engine),methods=['GET'])
