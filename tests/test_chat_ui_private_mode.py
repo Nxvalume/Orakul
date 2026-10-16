@@ -114,9 +114,11 @@ async def test_android_successful_owner_unlock_opens_private_browser_panel():
 
 
 def test_android_owner_panel_is_explicitly_opened_after_valid_unlock():
-    start = CHAT_HTML.index("$('unlockForm').onsubmit=async e=>{")
-    block = CHAT_HTML[start:CHAT_HTML.index("$('secureRefresh').onclick",start)]
+    start = CHAT_HTML.index("async function activatePrivate(token){")
+    block = CHAT_HTML[start:CHAT_HTML.index("async function tryResume(){", start)]
     assert "$('securePanel').open=true;" in block
     assert "$('securePanel').scrollIntoView(" in block
     assert "$('secureTools').hidden=false;" in block
     assert "if(secureToken && !$('securePanel').open) $('securePanel').open=true;" in CHAT_HTML
+    assert "await activatePrivate(body.token);" in CHAT_HTML
+    assert "securePoll=setInterval(()=>{void secureFrame()},1200);" in CHAT_HTML
