@@ -716,19 +716,32 @@ class BrowserEngine:
         s = self.get(sid, owner=True)
         async with s.lock:
             fields = await s.page.locator('input:visible, textarea:visible, [contenteditable="true"]:visible').evaluate_all(
-                """els => els.slice(0, 24).map((el, i) => ({
-                    index: i,
-                    kind: (el.getAttribute('type') || (el.isContentEditable ? 'text' : 'text')).toLowerCase(),
-                    label: String(el.getAttribute('aria-label') ||
-                        el.getAttribute('placeholder') ||
-                        el.getAttribute('name') ||
-                        el.getAttribute('id') ||
-                        el.closest('label')?.innerText ||
-                        'Поле ' + (i + 1)).slice(0, 90)
-                }))""")
+                """els => els.slice(0, 24).map((el, i) => {
+                    // A stable per-element identity survives insertion/reordering
+                    // of Telegram's country chooser. Do not expose field values.
+                    if (!el.dataset.minifishOwnerField)
+                        el.dataset.minifishOwnerField = (
+                            Math.random().toString(36).slice(2) +
+                            Math.random().toString(36).slice(2)
+                        );
+                    const inputLabel = el.closest('.input-field')?.querySelector(
+                        '.input-field-label, label')?.textContent;
+                    return {
+                        ref: el.dataset.minifishOwnerField,
+                        index: i,
+                        kind: (el.getAttribute('type') || (el.isContentEditable ? 'text' : 'text')).toLowerCase(),
+                        label: String(el.getAttribute('aria-label') ||
+                            el.getAttribute('placeholder') ||
+                            inputLabel ||
+                            el.getAttribute('name') ||
+                            el.getAttribute('id') ||
+                            el.closest('label')?.innerText ||
+                            'Поле ' + (i + 1)).slice(0, 90)
+                    };
+                })""")
             return {'fields': fields, 'site': urlsplit(s.page.url).hostname or ''}
 
-    async def owner_control(self, sid: str, action: str, *, x=None, y=None, text=None, key=None, field_index=None, element_index=None, pixels=None, url=None) -> dict:
+    async def owner_control(self, sid: str, action: str, *, x=None, y=None, text=None, key=None, field_index=None, field_ref=None, element_index=None, pixels=None, url=None) -> dict:
         """Owner-only manual handoff. Do not expose as an MCP tool.
 
         Owner may type into the browser directly (including login forms) without
@@ -797,15 +810,21 @@ class BrowserEngine:
                 await s.page.keyboard.insert_text(text)
                 s.last_action = 'Владелец ввёл текст'
             elif action == 'fill_field':
-                if (isinstance(field_index, bool) or not isinstance(field_index, int)
-                        or field_index < 0 or field_index > 23):
-                    raise ValueError('Выберите поле на странице')
+                # Fail closed for older Android widgets using unstable numeric
+                # indices. Otherwise a dynamic country picker can shift the
+                # phone input and silently put a phone number in Country.
+                if not isinstance(field_ref, str) or not re.fullmatch(
+                        r'[a-zA-Z0-9_-]{12,80}', field_ref):
+                    raise ValueError('Обновите окно MiniFish и выберите поле заново')
                 if not isinstance(text, str) or not 0 < len(text) <= 1000:
                     raise ValueError('Введите текст в поле MiniFish')
-                fields = s.page.locator('input:visible, textarea:visible, [contenteditable="true"]:visible')
-                if field_index >= await fields.count():
-                    raise ValueError('Поле больше не доступно. Обновите список полей')
-                target = fields.nth(field_index)
+                target = s.page.locator(
+                    'input[data-minifish-owner-field="' + field_ref + '"]:visible, '
+                    'textarea[data-minifish-owner-field="' + field_ref + '"]:visible, '
+                    '[contenteditable="true"][data-minifish-owner-field="' + field_ref + '"]:visible'
+                )
+                if await target.count() != 1:
+                    raise ValueError('Выбранное поле изменилось. Обновите поля и выберите его снова')
                 kind = (await target.get_attribute('type') or '').lower()
                 if kind in {'hidden','file','checkbox','radio','submit','button'}:
                     raise ValueError('В это поле нельзя вводить текст')
