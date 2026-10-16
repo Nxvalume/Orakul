@@ -93,6 +93,12 @@ def test_search_failure_returns_useful_page_without_leaking_backend_error(monkey
 
 def test_search_module_is_included_in_render_docker_image():
     from pathlib import Path
-    dockerfile = (Path(__file__).resolve().parents[1] / 'Dockerfile').read_text()
-    assert dockerfile.count('search_view.py') >= 2
-    assert 'COPY engine.py server.py' in dockerfile
+    root = Path(__file__).resolve().parents[1]
+    dockerfile = root / 'Dockerfile'
+    assert (root / 'search_view.py').is_file()
+    # Docker's runtime image intentionally omits the Dockerfile itself.
+    # Repository CI checks COPY instructions, while Docker CI checks module.
+    if dockerfile.is_file():
+        content = dockerfile.read_text()
+        assert content.count('search_view.py') >= 2
+        assert 'COPY engine.py server.py' in content
