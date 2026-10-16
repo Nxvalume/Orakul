@@ -9,6 +9,12 @@ from __future__ import annotations
 CHAT_UI_URI = "ui://minifish/browser-v4.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
+# Helper tools are callable from the inline widget but do not open new widgets.
+CHAT_ACTION_META = {
+    "ui": {"visibility": ["model", "app"]},
+    "openai/widgetAccessible": True,
+}
+
 CHAT_TOOL_META = {
     "ui": {"resourceUri": CHAT_UI_URI, "visibility": ["model", "app"]},
     "openai/outputTemplate": CHAT_UI_URI,
@@ -117,8 +123,13 @@ a{color:#93c9ff}
  async function call(name,args){
   // ChatGPT compatibility path and standards-first MCP Apps host bridge.
   // Secrets never pass through either tool-call transport.
-  if(typeof window.openai?.callTool==='function')
-    return window.openai.callTool(name,args);
+  if(typeof window.openai?.callTool==='function'){
+    const response=await Promise.race([
+     Promise.resolve().then(()=>window.openai.callTool(name,args)),timeout(16000)]);
+    const body=response?.result||response;
+    if(body?.isError)throw new Error('ChatGPT отклонил вызов '+name);
+    return response;
+   }
   if(ready)await ready;
   if(!bridgeAvailable)throw new Error('ChatGPT не предоставил MCP Apps-канал. Обнови подключение MiniFish или открой веб-версию ChatGPT.');
   const r=await bridge('tools/call',{name,arguments:args});
@@ -242,7 +253,11 @@ a{color:#93c9ff}
    }
    if(!select.options.length){const opt=document.createElement('option');opt.value='';opt.textContent='Нет обычных полей';select.appendChild(opt)}
    status('Готово · '+(result.title||$('site').textContent));
-  }catch(e){status('Ошибка: '+String(e.message||e).slice(0,140))}
+  }catch(e){
+   $('noimage').hidden=false;
+   $('noimage').textContent='Кадр не загрузился. Нажми «Обновить экран».';
+   status('Ошибка загрузки: '+String(e.message||e).slice(0,120));
+  }
   finally{busy=false}
  }
  async function act(name,args){
@@ -400,7 +415,10 @@ a{color:#93c9ff}
  
  if(!session)status('Ожидаю сеанс MiniFish от ChatGPT…');
  setTimeout(()=>{
-  if(!session)status('ChatGPT не передал ID браузера. Открой MiniFish повторно.');
+  if(!session){
+   status('ChatGPT не передал ID браузера. Открой MiniFish повторно.');
+   $('noimage').textContent='Нет соединения с сеансом. Повтори открытие окна.';
+  }
  },12000);
 })();
 </script></body></html>"""
