@@ -126,15 +126,36 @@ a{color:#93c9ff}
   return r;
  }
  function data(result){
-  if(result?.structuredContent && typeof result.structuredContent==='object')return result.structuredContent;
-  for(const el of result?.content||[])if(el.type==='text'){
+  const r=result?.result||result;
+  if(r?.structuredContent && typeof r.structuredContent==='object')return r.structuredContent;
+  for(const el of r?.content||r?.content_items||[])if(el.type==='text'){
    try{return JSON.parse(el.text)}catch(e){}
-  }return {};
+  }
+  if(typeof r?.text==='string'){try{return JSON.parse(r.text)}catch(e){}}
+  return {};
+ }
+ // Some clients deliver the session only in text MCP content or later globals.
+ function sessionFrom(payload,depth=0){
+  if(!payload||depth>5)return '';
+  if(typeof payload==='string'){
+   if(payload.length>4096)return '';
+   try{return sessionFrom(JSON.parse(payload),depth+1)}catch(e){return ''}
+  }
+  if(Array.isArray(payload)){
+   for(const item of payload){const id=sessionFrom(item,depth+1);if(id)return id}
+   return '';
+  }
+  if(typeof payload!=='object')return '';
+  const sid=payload.session_id;
+  if(typeof sid==='string' && /^[a-zA-Z0-9_-]{8,128}$/.test(sid))return sid;
+  for(const key of ['arguments','structuredContent','result','output','content','content_items','text','params']){
+   const id=sessionFrom(payload[key],depth+1);if(id)return id;
+  }
+  return '';
  }
  function inputFrom(payload){
   if(!payload)return;
-  const p=payload.structuredContent||payload;
-  const next=p?.session_id||p?.arguments?.session_id;
+  const next=sessionFrom(payload);
   if(next && next!==session){
    session=next;
    fallbackLink.href=trustedLoginUrl();
@@ -178,15 +199,27 @@ a{color:#93c9ff}
  if(initial)inputFrom(initial);
  const toolInput=window.openai?.toolInput;
  if(toolInput)inputFrom(toolInput);
+ // OpenAI can populate iframe globals after its initial HTML is rendered.
+ window.addEventListener('openai:set_globals',event=>{
+  const globals=event.detail?.globals||{};
+  if(globals.toolInput!==undefined)inputFrom(globals.toolInput);
+  if(globals.toolOutput!==undefined)inputFrom(globals.toolOutput);
+ });
  async function render(){
   if(!session||busy)return;
   busy=true;status('Читаю страницу…');
   try{
    const shot=await call('browser_screenshot',{session_id:session});
-   const im=(shot?.content||[]).find(i=>i.type==='image');
+   const sr=shot?.result||shot;
+   const images=Array.isArray(sr?.content)?sr.content:
+    (Array.isArray(sr?.content_items)?sr.content_items:[]);
+   const im=images.find(i=>i.type==='image');
    if(im?.data && /^(image\/png|image\/jpeg)$/.test(im.mimeType||'')){
+    $('shot').onerror=()=>{ $('noimage').hidden=false;status('ChatGPT не смог отобразить кадр браузера') };
     $('shot').src='data:'+im.mimeType+';base64,'+im.data;
     $('noimage').hidden=true;
+   }else{
+    throw new Error('ChatGPT не передал изображение браузера');
    }
    const result=data(await call('browser_snapshot',{session_id:session}));
    $('site').textContent=(()=>{try{return new URL(result.url).hostname}catch(e){return 'Страница'}})();
@@ -366,5 +399,8 @@ a{color:#93c9ff}
  };
  
  if(!session)status('Ожидаю сеанс MiniFish от ChatGPT…');
+ setTimeout(()=>{
+  if(!session)status('ChatGPT не передал ID браузера. Открой MiniFish повторно.');
+ },12000);
 })();
 </script></body></html>"""
