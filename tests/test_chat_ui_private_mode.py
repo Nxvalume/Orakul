@@ -65,7 +65,7 @@ async def test_android_successful_owner_unlock_opens_private_browser_panel():
         browser = await pw.chromium.launch(headless=True, args=['--disable-dev-shm-usage'])
         try:
             context = await browser.new_context(viewport={'width': 390, 'height': 740})
-            await context.add_init_script("""() => {
+            await context.add_init_script("""(() => {
                 window.openai = {
                     toolInput: {session_id: '""" + test_session + """'},
                     callTool: () => new Promise(() => {})
@@ -86,7 +86,7 @@ async def test_android_successful_owner_unlock_opens_private_browser_panel():
                             {status:200,headers:{'Content-Type':'image/jpeg'}});
                     return new Response('{}',{status:200});
                 };
-            }""")
+            })();""")
             page = await context.new_page()
             await page.route('https://minifish-ui-test.invalid/', lambda route: route.fulfill(
                 status=200, content_type='text/html', body=CHAT_HTML))
