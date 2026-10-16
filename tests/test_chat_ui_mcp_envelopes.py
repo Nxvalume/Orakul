@@ -16,7 +16,8 @@ def test_inline_view_can_use_delayed_chatgpt_globals_and_mcp_text():
     assert "const images=Array.isArray(sr?.content)" in CHAT_HTML
     assert "Array.isArray(sr?.content_items)" in CHAT_HTML
     assert "ChatGPT не передал изображение браузера" in CHAT_HTML
-    assert "ChatGPT не передал ID браузера" in CHAT_HTML
+    assert "Не получен ID браузера" in CHAT_HTML
+    assert "call('browser_attach',{})" in CHAT_HTML
 
 
 @pytest.mark.skipif(not shutil.which("node"), reason="Node.js unavailable")
