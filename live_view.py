@@ -336,15 +336,16 @@ async function ownerAction(action,payload={}) {
   if(!response.ok)throw Error(data.error||'Ошибка управления');
   $('manualStatus').textContent='Действие выполнено';
   if(action==='private_mode'){
-   privateMode=!!payload.enabled;
+   privateMode=!!data.private_mode;
    $('privateState').textContent=privateMode?'Личный вход: ассистент заблокирован':'Личный вход выключен: управление ассистента доступно';
    $('privateStart').disabled=privateMode;$('privateFinish').disabled=!privateMode;
    if(!privateMode && data.profile_saved){
     $('manualStatus').textContent='Авторизация Telegram сохранена в постоянной базе';
     $('telegramSavedStatus').textContent='Telegram: вход сохранён и проверен.';
-   }else if(!privateMode && data.save_error){
-    $('manualStatus').textContent='ВНИМАНИЕ: '+data.save_error;
+   }else if(data.save_error){
+    $('manualStatus').textContent='ВНИМАНИЕ: '+data.save_error+' Личный вход остаётся включённым.';
     $('telegramSavedStatus').textContent='Ошибка: вход не сохранён. '+data.save_error;
+    return false;
    }
   }
   return true;
