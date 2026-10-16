@@ -201,6 +201,6 @@ def test_android_omnibox_shows_search_keyboard_and_search_placeholder():
     assert 'enterkeyhint="search"' in CHAT_HTML
     assert 'Поиск, например: телеграмм' in CHAT_HTML
     assert 'Поиск или адрес сайта' in CHAT_HTML
-    assert "https://www.bing.com/search?q=" in CHAT_HTML
+    assert "https://nxval-minifish-2026.onrender.com/search?q=" in CHAT_HTML
     assert "resolveOmnibox($('navUrl').value)" in CHAT_HTML
     assert "resolveOmnibox($('secureUrl').value)" in CHAT_HTML
