@@ -116,3 +116,56 @@ async def test_new_mcp_tabs_tools_are_widget_callable_without_spawning_duplicate
         assert meta["openai/widgetAccessible"] is True
         assert meta["ui"]["visibility"] == ["model", "app"]
         assert "resourceUri" not in meta["ui"]
+
+
+@pytest.mark.asyncio
+async def test_background_authenticated_telegram_tab_is_checkpointed_before_owner_release():
+    from unittest.mock import AsyncMock
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True, args=['--disable-dev-shm-usage'])
+        try:
+            context = await browser.new_context()
+            await context.route("https://web.telegram.org/**", lambda route: route.fulfill(
+                status=200, content_type="text/html",
+                body="<title>Telegram</title><aside id='column-left'>test chat sidebar</aside>"))
+            telegram = await context.new_page()
+            await telegram.goto("https://web.telegram.org/k/", wait_until="domcontentloaded")
+            unrelated = await context.new_page()
+            await unrelated.set_content("<title>Other website</title>")
+            eng = BrowserEngine()
+            sid = "background-telegram"
+            eng._sessions[sid] = Session(context=context, page=unrelated, private_mode=True)
+            save = AsyncMock()
+            eng.profile_save_callback = save
+            result = await eng.owner_set_private(sid, False)
+            assert result["profile_saved"] is True
+            assert result["private_mode"] is False
+            assert eng.get(sid).page is unrelated
+            assert eng.get(sid).profile_name == "telegram"
+            save.assert_awaited_once()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.asyncio
+async def test_private_telegram_tab_cannot_be_closed_before_finishing_signin():
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True, args=['--disable-dev-shm-usage'])
+        try:
+            context = await browser.new_context()
+            telegram = await context.new_page()
+            await telegram.goto("data:text/html,<title>Mock tab</title>")
+            # Only the safe hostname is checked when preventing private tab closure.
+            # Set the URL using a completely local Playwright network interceptor.
+            await context.route("https://web.telegram.org/**",
+                lambda route: route.fulfill(status=200, content_type="text/html",
+                                           body="<title>Telegram login</title>"))
+            await telegram.goto("https://web.telegram.org/k/")
+            eng = BrowserEngine()
+            eng._sessions["protected-tab"] = Session(
+                context=context, page=telegram, private_mode=True)
+            with pytest.raises(PermissionError, match="Telegram"):
+                await eng.tab_action("protected-tab", "close", index=0, owner=True)
+            assert not telegram.is_closed()
+        finally:
+            await browser.close()
