@@ -21,6 +21,7 @@ from starlette.responses import JSONResponse, Response
 from web_auth import allowed_attempt, verify_password
 
 _LIMIT = 12 * 60
+_REMEMBER_LIMIT = 24 * 60 * 60  # Explicitly trusted device, never an indefinite password bypass.
 _UUID = re.compile(r'^[0-9a-f-]{36}$')
 _HOST = {'chatgpt.com', 'chat.openai.com'}
 
@@ -57,6 +58,31 @@ def _seal(sid: str, origin: str) -> str:
     return body + '.' + sig
 
 
+def _seal_remember(origin: str) -> str:
+    """24h origin-bound owner grant; no owner password is stored on device."""
+    payload = json.dumps({'v': 2, 'kind': 'owner-device', 'origin': origin,
+                          'exp': int(time.time() + _REMEMBER_LIMIT),
+                          'nonce': secrets.token_hex(16)}, separators=(',', ':')).encode()
+    body = base64.urlsafe_b64encode(payload).decode().rstrip('=')
+    return body + '.' + hmac.new(_secret(), body.encode(), hashlib.sha256).hexdigest()
+
+
+def _valid_remember(token: str, origin: str) -> bool:
+    if not isinstance(token, str) or not 80 <= len(token) <= 900:
+        return False
+    try:
+        raw, sig = token.rsplit('.', 1)
+        expected = hmac.new(_secret(), raw.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return False
+        data = json.loads(base64.urlsafe_b64decode(raw + '=' * (-len(raw) % 4)))
+        return (data.get('v') == 2 and data.get('kind') == 'owner-device'
+                and data.get('origin') == origin and isinstance(data.get('exp'), int)
+                and time.time() < data['exp'] <= time.time() + _REMEMBER_LIMIT + 5)
+    except (ValueError, TypeError, UnicodeError, KeyError):
+        return False
+
+
 def _valid(token: str, sid: str, origin: str) -> bool:
     if not isinstance(token, str) or not 60 <= len(token) <= 900 or not _UUID.fullmatch(sid):
         return False
@@ -78,7 +104,7 @@ def _cors(origin: str) -> dict:
     return {
         'Access-Control-Allow-Origin': origin,
         'Vary': 'Origin',
-        'Access-Control-Allow-Headers': 'Content-Type, X-MiniFish-Owner',
+        'Access-Control-Allow-Headers': 'Content-Type, X-MiniFish-Owner, X-MiniFish-Device',
         'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
         'Access-Control-Max-Age': '600',
         'Cache-Control': 'no-store',
@@ -123,6 +149,22 @@ def create_owner_routes(engine):
                 if (not isinstance(password, str) or len(password) > 500
                         or not allowed_attempt(ip) or not verify_password(password, ip)):
                     return JSONResponse({'error': 'Неверный пароль MiniFish или лимит попыток'}, status_code=401, headers=headers)
+                result = await engine.owner_set_private(sid, True)
+                body = {'token': _seal(sid, origin),
+                        'expires_seconds': _LIMIT, 'private_mode': result['private_mode']}
+                # Remember is explicit opt-in; never store the actual password.
+                if data.get('remember_device') is True:
+                    body['remember_token'] = _seal_remember(origin)
+                    body['remember_seconds'] = _REMEMBER_LIMIT
+                return JSONResponse(body, headers=headers)
+
+            if operation == 'resume':
+                # HTTPS owner-only handshake. A signed short-term device grant
+                # never enters MCP tool args, query strings, or page scripts.
+                remember = req.headers.get('x-minifish-device', '')
+                if not _valid_remember(remember, origin):
+                    return JSONResponse({'error': 'Доверие устройства истекло'}, status_code=401,
+                                        headers=headers)
                 result = await engine.owner_set_private(sid, True)
                 return JSONResponse({'token': _seal(sid, origin),
                                      'expires_seconds': _LIMIT,
