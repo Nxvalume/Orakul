@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v12.html"
+CHAT_UI_URI = "ui://minifish/browser-v13.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -74,6 +74,7 @@ a{color:#93c9ff}
 <div class="controls" id="publicControls">
 <button id="refresh" class="primary">Обновить экран</button>
 <button id="reload">Перезагрузить</button>
+<button type="button" id="left" aria-label="Прокрутить страницу влево">⇠ Влево</button><button type="button" id="right" aria-label="Прокрутить страницу вправо">Вправо ⇢</button>
 <button id="up">↑</button><button id="down">↓</button>
 </div>
 <div id="actions" aria-label="Доступные действия на странице"></div>
@@ -88,6 +89,7 @@ a{color:#93c9ff}
 <p class="status">Вход в этом окне отправляется напрямую по HTTPS в MiniFish, мимо инструментов модели. Пароли и коды не публикуются в чате.</p>
 <form id="unlockForm"><label for="ownerKey">Пароль владельца MiniFish (не Telegram)</label>
 <input id="ownerKey" type="password" autocomplete="off" placeholder="Пароль MiniFish" required>
+<label style="display:flex;align-items:center;gap:9px;margin:8px 0;font-size:13px"><input id="rememberOwner" type="checkbox" checked style="width:20px;height:20px;flex:none">Запомнить этот телефон на 24 часа без повторного пароля</label>
 <button id="unlock" class="primary" type="submit">Открыть защищённый режим</button></form>
 <div id="secureFallback" hidden style="padding:10px;margin-top:10px;background:#203247;border-radius:9px">
 <strong>Встроенный ввод недоступен в этом клиенте ChatGPT.</strong>
@@ -109,7 +111,7 @@ a{color:#93c9ff}
 <div class="controls"><button type="button" id="secureTelegram" class="primary">Открыть Telegram Web</button><button type="button" id="secureRefresh">Кадр</button>
 <button type="button" id="secureBackspace">Backspace</button>
 <button type="button" id="secureEnter">Enter</button>
-<button type="button" id="secureTab">Tab ↹</button><button type="button" id="secureReload">Обновить страницу</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
+<button type="button" id="secureTab">Tab ↹</button><button type="button" id="secureReload">Обновить страницу</button><button type="button" id="secureLeft" aria-label="Прокрутить страницу влево">⇠ Влево</button><button type="button" id="secureRight" aria-label="Прокрутить страницу вправо">Вправо ⇢</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
 <form id="secureForm"><label for="secureField">Поле страницы</label>
 <select id="secureField"><option value="">Выберите поле телефона, а не страну</option></select>
 <input id="secureValue" type="password" autocomplete="off" spellcheck="false" placeholder="Ввод только на сервер MiniFish">
@@ -125,6 +127,11 @@ a{color:#93c9ff}
  const pending=new Map();let nextId=1,session='',busy=false,ready=null,attaching=false;
  let queuedAction=null;
  let secureToken='',secureViewport={width:960,height:675},securePoll=null,privateLocked=false;
+ let secureFrameBusy=false,resuming=false;
+ const REMEMBER_KEY='minifish:owner:remember-v1';
+ const rememberedOwner=()=>{try{return localStorage.getItem(REMEMBER_KEY)||''}catch(e){return ''}};
+ const storeOwner=token=>{try{localStorage.setItem(REMEMBER_KEY,token);return true}catch(e){return false}};
+ const forgetOwner=()=>{try{localStorage.removeItem(REMEMBER_KEY)}catch(e){}};
  const SECURE_BASE='https://nxval-minifish-2026.onrender.com/chat/secure/';
  const fallbackLink=$('secureFallbackLink');
  function trustedLoginUrl(){
@@ -469,6 +476,8 @@ a{color:#93c9ff}
  $('back').onclick=()=>act('browser_back',{session_id:session});
  $('forward').onclick=()=>act('browser_tab_action',{session_id:session,action:'forward'});
  $('reload').onclick=()=>act('browser_tab_action',{session_id:session,action:'reload'});
+ $('left').onclick=()=>act('browser_scroll',{session_id:session,pixels:-420,axis:'horizontal'});
+ $('right').onclick=()=>act('browser_scroll',{session_id:session,pixels:420,axis:'horizontal'});
  $('up').onclick=()=>act('browser_scroll',{session_id:session,pixels:-460});
  $('down').onclick=()=>act('browser_scroll',{session_id:session,pixels:460});
  $('form').onsubmit=e=>{
@@ -484,6 +493,7 @@ a{color:#93c9ff}
  async function secureRequest(operation,data,method='POST'){
   const headers={'Content-Type':'application/json'};
   if(secureToken)headers['X-MiniFish-Owner']=secureToken;
+  if(operation==='resume')headers['X-MiniFish-Device']=rememberedOwner();
   const url=SECURE_BASE+operation+(method==='GET'?'?session_id='+encodeURIComponent(session):'');
   const opts={method,mode:'cors',credentials:'omit',headers,cache:'no-store'};
   if(method==='POST')opts.body=JSON.stringify({session_id:session,...data});
@@ -618,6 +628,8 @@ a{color:#93c9ff}
  $('secureBack').onclick=()=>secureAction('back',{});
  $('secureForward').onclick=()=>protectedTabAction('forward');
  $('secureReload').onclick=()=>protectedTabAction('reload');
+$('secureLeft').onclick=()=>secureAction('scroll',{pixels:-420,axis:'horizontal'});
+ $('secureRight').onclick=()=>secureAction('scroll',{pixels:420,axis:'horizontal'});
  $('secureUp').onclick=()=>secureAction('scroll',{pixels:-460});
  $('secureDown').onclick=()=>secureAction('scroll',{pixels:460});
  $('secureForm').onsubmit=e=>{
