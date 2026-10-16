@@ -425,9 +425,11 @@ class BrowserEngine:
             if bounds:
                 await self._move_cursor(s, bounds['x'] + bounds['width'] / 2,
                                         bounds['y'] + bounds['height'] / 2)
+            prior_pages = set(self._tab_pages(s))
             await el.click(timeout=TIMEOUT_MS)
-            if len(s.context.pages) > 1:
-                s.page = s.context.pages[-1]
+            popups = [p for p in self._tab_pages(s) if p not in prior_pages]
+            if popups:
+                s.page = popups[-1]
             s.last_action = 'Нажатие: ' + (label.strip()[:80] or selector[:80])
             return {'clicked': selector, 'url': s.page.url, 'label': label}
 
@@ -710,6 +712,7 @@ class BrowserEngine:
         if action == 'navigate':
             await asyncio.to_thread(validate_url, url)
         async with s.lock:
+            prior_pages = set(self._tab_pages(s))
             if (urlsplit(s.page.url).hostname == 'web.telegram.org'
                     and (action in ('click', 'click_element', 'telegram_next')
                          or (action == 'key' and key == 'Enter'))):
@@ -801,8 +804,9 @@ class BrowserEngine:
                     raise ValueError('Клавиша не разрешена')
                 await s.page.keyboard.press(key)
                 s.last_action = 'Владелец нажал клавишу'
-            if len(s.context.pages) > 1:
-                s.page = s.context.pages[-1]
+            popups = [p for p in self._tab_pages(s) if p not in prior_pages]
+            if popups:
+                s.page = popups[-1]
             return {'ok': True, 'site': urlsplit(s.page.url).hostname or ''}
 
     async def scroll(self, sid: str, pixels: int = 650) -> dict:
