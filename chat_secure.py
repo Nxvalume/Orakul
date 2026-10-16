@@ -135,6 +135,15 @@ def create_owner_routes(engine):
             if not session.private_mode:
                 return JSONResponse({'error': 'Личный режим не активен'}, status_code=403, headers=headers)
 
+            if operation == 'tabs':
+                # Owner capability is validated before returning private tab titles.
+                return JSONResponse(await engine.tab_list(sid, owner=True), headers=headers)
+            if operation == 'tab_action':
+                action = data.get('action')
+                index = data.get('index', -1)
+                url = data.get('url', '')
+                result = await engine.tab_action(sid, action, index, url, owner=True)
+                return JSONResponse(result, headers=headers)
             if operation == 'fields':
                 result = await engine.owner_fields(sid)
                 result['viewport'] = session.page.viewport_size or {'width': 960, 'height': 675}
