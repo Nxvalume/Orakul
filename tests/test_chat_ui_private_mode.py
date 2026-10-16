@@ -13,7 +13,9 @@ def test_protected_mode_hides_public_controls_and_restores_only_after_release():
     assert "function publicView(enabled)" in CHAT_HTML
     assert "publicView(false);" in CHAT_HTML
     assert "publicView(true);" in CHAT_HTML
-    assert CHAT_HTML.count("if(!session||busy||secureToken||privateLocked)return;") == 2
+    assert CHAT_HTML.count("if(!session||busy||secureToken||privateLocked)return;") == 1
+    assert "if(!session||secureToken||privateLocked)return;" in CHAT_HTML
+    assert "queuedAction=null;" in CHAT_HTML
     assert "if(session&&!busy&&!secureToken&&!privateLocked" in CHAT_HTML
     assert "if(ownerDenied(e))lockPrivateView(" in CHAT_HTML
     assert "if(next && next!==session && !secureToken && !privateLocked)" in CHAT_HTML
