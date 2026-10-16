@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v9.html"
+CHAT_UI_URI = "ui://minifish/browser-v10.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -67,7 +67,7 @@ a{color:#93c9ff}
 <form id="navForm"><label for="navUrl">Поиск или адрес сайта</label>
 <div style="display:flex;gap:7px;align-items:center">
 <input id="navUrl" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Поиск, например: телеграмм" required>
-<button class="primary" type="submit">Перейти</button></div></form>
+<button class="primary" type="submit">Найти</button></div></form>
 <div id="tabs" class="tabstrip" role="group" aria-label="Вкладки браузера">Загрузка вкладок…</div>
 <div class="screen" id="screen"><canvas id="shot" role="img" aria-label="Интерактивный кадр браузера MiniFish" style="cursor:crosshair"></canvas><span id="noimage" class="status">Загрузка кадра…</span></div>
 <p class="status">Нажимай прямо на экран браузера. Для выбора полей и кнопок используется настоящий курсор Playwright. Изображение обновляется автоматически, пока окно открыто.</p>
@@ -103,7 +103,7 @@ a{color:#93c9ff}
 <form id="secureNavForm"><label for="secureUrl">Поиск или адрес сайта (HTTPS)</label>
 <div style="display:flex;gap:7px;align-items:center">
 <input id="secureUrl" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Поиск или адрес сайта" required>
-<button class="primary" type="submit">Перейти</button></div></form>
+<button class="primary" type="submit">Найти</button></div></form>
 <div id="secureTabs" class="tabstrip" role="group" aria-label="Личные вкладки">Загрузка вкладок…</div>
 <div class="screen" style="margin-top:8px"><canvas id="secureShot" role="img" aria-label="Защищённый браузер — только владельцу"></canvas></div>
 <div class="controls"><button type="button" id="secureTelegram" class="primary">Открыть Telegram Web</button><button type="button" id="secureRefresh">Кадр</button>
@@ -200,6 +200,15 @@ a{color:#93c9ff}
   if(u.protocol!=='https:'||!u.hostname||u.username||u.password||u.port && u.port!=='443')
    throw new Error('Допустим только публичный HTTPS-адрес без логина и пароля в URL');
   return u.href;
+ }
+ function displayAddressOrQuery(raw){
+  try{
+   const u=new URL(String(raw||''));
+   if(u.protocol==='https:' && u.hostname==='nxval-minifish-2026.onrender.com' &&
+      u.pathname==='/search' && u.searchParams.has('q'))
+    return u.searchParams.get('q')||'';
+  }catch(error){}
+  return raw==='about:blank'?'':String(raw||'');
  }
  function resolveOmnibox(raw){
   const text=String(raw||'').trim();
@@ -380,9 +389,10 @@ a{color:#93c9ff}
    }
    const result=data(await call('browser_snapshot',{session_id:session}));
    $('site').textContent=(()=>{try{return new URL(result.url).hostname}catch(e){return 'Страница'}})();
-   // Update address bar after assistant or owner navigation, not on credentials.
-   if(result.url==='about:blank')$('navUrl').value='';
-   else if(typeof result.url==='string'&&!result.url.includes('@'))$('navUrl').value=result.url;
+   // Keep user-typed words while the 4.6s frame polling runs. Never
+   // replace the active text field with a URL during Android keyboard input.
+   if(document.activeElement!==$('navUrl')&&typeof result.url==='string'&&!result.url.includes('@'))
+    $('navUrl').value=displayAddressOrQuery(result.url);
    let arr=(result.elements||[]).filter(e=>e?.selector && ['button','a','input','textarea'].includes(e.tag));
    const actions=$('actions');actions.replaceChildren();
    for(const el of arr.filter(e=>e.tag==='button'||e.tag==='a').slice(0,18)){
@@ -440,6 +450,9 @@ a{color:#93c9ff}
   e.preventDefault();
   if(!session||privateLocked||secureToken){status('Перейдите в защищённый режим либо откройте браузер');return}
   try{const url=resolveOmnibox($('navUrl').value);
+   // Keep the address/search box above the frame and render results within it.
+   $('navUrl').blur();
+   status('Открываю страницу или результаты поиска…');
    act('browser_goto',{session_id:session,url});
   }catch(error){status('Ошибка поиска или адреса: '+String(error.message||error).slice(0,110))}
  };
