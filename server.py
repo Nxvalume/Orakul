@@ -137,6 +137,22 @@ def browser_chat_app() -> str:
     return CHAT_HTML
 
 
+# Serve the previous MCP Apps URI as a compatibility alias for older Android
+# clients that have cached the v4 tool metadata. New discovery advertises v5.
+@mcp.resource("ui://minifish/browser-v4.html", name="minifish-chat-browser-legacy",
+              mime_type=CHAT_UI_MIME,
+              meta={"ui": {"csp": CHAT_UI_CSP, "prefersBorder": True},
+                    "openai/ui": {"availableDisplayModes": ["inline", "fullscreen"]},
+                    "openai/widgetCSP": {"connect_domains":
+                        ["https://nxval-minifish-2026.onrender.com"],
+                        "redirect_domains":
+                        ["https://nxval-minifish-2026.onrender.com"]},
+                    "openai/widgetPrefersBorder": True})
+def browser_chat_app_legacy() -> str:
+    """The same patched UI for clients holding an earlier URI."""
+    return CHAT_HTML
+
+
 @mcp.tool()
 async def browser_telegram_status() -> dict:
     """Check Telegram authorization in the existing browser WITHOUT viewing credentials.
