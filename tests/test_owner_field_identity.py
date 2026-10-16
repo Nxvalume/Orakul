@@ -57,7 +57,13 @@ async def test_owner_phone_field_identity_survives_country_search_insertion():
             # When reactive Telegram replaces the node, never fall back to its
             # position, even when the replacement shares type/placeholder.
             await page.locator("#phone").evaluate(
-                """el => el.replaceWith(el.cloneNode(true))""")
+                """el => {
+                    const replacement = document.createElement('input');
+                    replacement.id = 'phone';
+                    replacement.type = 'tel';
+                    replacement.placeholder = 'Phone Number';
+                    el.replaceWith(replacement);
+                }""")
             with pytest.raises(ValueError, match="Выбранное поле изменилось"):
                 await eng.owner_control("private-phone", "fill_field",
                                         field_ref=phone["ref"], text="5559999")
