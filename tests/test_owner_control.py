@@ -246,7 +246,10 @@ async def test_telegram_private_mode_exposes_clean_save_failure():
     assert result['profile_saved'] is False
     assert 'RuntimeError' in result['save_error']
     assert 'sensitive-sentinel' not in str(result)
-    assert result['private_mode'] is False
+    # Failed durable checkpoint must NOT release the browser to MCP.
+    assert result['private_mode'] is True
+    with pytest.raises(PermissionError, match='Личный режим'):
+        engine.get('session')
 
 
 
