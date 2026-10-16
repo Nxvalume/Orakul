@@ -258,6 +258,22 @@ async def browser_back(session_id: str) -> dict:
     return await engine.back(session_id)
 
 @mcp.tool(meta=CHAT_ACTION_META)
+async def browser_tabs(session_id: str) -> dict:
+    """List real browser tabs, current tab and their public titles/sites.
+
+    In owner-private mode no tab metadata is exposed through MCP.
+    """
+    return await engine.tab_list(session_id)
+
+
+@mcp.tool(meta=CHAT_ACTION_META)
+async def browser_tab_action(session_id: str, action: str, index: int = -1,
+                             url: str = '') -> dict:
+    """New/switch/close/forward/reload tabs in the current Chromium context."""
+    return await engine.tab_action(session_id, action, index, url)
+
+
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_snapshot(session_id: str) -> dict:
     """Read title, visible text, and element selectors of the current page."""
     return await engine.snapshot(session_id)
