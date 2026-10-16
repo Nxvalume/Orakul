@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v5.html"
+CHAT_UI_URI = "ui://minifish/browser-v6.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
