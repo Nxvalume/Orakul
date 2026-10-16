@@ -81,18 +81,21 @@ mcp = FastMCP(
 )
 
 async def _open_telegram(url: str) -> dict:
+    """Attach to the live Telegram Chromium context before restoring a profile.
+
+    Both the owner's /live panel and ChatGPT MCP must use the same session_id.
+    Never discard an in-progress login because older saved state exists.
+    Private owner login remains inaccessible through MCP.
+    """
     validate_url(url)
     sid = engine.telegram_session_id()
-    if sid and engine._sessions.get(sid) and engine._sessions[sid].private_mode:
-        raise PermissionError('Личный вход владельца: подожди, пока управление будет возвращено')
-    if sid and await engine.telegram_logged_in(sid):
-        session = engine.get(sid)
+    if sid:
+        session = engine.get(sid)  # Also enforces private-mode isolation.
         return {'session_id': sid, 'url': session.page.url,
                 'title': await session.page.title(), 'profile': session.profile_name,
                 'reused': True}
-    # Owner may see a white /healthz diagnostic page if an assistant probed
-    # the server using the single Render Free browser slot. That page has no
-    # user profile and is never a login: retire it before opening Telegram.
+    # A diagnostic /healthz page is not a user browser and may occupy the
+    # single Render Free browser slot; retire only this exact temporary page.
     public_host = urlsplit(os.getenv('MINIFISH_PUBLIC_URL',
         'https://nxval-minifish-2026.onrender.com')).hostname
     for diagnostic_sid, diagnostic in list(engine._sessions.items()):
@@ -106,14 +109,7 @@ async def _open_telegram(url: str) -> dict:
     except ValueError:
         saved = None
     if saved and saved['site'] == 'web.telegram.org':
-        if sid:
-            await engine.close(sid)
         return await engine.open(url, storage_state=saved['state'], profile_name='telegram')
-    if sid:
-        session = engine.get(sid)
-        return {'session_id': sid, 'url': session.page.url,
-                'title': await session.page.title(), 'profile': session.profile_name,
-                'reused': True}
     return await engine.open(url)
 
 
