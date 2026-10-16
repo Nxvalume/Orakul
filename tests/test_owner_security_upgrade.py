@@ -13,7 +13,9 @@ from state_store import Store
 async def test_private_login_blocks_mcp_reads_but_allows_owner_actions():
     engine = BrowserEngine()
     page = Mock()
-    page.url = 'https://web.telegram.org/k/'
+    # Test ordinary owner handoff separately from authenticated Telegram.
+    # Telegram must retain private mode until verified encrypted checkpoint.
+    page.url = 'https://example.com/'
     page.is_closed.return_value = False
     sid = 'test-private'
     engine._sessions[sid] = Session(context=None, page=page)
