@@ -141,12 +141,18 @@ def create_owner_routes(engine):
                 return JSONResponse(result, headers=headers)
             if operation == 'control':
                 action = data.get('action', '')
-                if action not in {'click', 'fill_field', 'key', 'scroll'}:
+                if action not in {'click', 'fill_field', 'key', 'scroll', 'telegram_open'}:
                     return JSONResponse({'error': 'Неизвестное действие'}, status_code=400, headers=headers)
-                result = await engine.owner_control(
-                    sid, action, x=data.get('x'), y=data.get('y'),
-                    field_index=data.get('field_index'), text=data.get('text'),
-                    key=data.get('key'), pixels=data.get('pixels'))
+                if action == 'telegram_open':
+                    # Owner-requested navigation only; never expose this private page via MCP.
+                    # The URL is fixed to Telegram Web, not supplied by the caller.
+                    result = await engine.owner_control(
+                        sid, 'navigate', url='https://web.telegram.org/k/')
+                else:
+                    result = await engine.owner_control(
+                        sid, action, x=data.get('x'), y=data.get('y'),
+                        field_index=data.get('field_index'), text=data.get('text'),
+                        key=data.get('key'), pixels=data.get('pixels'))
                 return JSONResponse(result, headers=headers)
             if operation == 'finish':
                 result = await engine.owner_set_private(sid, False)
