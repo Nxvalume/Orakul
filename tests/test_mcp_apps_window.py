@@ -24,6 +24,8 @@ async def test_chat_window_is_discoverable_as_mcp_app():
     assert legacy_v5.mimeType == CHAT_UI_MIME
     legacy_v6 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v6.html')
     assert legacy_v6.mimeType == CHAT_UI_MIME
+    legacy_v7 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v7.html')
+    assert legacy_v7.mimeType == CHAT_UI_MIME
     html = await mcp.read_resource(CHAT_UI_URI)
     assert 'ui/notifications/initialized' in str(html)
     assert 'tools/call' in str(html)
@@ -81,7 +83,7 @@ async def test_mcp_v3_browser_tap_metadata_and_fullscreen():
     assert opened.meta['ui']['visibility'] == ['model', 'app']
     assert tapped.meta['openai/widgetAccessible'] is True
     assert 'resourceUri' not in tapped.meta['ui']  # tapping should update current window
-    assert CHAT_UI_URI.endswith('browser-v7.html')
+    assert CHAT_UI_URI.endswith('browser-v8.html')
     resources = await mcp.list_resources()
     window = next(resource for resource in resources if str(resource.uri) == CHAT_UI_URI)
     assert window.meta['openai/ui']['availableDisplayModes'] == ['inline', 'fullscreen']
@@ -192,3 +194,13 @@ def test_tab_click_while_page_loading_is_queued_not_silently_dropped():
     assert 'if(queuedAction&&!secureToken&&!privateLocked)' in renderer
     assert 'void act(next.name,next.args);' in renderer
     assert 'privateLocked=true;secureToken=\'\';queuedAction=null;' in CHAT_HTML
+
+
+def test_android_omnibox_shows_search_keyboard_and_search_placeholder():
+    from chat_ui import CHAT_HTML
+    assert 'enterkeyhint="search"' in CHAT_HTML
+    assert 'Поиск, например: телеграмм' in CHAT_HTML
+    assert 'Поиск или адрес сайта' in CHAT_HTML
+    assert "https://www.bing.com/search?q=" in CHAT_HTML
+    assert "resolveOmnibox($('navUrl').value)" in CHAT_HTML
+    assert "resolveOmnibox($('secureUrl').value)" in CHAT_HTML
