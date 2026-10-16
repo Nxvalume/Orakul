@@ -246,6 +246,103 @@ class BrowserEngine:
         s.touched = time.monotonic()
         return s
 
+    # Render Free hosts a single Chromium context. Tabs share its cookies,
+    # IndexedDB and authorization without consuming additional browser slots.
+    MAX_TABS = 6
+
+    def _tab_pages(self, session: Session) -> list:
+        return [page for page in session.context.pages if not page.is_closed()]
+
+    async def tab_list(self, sid: str, *, owner: bool = False) -> dict:
+        """Return bounded tab metadata; private pages only through owner HTTPS."""
+        session = self.get(sid, owner=owner)
+        async with session.lock:
+            pages = self._tab_pages(session)
+            if not pages:
+                raise ValueError('Не осталось открытых вкладок')
+            if session.page not in pages:
+                session.page = pages[-1]
+            items = []
+            for idx, page in enumerate(pages):
+                site = urlsplit(page.url).hostname or ''
+                try:
+                    title = str(await asyncio.wait_for(page.title(), timeout=2))[:72]
+                except Exception:
+                    title = site or 'Новая вкладка'
+                items.append({'index': idx, 'title': title or site or 'Новая вкладка',
+                              'site': site, 'active': page is session.page})
+            return {'tabs': items, 'active': pages.index(session.page),
+                    'max_tabs': self.MAX_TABS}
+
+    async def tab_action(self, sid: str, action: str, index: int = -1, url: str = '',
+                         *, owner: bool = False) -> dict:
+        """Create, switch or close real Playwright Page objects within one context.
+
+        Model tools cannot touch any tabs while owner private mode is enabled.
+        The owner channel passes owner=True only after HMAC+password validation.
+        """
+        if action not in ('new', 'switch', 'close', 'forward', 'reload'):
+            raise ValueError('Недопустимое действие с вкладкой')
+        if isinstance(index, bool) or type(index) is not int:
+            raise ValueError('Неверный номер вкладки')
+        if action == 'new' and url:
+            await asyncio.to_thread(validate_url, url)
+        session = self.get(sid, owner=owner)
+        async with session.lock:
+            pages = self._tab_pages(session)
+            if not pages:
+                raise ValueError('Браузерные вкладки закрыты')
+            if session.page not in pages:
+                session.page = pages[-1]
+            if action in ('switch', 'close') and not 0 <= index < len(pages):
+                raise ValueError('Вкладка не найдена; обновите список')
+            if action == 'new':
+                if len(pages) >= self.MAX_TABS:
+                    raise ValueError('Достигнут предел 6 вкладок для Render Free')
+                page = await session.context.new_page()
+                try:
+                    if url:
+                        await page.goto(url, timeout=TIMEOUT_MS,
+                                        wait_until='domcontentloaded')
+                    session.page = page
+                except Exception:
+                    await page.close()
+                    raise
+            elif action == 'switch':
+                session.page = pages[index]
+                await session.page.bring_to_front()
+            elif action == 'close':
+                to_close = pages[index]
+                was_active = to_close is session.page
+                if len(pages) == 1:
+                    # Keep the same context/owner capability and a usable
+                    # blank page, even after closing the last tab.
+                    replacement = await session.context.new_page()
+                    session.page = replacement
+                elif was_active:
+                    session.page = pages[min(index + 1, len(pages) - 1)
+                                         if index + 1 < len(pages) else index - 1]
+                await to_close.close()
+            elif action == 'forward':
+                await session.page.go_forward(timeout=TIMEOUT_MS,
+                                              wait_until='domcontentloaded')
+            elif action == 'reload':
+                if session.page.url != 'about:blank':
+                    await session.page.reload(timeout=TIMEOUT_MS,
+                                              wait_until='domcontentloaded')
+            session.pending_click = None
+            session.approved_click = None
+            session.last_action = {
+                'new': 'Открыта новая вкладка',
+                'switch': 'Выбрана вкладка',
+                'close': 'Закрыта вкладка',
+                'forward': 'Вперёд по истории',
+                'reload': 'Обновлена страница',
+            }[action]
+            current = self._tab_pages(session)
+            return {'ok': True, 'action': action, 'active': current.index(session.page),
+                    'count': len(current), 'site': urlsplit(session.page.url).hostname or ''}
+
     async def goto(self, sid: str, url: str) -> dict:
         validate_url(url)
         s = self.get(sid)
