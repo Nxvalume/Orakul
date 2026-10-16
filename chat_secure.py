@@ -160,7 +160,8 @@ def create_owner_routes(engine):
                 else:
                     result = await engine.owner_control(
                         sid, action, x=data.get('x'), y=data.get('y'),
-                        field_index=data.get('field_index'), text=data.get('text'),
+                        field_index=data.get('field_index'),
+                        field_ref=data.get('field_ref'), text=data.get('text'),
                         key=data.get('key'), pixels=data.get('pixels'),
                         url=data.get('url'))
                 return JSONResponse(result, headers=headers)
