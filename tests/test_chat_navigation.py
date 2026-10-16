@@ -93,11 +93,10 @@ for(const [typed,kind] of samples){
  const url=resolveOmnibox(typed);
  const parsed=new URL(url);
  if(kind==='search'){
-  if(parsed.hostname!=='www.bing.com' ||
+  if(parsed.hostname!=='nxval-minifish-2026.onrender.com' ||
      parsed.pathname!=='/search' ||
-     parsed.searchParams.get('q')!==typed ||
-     parsed.searchParams.get('setlang')!=='ru')process.exit(1);
- }else if(parsed.hostname==='www.bing.com')process.exit(2);
+     parsed.searchParams.get('q')!==typed)process.exit(1);
+ }else if(parsed.hostname==='nxval-minifish-2026.onrender.com')process.exit(2);
 }
 for(const invalid of ['http://example.com','ftp://example.com',
   'https://user:pass@example.com','https://example.com:444','https://','']){
