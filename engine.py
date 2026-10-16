@@ -251,7 +251,12 @@ class BrowserEngine:
     MAX_TABS = 6
 
     def _tab_pages(self, session: Session) -> list:
-        return [page for page in session.context.pages if not page.is_closed()]
+        # Legacy owner-control test fixtures provide a Page without a complete
+        # BrowserContext. Production Playwright contexts always expose pages.
+        pages = getattr(session.context, 'pages', None)
+        if pages is None:
+            pages = [session.page]
+        return [page for page in pages if not page.is_closed()]
 
     async def tab_list(self, sid: str, *, owner: bool = False) -> dict:
         """Return bounded tab metadata; private pages only through owner HTTPS."""
