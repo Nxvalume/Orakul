@@ -205,7 +205,7 @@ def create_owner_routes(engine):
                         field_index=data.get('field_index'),
                         field_ref=data.get('field_ref'), text=data.get('text'),
                         key=data.get('key'), pixels=data.get('pixels'),
-                        url=data.get('url'))
+                        axis=data.get('axis', 'vertical'), url=data.get('url'))
                 return JSONResponse(result, headers=headers)
             if operation == 'finish':
                 result = await engine.owner_set_private(sid, False)
