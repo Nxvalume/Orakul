@@ -53,7 +53,7 @@ a{color:#93c9ff}
 <p id="status" class="status" role="status">Подключаю интерфейс ChatGPT…</p>
 <div class="screen" id="screen"><img id="shot" alt="Интерактивный кадр браузера MiniFish — нажимайте на кнопки и поля" style="cursor:crosshair;touch-action:manipulation"><span id="noimage" class="status">Загрузка кадра…</span></div>
 <p class="status">Нажимай прямо на экран браузера. Для выбора полей и кнопок используется настоящий курсор Playwright. Изображение обновляется автоматически, пока окно открыто.</p>
-<div class="controls">
+<div class="controls" id="publicControls">
 <button id="refresh" class="primary">Обновить экран</button>
 <button id="back">Назад</button>
 <button id="up">↑</button><button id="down">↓</button>
@@ -82,7 +82,7 @@ a{color:#93c9ff}
 <div class="controls"><button type="button" id="secureRefresh">Кадр</button>
 <button type="button" id="secureBackspace">Backspace</button>
 <button type="button" id="secureEnter">Enter</button>
-<button type="button" id="secureTab">Tab</button></div>
+<button type="button" id="secureTab">Tab</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
 <form id="secureForm"><label for="secureField">Поле страницы</label>
 <select id="secureField"><option value="">Читаю поля…</option></select>
 <input id="secureValue" type="password" autocomplete="off" spellcheck="false" placeholder="Ввод только на сервер MiniFish">
@@ -96,6 +96,7 @@ a{color:#93c9ff}
 (()=>{
  const $=id=>document.getElementById(id);
  const pending=new Map();let nextId=1,session='',busy=false,ready=null,attaching=false;
+ let secureToken='',secureViewport={width:960,height:675},securePoll=null,privateLocked=false;
  const SECURE_BASE='https://nxval-minifish-2026.onrender.com/chat/secure/';
  const fallbackLink=$('secureFallbackLink');
  function trustedLoginUrl(){
@@ -110,7 +111,18 @@ a{color:#93c9ff}
    window.openai.openExternal({href:link});
   }
  };
- let secureToken='',secureImageUrl='',secureViewport={width:960,height:675},securePoll=null;
+ function publicView(enabled){
+  $('screen').hidden=!enabled;$('publicControls').hidden=!enabled;
+  $('actions').hidden=!enabled;$('form').hidden=!enabled;
+ }
+ function lockPrivateView(message){
+  privateLocked=true;secureToken='';
+  if(securePoll){clearInterval(securePoll);securePoll=null}
+  publicView(false);$('securePanel').open=true;
+  $('unlockForm').hidden=false;$('secureTools').hidden=true;
+  status(message||'Личный режим активен. Введите пароль владельца MiniFish для продолжения.');
+ }
+ function ownerDenied(error){return /Личный режим владельца|доступ MCP временно заблокирован|private.mode|private mode/i.test(String(error?.message||error))}
  let bridgeAvailable=true;
  const timeout=ms=>new Promise((_,reject)=>setTimeout(()=>reject(new Error('Превышено время ожидания')),ms));
  const status=t=>$('status').textContent=t;
@@ -167,13 +179,13 @@ a{color:#93c9ff}
  function inputFrom(payload){
   if(!payload)return;
   const next=sessionFrom(payload);
-  if(next && next!==session){
+  if(next && next!==session && !secureToken && !privateLocked){
    session=next;
    fallbackLink.href=trustedLoginUrl();
    if(securePoll){clearInterval(securePoll);securePoll=null}
    secureToken='';
    $('unlockForm').hidden=false;$('secureTools').hidden=true;
-   $('screen').hidden=false;$('actions').hidden=false;$('form').hidden=false;
+   publicView(true);
    render();
   }
  }
@@ -236,7 +248,7 @@ a{color:#93c9ff}
   }finally{attaching=false}
  }
  async function render(){
-  if(!session||busy)return;
+  if(!session||busy||secureToken||privateLocked)return;
   busy=true;status('Читаю страницу…');
   try{
    const shot=await call('browser_screenshot',{session_id:session});
@@ -273,18 +285,22 @@ a{color:#93c9ff}
    if(!select.options.length){const opt=document.createElement('option');opt.value='';opt.textContent='Нет обычных полей';select.appendChild(opt)}
    status('Готово · '+(result.title||$('site').textContent));
   }catch(e){
-   $('noimage').hidden=false;
-   $('noimage').textContent='Кадр не загрузился. Нажми «Обновить экран».';
-   status('Ошибка загрузки: '+String(e.message||e).slice(0,120));
+   if(ownerDenied(e)){lockPrivateView('Личный режим активен — просмотр только после входа владельца MiniFish.');}
+   else if(!secureToken&&!privateLocked){
+    $('noimage').hidden=false;
+    $('noimage').textContent='Кадр не загрузился. Нажми «Обновить экран».';
+    status('Ошибка загрузки: '+String(e.message||e).slice(0,120));
+   }
   }
   finally{busy=false}
  }
  async function act(name,args){
-  if(!session||busy)return;
+  if(!session||busy||secureToken||privateLocked)return;
   busy=true;status('Выполняю действие…');
   try{
    await call(name,args);status('Выполнено');busy=false;await render();
-  }catch(e){busy=false;status('Ошибка: '+String(e.message||e).slice(0,140))}
+  }catch(e){busy=false;if(ownerDenied(e))lockPrivateView('Личный режим активен — управление через защищённую панель.');
+   else if(!secureToken&&!privateLocked)status('Ошибка: '+String(e.message||e).slice(0,140))}
  }
  $('refresh').onclick=()=>session?render():attachExisting();
  $('shot').onclick=e=>{
@@ -297,7 +313,7 @@ a{color:#93c9ff}
   act('browser_tap',{session_id:session,x:Math.floor(x),y:Math.floor(y)});
  };
  setInterval(()=>{
-  if(session&&!busy&&!secureToken&&document.visibilityState!=='hidden')
+  if(session&&!busy&&!secureToken&&!privateLocked&&document.visibilityState!=='hidden')
     render();
  },4600);
  $('back').onclick=()=>act('browser_back',{session_id:session});
@@ -351,10 +367,21 @@ a{color:#93c9ff}
    const res=await secureRequest('frame',null,'GET');
    const blob=await res.blob();
    if(!blob.type.startsWith('image/'))throw new Error('Получен некорректный кадр');
-   const url=URL.createObjectURL(blob),last=secureImageUrl;
-   secureImageUrl=url;$('secureShot').src=url;
-   if(last)URL.revokeObjectURL(last);
-  }catch(e){secureStatus('Не удалось показать кадр: '+String(e.message||e).slice(0,120))}
+   // Android MCP Apps CSP may reject blob: URLs. Render a safe data: image
+   // without putting the owner's capability in a URL or MCP tool result.
+   const src=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(new Error('Ошибка декодирования кадра'));
+    reader.readAsDataURL(blob);
+   });
+   $('secureShot').onerror=()=>secureStatus('Клиент ChatGPT заблокировал изображение защищённого браузера.');
+   $('secureShot').src=src;
+  }catch(e){
+   if(/Защищённый доступ истёк|Требуется приватный вход|HTTP 401/i.test(String(e.message||e)))
+    lockPrivateView('Защищённый доступ истёк. Введите пароль владельца MiniFish ещё раз.');
+   else secureStatus('Не удалось показать кадр: '+String(e.message||e).slice(0,120));
+  }
  }
  async function secureAction(action,extra){
   if(!secureToken)return;
@@ -375,9 +402,9 @@ a{color:#93c9ff}
    status('Проверяю владельца напрямую по HTTPS…');
    const res=await secureRequest('unlock',{owner_password:password});
    const body=await res.json();
-   secureToken=body.token;
+   secureToken=body.token;privateLocked=false;
    $('unlockForm').hidden=true;$('secureTools').hidden=false;
-   $('screen').hidden=true;$('actions').hidden=true;$('form').hidden=true;
+   publicView(false);
    secureStatus('Защищённый режим. ChatGPT не имеет доступа к полям входа.');
    await secureFields();await secureFrame();
    if(securePoll)clearInterval(securePoll);
@@ -398,6 +425,8 @@ a{color:#93c9ff}
  $('secureBackspace').onclick=()=>secureAction('key',{key:'Backspace'});
  $('secureEnter').onclick=()=>secureAction('key',{key:'Enter'});
  $('secureTab').onclick=()=>secureAction('key',{key:'Tab'});
+ $('secureUp').onclick=()=>secureAction('scroll',{pixels:-460});
+ $('secureDown').onclick=()=>secureAction('scroll',{pixels:460});
  $('secureForm').onsubmit=e=>{
   e.preventDefault();
   const index=Number($('secureField').value),value=$('secureValue').value;
@@ -422,10 +451,13 @@ a{color:#93c9ff}
   if(!secureToken)return;
   try{
    const result=await (await secureRequest('finish',{})).json();
+   if(result.private_mode){
+    secureStatus('Сохранение входа не подтверждено: '+(result.save_error||'Личный режим пока активен')+'. Продолжайте в защищённом режиме.');
+    return;
+   }
    if(securePoll){clearInterval(securePoll);securePoll=null}
-   secureToken='';$('secureTools').hidden=true;$('unlockForm').hidden=false;
-   $('screen').hidden=false;$('actions').hidden=false;$('form').hidden=false;
-   if(secureImageUrl){URL.revokeObjectURL(secureImageUrl);secureImageUrl=''}
+   secureToken='';privateLocked=false;$('secureTools').hidden=true;$('unlockForm').hidden=false;
+   publicView(true);
    const note=result.profile_saved?'Авторизация сохранена в постоянном хранилище.':
      result.save_error?'ВНИМАНИЕ: '+result.save_error:'Вход завершён; профиль не подтверждён.';
    status(note);await render();
