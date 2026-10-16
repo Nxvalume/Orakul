@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v10.html"
+CHAT_UI_URI = "ui://minifish/browser-v11.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -111,7 +111,7 @@ a{color:#93c9ff}
 <button type="button" id="secureEnter">Enter</button>
 <button type="button" id="secureTab">Tab ↹</button><button type="button" id="secureReload">Обновить страницу</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
 <form id="secureForm"><label for="secureField">Поле страницы</label>
-<select id="secureField"><option value="">Читаю поля…</option></select>
+<select id="secureField"><option value="">Выберите поле телефона, а не страну</option></select>
 <input id="secureValue" type="password" autocomplete="off" spellcheck="false" placeholder="Ввод только на сервер MiniFish">
 <button type="submit" class="primary">Вставить в браузер (без отправки в ChatGPT)</button></form>
 <button type="button" id="secureFinish" style="margin-top:10px">Закончить вход и сохранить авторизацию</button>
@@ -520,16 +520,22 @@ a{color:#93c9ff}
    const res=await secureRequest('fields',{});
    const data=await res.json();
    secureViewport=data.viewport||secureViewport;
-   const select=$('secureField');select.replaceChildren();
+   const select=$('secureField'),previous=select.value;
+   select.replaceChildren();
+   // Never silently default to Country after Telegram reorders visible inputs.
+   const hint=document.createElement('option');hint.value='';
+   hint.textContent='Выберите поле (Phone Number, не Country)';
+   select.appendChild(hint);
    for(const fld of (data.fields||[])){
     const type=(fld.kind||'text').toLowerCase();
     if(['hidden','file','checkbox','radio','submit','button'].includes(type))continue;
-    const option=document.createElement('option');option.value=String(fld.index);
+    if(!/^[a-zA-Z0-9_-]{12,80}$/.test(String(fld.ref||'')))continue;
+    const option=document.createElement('option');option.value=fld.ref;
     option.textContent=fld.label||('Поле '+(fld.index+1));select.appendChild(option);
    }
-   if(!select.options.length){
-    const option=document.createElement('option');option.value='';option.textContent='Поля пока не загружены';select.appendChild(option);
-   }
+   if(previous && Array.from(select.options).some(opt=>opt.value===previous))
+    select.value=previous;
+   else select.value='';
   }catch(e){secureStatus('Ошибка полей: '+String(e.message||e).slice(0,140))}
  }
  async function secureFrame(){
@@ -607,10 +613,11 @@ a{color:#93c9ff}
  $('secureDown').onclick=()=>secureAction('scroll',{pixels:460});
  $('secureForm').onsubmit=e=>{
   e.preventDefault();
-  const index=Number($('secureField').value),value=$('secureValue').value;
+  const field_ref=$('secureField').value,value=$('secureValue').value;
   $('secureValue').value='';
-  if(!$('secureField').value||!value)return;
-  secureAction('fill_field',{field_index:index,text:value});
+  if(!field_ref){secureStatus('Выберите поле Phone Number, а не Country');return}
+  if(!value)return;
+  secureAction('fill_field',{field_ref,text:value});
  };
  $('secureShot').onclick=e=>{
   if(!secureToken)return;
