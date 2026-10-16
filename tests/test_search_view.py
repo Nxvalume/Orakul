@@ -45,7 +45,9 @@ def test_search_results_filter_non_https_and_escape_markup():
     assert 'javascript:alert' not in page
     assert '169.254.169.254' not in page
     assert '<script>' not in page
-    assert 'Поиск в MiniFish' in page
+    assert 'Результаты: телеграмм' in page
+    assert '<form' not in page
+    assert 'Новый запрос введи в строке MiniFish над экраном' in page
 
 
 def test_reject_xml_entities_and_oversized_feeds():
@@ -102,3 +104,12 @@ def test_search_module_is_included_in_render_docker_image():
         content = dockerfile.read_text()
         assert content.count('search_view.py') >= 2
         assert 'COPY engine.py server.py' in content
+
+
+def test_results_are_readable_on_phone_and_have_only_one_search_field_above_canvas():
+    document = search_view._document('телеграмм', search_view._results(FEED))
+    assert 'font-size:29px' in document
+    assert 'font-size:23px' in document
+    assert 'width=device-width' in document
+    assert 'name="q"' not in document  # search field is in the ChatGPT widget above the browser viewport
+    assert 'https://telegram.org/' in document
