@@ -98,25 +98,17 @@ def _document(query: str, results: list[dict], note: str = "") -> str:
 *{{box-sizing:border-box}}
 body{{font:20px/1.45 system-ui,sans-serif;background:#0f1926;color:#edf4ff;margin:0;padding:24px;}}
 main{{max-width:850px;margin:0 auto}}
-h1{{font-size:27px;margin:0 0 16px}}
-form{{display:flex;gap:10px;margin-bottom:25px}}
-input{{font:inherit;min-width:0;flex:1;padding:15px 16px;border:1px solid #536c84;
-background:#1b2b3c;color:#fff;border-radius:12px}}
-button{{font:inherit;background:#2776b7;color:white;border:0;border-radius:12px;padding:12px 17px}}
-article{{padding:15px 0 20px;border-bottom:1px solid #32465b}}
-article small{{display:block;color:#a3c2d8;font-size:16px}}
-article a{{display:block;color:#91c8ff;font-size:23px;font-weight:600;text-decoration:none;margin-top:3px}}
-article p{{font-size:18px;color:#d1dbe7;margin:6px 0 0}}
+h1{{font-size:30px;margin:0 0 8px}}
+article{{padding:11px 0 16px;border-bottom:1px solid #32465b}}
+article small{{display:block;color:#a3c2d8;font-size:20px}}
+article a{{display:block;color:#91c8ff;font-size:29px;font-weight:600;text-decoration:none;margin-top:3px}}
+article p{{font-size:23px;color:#d1dbe7;margin:5px 0 0}}
 .note{{color:#d4dfeb}}
 footer{{font-size:14px;color:#a3b5c9;margin-top:24px}}
 </style></head><body><main>
-<h1>Поиск в MiniFish</h1>
-<form method="get" action="/search">
-<input type="search" name="q" inputmode="search" enterkeyhint="search"
-placeholder="Что найти?" value="{q}" maxlength="{MAX_QUERY_LENGTH}" required>
-<button type="submit">Найти</button></form>
+<h1>Результаты: {q}</h1>
 {message}{''.join(rows)}
-<footer>Результаты поиска: Bing RSS. Перейди по ссылке, чтобы открыть сайт в этой вкладке.</footer>
+<footer>Поиск Bing. Новый запрос введи в строке MiniFish над экраном.</footer>
 </main></body></html>"""
 
 
