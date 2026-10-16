@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v11.html"
+CHAT_UI_URI = "ui://minifish/browser-v12.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -564,6 +564,11 @@ a{color:#93c9ff}
    }
   }catch(e){secureStatus('Ошибка: '+String(e.message||e).slice(0,180))}
  }
+ // While the owner capability is active, never let collapsing <details>
+ // make the only accessible browser viewport disappear from Android.
+ $('securePanel').addEventListener('toggle',()=>{
+  if(secureToken && !$('securePanel').open) $('securePanel').open=true;
+ });
  $('unlockForm').onsubmit=async e=>{
   e.preventDefault();
   if(!session){status('Сначала откройте браузер MiniFish');return}
@@ -577,6 +582,10 @@ a{color:#93c9ff}
    secureToken=body.token;privateLocked=false;
    $('unlockForm').hidden=true;$('secureTools').hidden=false;
    publicView(false);
+   // The browser frame lives inside <details>. Without opening it, Android
+   // hides the ENTIRE private viewport although unlock succeeded.
+   $('securePanel').open=true;
+   $('securePanel').scrollIntoView({block:'start',behavior:'auto'});
    secureStatus('Защищённый режим. ChatGPT не имеет доступа к полям входа.');
    await secureFields();await secureFrame();await refreshSecureTabs();
    if(securePoll)clearInterval(securePoll);
@@ -639,6 +648,7 @@ a{color:#93c9ff}
    if(securePoll){clearInterval(securePoll);securePoll=null}
    secureToken='';privateLocked=false;$('secureTools').hidden=true;$('unlockForm').hidden=false;
    publicView(true);
+   $('securePanel').open=false;
    const note=result.profile_saved?'Авторизация сохранена в постоянном хранилище.':
      result.save_error?'ВНИМАНИЕ: '+result.save_error:'Вход завершён; профиль не подтверждён.';
    status(note);await render();
