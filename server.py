@@ -403,9 +403,10 @@ async def browser_select(session_id: str, css_selector: str, value: str) -> dict
     return await engine.select(session_id, css_selector, value)
 
 @mcp.tool(meta=CHAT_ACTION_META)
-async def browser_scroll(session_id: str, pixels: int = 650) -> dict:
-    """Scroll up or down."""
-    return await engine.scroll(session_id, pixels)
+async def browser_scroll(session_id: str, pixels: int = 650,
+                         axis: str = 'vertical') -> dict:
+    """Scroll vertically or horizontally in the active page."""
+    return await engine.scroll(session_id, pixels, axis=axis)
 
 @mcp.tool(meta=CHAT_ACTION_META)
 async def browser_screenshot(session_id: str) -> Image:
