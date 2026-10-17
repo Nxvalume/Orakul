@@ -32,6 +32,23 @@ def session_idle_limit(session) -> int:
     return TTL_SECONDS
 TIMEOUT_MS = 15000
 
+
+def memory_pressure() -> bool:
+    """Best-effort memory guard for 512-MiB Render instances; fail open elsewhere."""
+    try:
+        with open('/sys/fs/cgroup/memory.max', encoding='ascii') as f:
+            maximum = f.read(32).strip()
+        if not maximum.isdigit():
+            return False
+        capacity = int(maximum)
+        if not 0 < capacity <= 1024 * 1024 * 1024:
+            return False
+        with open('/sys/fs/cgroup/memory.current', encoding='ascii') as f:
+            used = int(f.read(32).strip())
+        return used >= capacity * 0.80
+    except (OSError, ValueError):
+        return False
+
 # In-browser cursor is a visual-only overlay. It never intercepts input,
 # reads text/credentials, or communicates with any external endpoint.
 CURSOR_INIT = r"""(() => {
@@ -168,6 +185,11 @@ class BrowserEngine:
                 '--no-first-run', '--disable-component-update'])
 
     async def _route(self, route):
+        # Under memory pressure, degrade only optional assets rather than
+        # allow a kernel OOM kill to erase the owner's active Chromium state.
+        if memory_pressure() and route.request.resource_type in {'image', 'media', 'font'}:
+            await route.abort('blockedbyclient')
+            return
         # Check every subresource and redirect, not only top-level navigations.
         # DNS can block for seconds. Never stall the single event loop while a
         # live video stream, owner input and MCP commands are also active.
@@ -656,6 +678,8 @@ class BrowserEngine:
         # actions. A skipped frame is preferable to hanging an agent call.
         if s.lock.locked():
             raise TimeoutError('Страница занята')
+        if memory_pressure():
+            raise TimeoutError('Кадр временно недоступен: ограничение памяти')
         try:
             async with asyncio.timeout(4):
                 async with s.lock:
@@ -678,6 +702,8 @@ class BrowserEngine:
 
     async def screenshot(self, sid: str) -> bytes:
         s = self.get(sid)
+        if memory_pressure():
+            raise TimeoutError('Кадр временно недоступен: ограничение памяти')
         async with s.lock:
             return await s.page.screenshot(type='png', full_page=False, timeout=TIMEOUT_MS)
 
