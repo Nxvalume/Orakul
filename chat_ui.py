@@ -109,7 +109,7 @@ a{color:#93c9ff}
 <div id="secureTabs" class="tabstrip" role="group" aria-label="Личные вкладки">Загрузка вкладок…</div>
 <div class="screen" style="margin-top:8px"><canvas id="secureShot" role="img" aria-label="Защищённый браузер — только владельцу"></canvas></div>
 <form id="secureForm"><label for="secureValue">Ввод в любое поле сайта</label>
-<small>Коснитесь поля на изображении. Телефонный номер заменяется целиком, код из нескольких ячеек вводится по цифрам. Для выбора страны указывайте номер с международным +кодом.</small>
+<small>Коснитесь нужного поля на изображении. Телефонный номер заменяется целиком, код из нескольких ячеек вводится по цифрам. Для выбора страны указывайте номер с международным +кодом.</small>
 <input id="secureValue" type="password" autocomplete="off" inputmode="text" spellcheck="false" placeholder="Текст или код — только MiniFish" aria-label="Защищённый ввод в выбранное касанием поле">
 <button type="button" id="secureClearDraft" aria-label="Очистить текст ввода">✕ Очистить ввод</button>
 <button type="submit" class="primary">Ввести в выбранное поле</button>
