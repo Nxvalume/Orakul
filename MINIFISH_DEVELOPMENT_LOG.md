@@ -220,3 +220,17 @@
 **Фактическое состояние:** коммит приложения/тестов `c2f2fdd3d961bb184a9e29ea13bf417b5837cc26`, GitHub workflows MiniFish CI, MiniFish checks, MiniFish stability CI — все SUCCESS. Docker Render: 163 passed, 4 skipped. Деплой `dep-db9kh3jrjlhs73f5u3gg` = **live**. После перезапуска safe-only `browser_telegram_status` показал `not_open;logged_in=false;saved=false;storage=ok`; новый `browser_open(web.telegram.org/k/)` создал session `2ae3d98e-0d39-4d47-9605-665ba337dac1`; `browser_window` отобразил встроенный MiniFish UI в чате.
 
 **Ограничение:** текущая Telegram-авторизация не сохранена (переход к экрану кода был до рестарта, логин не завершался). Не раскрывать телефон, OTP/пароли или содержимое приватного кадра через MCP. Прямое нажатие/ввод именно на Samsung Android ещё требует подтверждения, хотя синтетические Playwright-тесты прошли. Рабочая ветка `minifish-v02`; `main` не тронута. Новых платных ресурсов не создано.
+
+## 2026-10-17 — Android private number replacement and clear (v17)
+
+Observed on owner Android screenshot: Telegram country showed Germany and the phone input retained an existing +49 prefix; the private panel had Backspace but no one-tap clear.
+
+Implemented **on minifish-v02 only**:
+- `engine.py`: `type_focused` detects telephone fields using type/inputmode/autocomplete/label hints; sends Ctrl+A, Backspace, then individual keystrokes so the new international number replaces the old value and the site's own reactive country logic receives input events. OTP multi-cell inputs continue receiving sequential keyboard events, without clearing all cells.
+- `engine.py` + `chat_secure.py`: owner-only `clear_focused` command, fail-closed when there is no focused editable field. It is not an assistant-visible MCP command.
+- `chat_ui.py`: mobile buttons `✕ Очистить ввод` (local owner text) and `Удалить номер / очистить поле` (real selected website field), with guidance to include a `+` international dialing prefix.
+- `tests/test_phone_replace_clear.py`: simulated prefilled German phone number -> Russian +7, reactive country label event, one-tap clearing, no arbitrary-field clearing, and private widget button presence. Existing OTP tests remain.
+- MCP Apps resource URI bumped to `ui://minifish/browser-v17.html`; older `v16` URI continues to serve the current HTML to avoid breaking cached Android clients.
+- Code milestone: `dda945d7d71751e999a0a3d9c005e2d7c04c9605`. Latest test and deploy status must be verified from GitHub Actions and Render; do not count synthetic country logic as proof of Telegram Web's live behavior.
+- Pending hands-on acceptance: Android must render v17, selected phone must be replaced (not appended), and Telegram Web should show country matching the entered `+` prefix. Do not request OTP or passwords in chat.
+
