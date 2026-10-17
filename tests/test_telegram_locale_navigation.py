@@ -20,12 +20,17 @@ async def test_accidental_telegram_locale_document_returns_to_app(monkeypatch):
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True, args=['--disable-dev-shm-usage'])
         try:
-            context = await browser.new_context()
-            async def app_home(route):
-                await route.fulfill(status=200, content_type='text/html',
-                                    body='<title>Telegram fixture</title><h1>Telegram home</h1>')
-            await context.route('https://web.telegram.org/k/', app_home)
-            await context.route('https://web.telegram.org/js/locales/*.json', browser_engine._route)
+            context = await browser.new_context(service_workers='block')
+            async def fixture_route(route):
+                # A single catch-all route intercepts *redirected* requests too:
+                # no test browser is allowed to contact real Telegram endpoints.
+                if route.request.url.split('?', 1)[0] == 'https://web.telegram.org/k/':
+                    await route.fulfill(
+                        status=200, content_type='text/html',
+                        body='<title>Telegram fixture</title><h1>Telegram home</h1>')
+                else:
+                    await browser_engine._route(route)
+            await context.route('**/*', fixture_route)
             page = await context.new_page()
             await page.goto('https://web.telegram.org/js/locales/en-us.json')
             assert page.url == 'https://web.telegram.org/k/'
