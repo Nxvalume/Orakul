@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v13.html"
+CHAT_UI_URI = "ui://minifish/browser-v14.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -125,7 +125,7 @@ a{color:#93c9ff}
 (()=>{
  const $=id=>document.getElementById(id);
  const pending=new Map();let nextId=1,session='',busy=false,ready=null,attaching=false;
- let queuedAction=null;
+ let queuedAction=null,recovering=null,lastRecovery=0;
  let secureToken='',secureViewport={width:960,height:675},securePoll=null,privateLocked=false;
  let secureFrameBusy=false,resuming=false;
  const REMEMBER_KEY='minifish:owner:remember-v1';
@@ -192,7 +192,12 @@ a{color:#93c9ff}
    paintTabs('tabs',tabs,(action,index)=>act('browser_tab_action',{session_id:session,action,index}));
   }catch(e){
    if(ownerDenied(e)){lockPrivateView('Личный режим: вкладки доступны только владельцу MiniFish.');return}
-   $('tabs').textContent='Вкладки недоступны: '+String(e.message||e).slice(0,90);
+   if(sessionError(e)){
+    $('tabs').textContent='Переподключаю вкладки…';
+    void recoverSession();
+    return;
+   }
+   $('tabs').textContent='Не удалось прочитать вкладки. Нажмите «Обновить экран».';
   }
  }
  let bridgeAvailable=true;
@@ -353,23 +358,66 @@ a{color:#93c9ff}
   if(globals.toolInput!==undefined)inputFrom(globals.toolInput);
   if(globals.toolOutput!==undefined)inputFrom(globals.toolOutput);
  });
- async function attachExisting(){
-  // Some Android ChatGPT hosts display the iframe without providing
-  // browser_window's toolInput / toolOutput. Reattach via the authorized
-  // MCP bridge to the *existing* session; do not open another browser.
-  if(session||attaching)return;
-  attaching=true;
-  status('Подключаюсь к открытому браузеру…');
-  try{
+ function sessionError(error){
+  const message=String(error?.message||error);
+  // Android ChatGPT may wrap MCP tool exceptions as INVALID_ARGUMENT without
+  // exposing the underlying ValueError about an expired Render session.
+  return /INVALID_ARGUMENT|Браузерная сессия|session.*(expired|not found|not_open)|не найдена|session_id|browser_(screenshot|tabs)/i.test(message);
+ }
+ function replaceSession(next){
+  if(!next||!(/^[a-zA-Z0-9_-]{8,128}$/.test(next)))return false;
+  if(next!==session){
+   session=next;
+   secureToken='';privateLocked=false;queuedAction=null;
+   fallbackLink.href=trustedLoginUrl();
+   if(securePoll){clearInterval(securePoll);securePoll=null}
+   $('unlockForm').hidden=false;$('secureTools').hidden=true;
+   publicView(true);
+   $('tabs').textContent='Загружаю вкладки…';
+   $('noimage').hidden=false;$('noimage').textContent='Подключаю браузер…';
+  }
+  return true;
+ }
+ async function recoverSession(){
+  if(recovering)return recovering;
+  if(secureToken||privateLocked)return false;
+  if(Date.now()-lastRecovery<5000)return false;
+  lastRecovery=Date.now();
+  recovering=(async()=>{
+   status('Сервер перезапустился или сеанс истёк. Восстанавливаю браузер…');
    const info=data(await call('browser_attach',{}));
-   if(!info.attached||!info.session_id)
-    throw new Error(info.reason==='private_mode'?
-      'Защищённый сеанс активен: вернись в первоначальное окно MiniFish с открытой сессией':
-      'Открытый сеанс пока не найден');
-   inputFrom(info);
-  }catch(e){
-   status('Не удалось подключить браузер: '+String(e.message||e).slice(0,130));
-   $('noimage').textContent='Нажми «Обновить экран» для повторного подключения.';
+   if(info.reason==='private_mode'){
+    lockPrivateView('Личный сеанс защищён. Для просмотра требуется защищённый доступ владельца.');
+    return false;
+   }
+   if(info.attached&&info.session_id)return replaceSession(info.session_id);
+   if(info.reason==='ambiguous'){
+    status('Найдено несколько сеансов. Автоматическое восстановление остановлено.');
+    return false;
+   }
+   if(info.reason!=='not_open'&&info.reason!=='expired'){
+    status('Браузер временно недоступен. Повторите подключение.');
+    return false;
+   }
+   // Only when no browser exists. Never reopen Telegram automatically or
+   // expose a private owner session. Safe default has no account credentials.
+   const opened=data(await call('browser_open',{url:'https://example.com/'}));
+   if(!opened.session_id)throw new Error('Сервер не выдал новый сеанс');
+   return replaceSession(opened.session_id);
+  })().catch(e=>{
+   status('Не удалось восстановить браузер: '+String(e.message||e).slice(0,120));
+   return false;
+  }).finally(()=>{recovering=null});
+  return recovering;
+ }
+ async function attachExisting(){
+  if(attaching||recovering)return;
+  attaching=true;
+  try{
+   const ok=await recoverSession();
+   if(ok&&!busy&&!secureToken&&!privateLocked)await render();
+   else if(!ok&&!privateLocked)
+    $('noimage').textContent='Не удалось подключиться. Нажмите «Обновить экран» ещё раз.';
   }finally{attaching=false}
  }
  async function render(){
@@ -378,7 +426,7 @@ a{color:#93c9ff}
   // Draw tabs independently of the page snapshot, which can be slow on
   // JavaScript-heavy pages and must not block tab switching on Android.
   void refreshPublicTabs();
-  let frameReady=false;
+  let frameReady=false,recovered=false;
   try{
    const shot=await call('browser_screenshot',{session_id:session});
    const sr=shot?.result||shot;
@@ -422,7 +470,13 @@ a{color:#93c9ff}
    status('Готово · '+(result.title||$('site').textContent));
   }catch(e){
    if(ownerDenied(e)){lockPrivateView('Личный режим активен — просмотр только после входа владельца MiniFish.');}
-   else if(!secureToken&&!privateLocked){
+   else if(!secureToken&&!privateLocked && !frameReady && sessionError(e)){
+    recovered=await recoverSession();
+    if(!recovered&&!privateLocked){
+     $('noimage').hidden=false;
+     $('noimage').textContent='Соединение потеряно. Попробуйте «Обновить экран».';
+    }
+   }else if(!secureToken&&!privateLocked){
     if(!frameReady){
      $('noimage').hidden=false;
      $('noimage').textContent='Кадр не загрузился. Нажми «Обновить экран».';
@@ -432,6 +486,10 @@ a{color:#93c9ff}
   }
   finally{
    busy=false;
+   if(recovered && !secureToken && !privateLocked){
+    void render();
+    return;
+   }
    // A user can tap a tab while screenshot/DOM is still rendering.
    // Execute the last queued action once render completes; do not discard it.
    if(queuedAction&&!secureToken&&!privateLocked){
@@ -453,7 +511,14 @@ a{color:#93c9ff}
   }catch(e){busy=false;if(ownerDenied(e))lockPrivateView('Личный режим активен — управление через защищённую панель.');
    else if(!secureToken&&!privateLocked)status('Ошибка: '+String(e.message||e).slice(0,140))}
  }
- $('refresh').onclick=()=>session?render():attachExisting();
+ $('refresh').onclick=async()=>{
+  if(!session)await attachExisting();
+  else{
+   // Recheck the backend even if an old ChatGPT widget retained a stale ID.
+   const ok=await recoverSession();
+   if(ok&&!busy&&!secureToken&&!privateLocked)await render();
+  }
+ };
  $('navForm').onsubmit=e=>{
   e.preventDefault();
   if(!session||privateLocked||secureToken){status('Перейдите в защищённый режим либо откройте браузер');return}
