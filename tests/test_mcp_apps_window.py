@@ -175,7 +175,8 @@ def test_android_ui_auto_recovers_missing_tool_input_without_new_session():
     from chat_ui import CHAT_HTML
     assert "call('browser_attach',{})" in CHAT_HTML
     assert 'setTimeout(()=>{if(!session)attachExisting()},600)' in CHAT_HTML
-    assert "session?refreshWithRecovery():attachExisting()" in CHAT_HTML
+    assert "if(!session)await attachExisting();" in CHAT_HTML
+    assert "const ok=await recoverSession();" in CHAT_HTML
     assert 'window.openai?.toolInput' in CHAT_HTML
     assert "call('browser_open',{url:'https://example.com/'})" in CHAT_HTML
 
