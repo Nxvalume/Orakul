@@ -133,6 +133,8 @@ a{color:#93c9ff}
  const $=id=>document.getElementById(id);
  const pending=new Map();let nextId=1,session='',busy=false,ready=null,attaching=false;
  let queuedAction=null,recovering=null,lastRecovery=0,recoveryUrl='';
+ // Keep screenshot cadence for Android; refresh expensive DOM on actions or every 15s.
+ let lastDomRead=0,needsDomRead=true;
  const invalidSessionIds=new Set();
  let secureToken='',secureViewport={width:960,height:675},securePoll=null,privateLocked=false;
  let secureFrameBusy=false,resuming=false;
@@ -339,7 +341,7 @@ a{color:#93c9ff}
    recoveryUrl='https://web.telegram.org/k/';
   const next=sessionFrom(payload);
   if(next && next!==session && !invalidSessionIds.has(next) && !secureToken && !privateLocked){
-   session=next;
+   session=next;needsDomRead=true;
    fallbackLink.href=trustedLoginUrl();
    if(securePoll){clearInterval(securePoll);securePoll=null}
    secureToken='';
@@ -397,7 +399,7 @@ a{color:#93c9ff}
   if(!next||!(/^[a-zA-Z0-9_-]{8,128}$/.test(next)))return false;
   if(next!==session){
    if(session)invalidSessionIds.add(session);
-   session=next;
+   session=next;needsDomRead=true;
    secureToken='';privateLocked=false;queuedAction=null;
    fallbackLink.href=trustedLoginUrl();
    if(securePoll){clearInterval(securePoll);securePoll=null}
@@ -466,7 +468,7 @@ a{color:#93c9ff}
   busy=true;status('Читаю страницу…');
   // Draw tabs independently of the page snapshot, which can be slow on
   // JavaScript-heavy pages and must not block tab switching on Android.
-  void refreshPublicTabs();
+  if(needsDomRead||Date.now()-lastDomRead>15000)void refreshPublicTabs();
   let frameReady=false,recovered=false;
   try{
    const shot=await call('browser_screenshot',{session_id:session});
@@ -496,7 +498,12 @@ a{color:#93c9ff}
    }else{
     throw new Error('ChatGPT не передал изображение браузера');
    }
+   if(!needsDomRead && Date.now()-lastDomRead<15000){
+    status('Экран обновлён');
+    return;
+   }
    const result=data(await call('browser_snapshot',{session_id:session}));
+   needsDomRead=false;lastDomRead=Date.now();
    if(typeof result.url==='string'){
     try{
      const parsed=new URL(result.url);
@@ -574,11 +581,12 @@ a{color:#93c9ff}
   }
   busy=true;status('Выполняю действие…');
   try{
-   await call(name,args);status('Выполнено');busy=false;await render();
+   await call(name,args);needsDomRead=true;status('Выполнено');busy=false;await render();
   }catch(e){busy=false;if(ownerDenied(e))lockPrivateView('Личный режим активен — управление через защищённую панель.');
    else if(!secureToken&&!privateLocked)status('Ошибка: '+String(e.message||e).slice(0,140))}
  }
  $('refresh').onclick=async()=>{
+  needsDomRead=true;
   if(!session)await attachExisting();
   else{
    // Recheck the backend even if an old ChatGPT widget retained a stale ID.
