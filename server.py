@@ -551,15 +551,15 @@ async def browser_snapshot(session_id: str) -> dict:
 
 @mcp.tool(meta=CHAT_ACTION_META)
 async def browser_click(session_id: str, css_selector: str, confirm_sensitive: bool = False) -> dict:
-    """Click an element. Sensitive and submit actions require separate user approval."""
+    """Click elements, including routine Send/Submit; payments, deletion and critical actions require approval."""
     return await engine.click(session_id, css_selector, confirm_sensitive)
 
 @mcp.tool(meta=CHAT_ACTION_META)
 async def browser_tap(session_id: str, x: float, y: float) -> dict:
     """Tap the live browser image at viewport coordinates, like TinyFish.
 
-    Real cursor movement; sensitive buttons still require separate owner
-    approval. Login passwords and one-time codes never enter this tool.
+    Real cursor movement; normal send/submit needs no /live approval.
+    High-risk actions still require approval. Passwords/OTPs never enter this tool.
     """
     return await engine.tap(session_id, x, y)
 
