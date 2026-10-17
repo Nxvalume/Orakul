@@ -76,12 +76,14 @@ def test_profile_shape_reports_counts_without_exposing_secret_material():
     state = {'cookies':[{'value': secret}],
              'origins':[{'origin':'https://web.telegram.org',
                          'localStorage':[{'value':secret}],
-                         'indexedDB':[{'name':secret}],
+                         'indexedDB':[{'name':'telegram','stores':[{'name':'session','records':[{'value':secret}]}]}],
                          'opfs':[{'path':secret}]}],
              '_minifish_session_storage':{'https://web.telegram.org':{'secret':secret}}}
     result = _telegram_state_shape(state)
     assert result == {'cookies':1,'origins':1,'indexed_db':1,
-                      'opfs':1,'session_keys':1}
+                      'opfs':1,'session_keys':1,
+                      'telegram_session_db':True,'telegram_session_records':1}
     assert secret not in str(result)
     assert _telegram_state_shape({}) == {
-        'cookies':0,'origins':0,'indexed_db':0,'opfs':0,'session_keys':0}
+        'cookies':0,'origins':0,'indexed_db':0,'opfs':0,'session_keys':0,
+        'telegram_session_db':False,'telegram_session_records':0}
