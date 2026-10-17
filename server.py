@@ -508,8 +508,8 @@ async def browser_scroll(session_id: str, pixels: int = 650,
 
 @mcp.tool(meta=CHAT_ACTION_META)
 async def browser_screenshot(session_id: str) -> Image:
-    """Return a PNG of the current browser viewport."""
-    return Image(data=await engine.screenshot(session_id), format='png')
+    """Return compact JPEG frame for Android with lower 512-MiB memory pressure."""
+    return Image(data=await engine.screenshot_jpeg(session_id), format='jpeg')
 
 @mcp.tool(meta=CHAT_ACTION_META)
 async def browser_close(session_id: str) -> dict:
