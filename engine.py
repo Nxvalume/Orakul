@@ -182,7 +182,9 @@ class BrowserEngine:
             self._browser = await self._pw.chromium.launch(headless=True, args=[
                 '--disable-dev-shm-usage', '--disable-extensions',
                 '--disable-background-networking', '--disable-default-apps',
-                '--no-first-run', '--disable-component-update'])
+                '--no-first-run', '--disable-component-update',
+                '--disable-gpu', '--renderer-process-limit=2',
+                '--disable-breakpad'])
 
     async def _route(self, route):
         # Under memory pressure, degrade only optional assets rather than
