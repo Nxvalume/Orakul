@@ -34,6 +34,20 @@ async def test_telegram_owner_sessionstorage_restores_with_indexeddb_profile(mon
               localStorage.setItem('test-only-local-key','fixture');
               document.body.innerHTML='<div id="column-left">Synthetic authenticated UI</div>';
             }""")
+            await page.evaluate("""async () => {
+              await new Promise((resolve, reject) => {
+                const req = indexedDB.open('telegram', 1);
+                req.onupgradeneeded = () => req.result.createObjectStore('session');
+                req.onerror = () => reject(req.error);
+                req.onsuccess = () => {
+                  const db = req.result;
+                  const tx = db.transaction('session', 'readwrite');
+                  tx.objectStore('session').put('fixture', 'synthetic-record');
+                  tx.oncomplete = () => { db.close(); resolve(); };
+                  tx.onerror = () => { db.close(); reject(tx.error); };
+                };
+              });
+            }""")
             engine = BrowserEngine()
             sid = "fictional-owner"
             engine._sessions[sid] = Session(
