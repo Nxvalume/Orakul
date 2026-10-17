@@ -205,7 +205,7 @@ class BrowserEngine:
         # in the one existing browser context (never create another session).
         request = route.request
         target = urlsplit(request.url)
-        if (request.is_navigation_request()
+        if (getattr(request, 'is_navigation_request', lambda: False)()
                 and target.hostname == 'web.telegram.org'
                 and re.fullmatch(r'/js/locales/[a-z0-9_-]+[.]json', target.path, re.I)):
             await route.fulfill(
