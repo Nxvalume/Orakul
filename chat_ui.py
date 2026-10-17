@@ -126,6 +126,7 @@ a{color:#93c9ff}
  const $=id=>document.getElementById(id);
  const pending=new Map();let nextId=1,session='',busy=false,ready=null,attaching=false;
  let queuedAction=null,recovering=null,lastRecovery=0;
+ const invalidSessionIds=new Set();
  let secureToken='',secureViewport={width:960,height:675},securePoll=null,privateLocked=false;
  let secureFrameBusy=false,resuming=false;
  const REMEMBER_KEY='minifish:owner:remember-v1';
@@ -309,7 +310,7 @@ a{color:#93c9ff}
  function inputFrom(payload){
   if(!payload)return;
   const next=sessionFrom(payload);
-  if(next && next!==session && !secureToken && !privateLocked){
+  if(next && next!==session && !invalidSessionIds.has(next) && !secureToken && !privateLocked){
    session=next;
    fallbackLink.href=trustedLoginUrl();
    if(securePoll){clearInterval(securePoll);securePoll=null}
@@ -367,6 +368,7 @@ a{color:#93c9ff}
  function replaceSession(next){
   if(!next||!(/^[a-zA-Z0-9_-]{8,128}$/.test(next)))return false;
   if(next!==session){
+   if(session)invalidSessionIds.add(session);
    session=next;
    secureToken='';privateLocked=false;queuedAction=null;
    fallbackLink.href=trustedLoginUrl();
