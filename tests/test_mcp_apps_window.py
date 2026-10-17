@@ -175,9 +175,9 @@ def test_android_ui_auto_recovers_missing_tool_input_without_new_session():
     from chat_ui import CHAT_HTML
     assert "call('browser_attach',{})" in CHAT_HTML
     assert 'setTimeout(()=>{if(!session)attachExisting()},600)' in CHAT_HTML
-    assert "session?render():attachExisting()" in CHAT_HTML
+    assert "session?refreshWithRecovery():attachExisting()" in CHAT_HTML
     assert 'window.openai?.toolInput' in CHAT_HTML
-    assert "call('browser_open'" not in CHAT_HTML
+    assert "call('browser_open',{url:'https://example.com/'})" in CHAT_HTML
 
 
 def test_mobile_tabs_load_independently_of_slow_page_snapshot():
@@ -187,7 +187,7 @@ def test_mobile_tabs_load_independently_of_slow_page_snapshot():
     renderer = CHAT_HTML[start:end]
     assert renderer.index('void refreshPublicTabs();') < renderer.index("call('browser_screenshot'")
     assert renderer.index('void refreshPublicTabs();') < renderer.index("call('browser_snapshot'")
-    assert 'let frameReady=false;' in renderer
+    assert 'let frameReady=false,recovered=false;' in renderer
     assert "Экран готов; элементы страницы временно недоступны:" in renderer
     # The DOM snapshot must never be required before tabs can load.
     assert "await refreshPublicTabs();" not in renderer
