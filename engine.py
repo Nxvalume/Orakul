@@ -731,35 +731,47 @@ class BrowserEngine:
         return state
 
     async def _telegram_indexeddb_auth_ready(self, page: Page) -> bool | None:
-        """Check *only* presence of saved Web K session records, never their values.
+        """Check session-record *counts*, never browser authentication values.
 
-        False means a visible chat UI has not yet persisted its auth keys.
-        None means inspection unsupported, so other clients can fall back to
-        the existing snapshot path without accessing private content.
+        Telegram Web K moved storage from the old 'telegram' database to
+        'tweb-common' and 'tweb-account-N'; account records may be in the
+        session__encrypted store when Telegram's local passcode is enabled.
+        Do not assume the legacy DB name or create an empty DB while probing.
         """
         try:
             return await asyncio.wait_for(page.evaluate("""async () => {
                 if(typeof indexedDB.databases !== 'function') return null;
-                const dbs=await indexedDB.databases();
-                if(!dbs.some(db=>db.name==='telegram')) return false;
-                return await new Promise(resolve => {
-                    const req=indexedDB.open('telegram');
-                    req.onerror=()=>resolve(null);
-                    req.onsuccess=()=>{
-                        const db=req.result;
-                        if(!db.objectStoreNames.contains('session')){
-                            db.close();resolve(false);return;
-                        }
-                        const tx=db.transaction('session','readonly');
-                        const count=tx.objectStore('session').count();
-                        count.onsuccess=()=>{const ready=count.result>0;db.close();resolve(ready)};
-                        count.onerror=()=>{db.close();resolve(null)};
+                const all = await indexedDB.databases();
+                const names = all.map(db => db.name).filter(name =>
+                    typeof name === 'string' &&
+                    /^(telegram|tweb|tweb-common|tweb-account-[1-4])$/.test(name));
+                if(!names.length) return false;
+                const results = await Promise.all(names.map(name => new Promise(resolve => {
+                    const req = indexedDB.open(name);
+                    req.onerror = () => resolve(null);
+                    req.onsuccess = () => {
+                        const db = req.result;
+                        const store = db.objectStoreNames.contains('session__encrypted')
+                          ? 'session__encrypted'
+                          : db.objectStoreNames.contains('session') ? 'session' : null;
+                        if(!store){ db.close(); resolve(false); return; }
+                        try {
+                            const tx = db.transaction(store, 'readonly');
+                            const count = tx.objectStore(store).count();
+                            count.onsuccess = () => {
+                                const populated = count.result > 0;
+                                db.close(); resolve(populated);
+                            };
+                            count.onerror = () => { db.close(); resolve(null); };
+                        }catch(e){ db.close(); resolve(null); }
                     };
-                });
-            }"""),timeout=4)
-        except (Exception, asyncio.CancelledError) as exc:
-            if isinstance(exc, asyncio.CancelledError):
-                raise
+                })));
+                if(results.some(value => value === true)) return true;
+                return results.some(value => value === null) ? null : false;
+            }"""), timeout=6)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
             return None
 
     async def telegram_authenticated_state(self, sid: str) -> dict | None:
