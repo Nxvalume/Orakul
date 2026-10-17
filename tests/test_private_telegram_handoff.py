@@ -42,7 +42,7 @@ async def test_owner_stays_private_when_checkpoint_fails():
     with pytest.raises(PermissionError, match='Личный режим'):
         engine.get('telegram-test')
     assert engine.telegram_session_id() == 'telegram-test'
-    context.storage_state.assert_awaited_once_with(indexed_db=True, opfs=True)
+    context.storage_state.assert_awaited_once_with(indexed_db=True)
 
 
 @pytest.mark.asyncio
