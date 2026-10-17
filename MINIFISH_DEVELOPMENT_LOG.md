@@ -246,3 +246,10 @@ Implemented **on minifish-v02 only**:
   - No codes, passwords, cookies or raw storage exported via MCP tools or logs.
 - Commits: `35f8004`, `de9bc29`, `9df5660`. Three GitHub Actions workflows pass at `9df5660` (MiniFish CI, checks, stability CI).
 - Remaining: production Render latest observed `dep-db9luanbtjjs73c7g3ug` on old HEAD `ac06dc4`; verify new deploy. Only after deploying, test `browser_open_profile('telegram')`, `browser_telegram_status` and restart persistence without requesting secrets. Existing saved state may be incomplete and require new owner login if server cannot recover.
+
+## 2026-10-17 — confirmed Render OOM and memory guard
+
+- Render `list_events` confirmed `server_failed` with `oomKilled.memoryLimit=512Mi` for instance `z9lg2` at 12:01:28Z and 12:07:13Z. A later instance had ~502 MB memory usage at 12:14Z with a 512-MiB cap, near another session loss. Repeated process replacement explains volatile Chromium loss; log-only checkpoint success does not mean Telegram remains authenticated.
+- Restore of previously saved `telegram` profile with the deployed new browser code still yielded `login_required`. The previous checkpoint may lack some required state; cannot access account yet.
+- Memory mitigation on `minifish-v02`: restore `service_workers='block'` to reduce memory and preserve request routing; avoid large OPFS snapshots on 512-MiB tier while still saving IndexedDB and encrypted exact-origin sessionStorage; throttle background Telegram checkpoint to every 180 seconds after immediate first save; launch Chromium with reduced background components. Before screenshot/video and optional image/media/font downloads, consult cgroup memory current/max and shed load above 80%, without closing the owner's session. Synthetic tests added in `tests/test_memory_pressure_guard.py`.
+- Commits `924bfe6`, `2baa26d`, `ea22179`, `42bbf07`, `1e9ccef`, `aee8f2b`. CI and Render release for this memory mitigation must still be verified. Telegram account login, live UI and persistence remain NOT acceptance-approved until a real post-deploy sign-in and restart cycle succeeds.
