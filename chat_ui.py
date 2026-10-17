@@ -443,7 +443,15 @@ a{color:#93c9ff}
    // Recover the actual last owner-requested site, including encrypted
    // Telegram storage. Never create an unrelated example.com placeholder.
    // The private owner session is never exposed to this recovery path.
-   if(!recoveryUrl){status('Нет открытого браузера. Откройте MiniFish через чат.');return false}
+   if(!recoveryUrl){
+    // A fresh Android widget may have lost the previous browser tool input.
+    // Restore only a previously verified encrypted Telegram session.
+    const saved=data(await call('browser_telegram_status',{}));
+    if(saved.phase==='private_login'){lockPrivateView('Telegram: личный вход защищён.');return false}
+    if(saved.phase==='not_open'&&saved.saved===true&&saved.storage==='ok')
+     recoveryUrl='https://web.telegram.org/k/';
+   }
+   if(!recoveryUrl){status('Нет сохранённого сеанса. Откройте MiniFish через чат.');return false}
    const opened=data(await call('browser_open',{url:recoveryUrl}));
    if(!opened.session_id)throw new Error('Сервер не выдал новый сеанс');
    return replaceSession(opened.session_id);
