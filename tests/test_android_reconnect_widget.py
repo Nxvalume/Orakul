@@ -75,7 +75,10 @@ async def test_stale_example_placeholder_is_replaced_with_saved_telegram_not_dup
                         if(name==='browser_tabs')return encode({
                             tabs:[{index:0,title:'Telegram',site:'web.telegram.org',active:true}],
                             active:0,max_tabs:6});
-                        if(name==='browser_screenshot')throw Error('No screenshot in fixture');
+                        if(name==='browser_screenshot'){
+                            if(args.session_id==='expired-telegram-99')throw Error('INVALID_ARGUMENT: expired');
+                            throw Error('No screenshot in fixture');
+                        }
                         throw Error('Unexpected tool '+name);
                     }
                 };
