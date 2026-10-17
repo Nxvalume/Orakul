@@ -109,8 +109,9 @@ a{color:#93c9ff}
 <div id="secureTabs" class="tabstrip" role="group" aria-label="Личные вкладки">Загрузка вкладок…</div>
 <div class="screen" style="margin-top:8px"><canvas id="secureShot" role="img" aria-label="Защищённый браузер — только владельцу"></canvas></div>
 <form id="secureForm"><label for="secureValue">Ввод в любое поле сайта</label>
-<small>Коснитесь нужного поля на изображении выше, затем введите текст здесь. Подходит для кодов из нескольких ячеек.</small>
+<small>Коснитесь поля на изображении. Телефонный номер заменяется целиком, код из нескольких ячеек вводится по цифрам. Для выбора страны указывайте номер с международным +кодом.</small>
 <input id="secureValue" type="password" autocomplete="off" inputmode="text" spellcheck="false" placeholder="Текст или код — только MiniFish" aria-label="Защищённый ввод в выбранное касанием поле">
+<button type="button" id="secureClearDraft" aria-label="Очистить текст ввода">✕ Очистить ввод</button>
 <button type="submit" class="primary">Ввести в выбранное поле</button>
 <details id="secureFieldAdvanced"><summary>Дополнительно: выбрать поле из списка</summary>
 <label for="secureField">Поле страницы (необязательно)</label>
@@ -118,6 +119,7 @@ a{color:#93c9ff}
 </details></form>
 <div class="controls"><button type="button" id="secureTelegram" class="primary">Открыть Telegram Web</button><button type="button" id="secureRefresh">Кадр</button>
 <button type="button" id="secureBackspace">Backspace</button>
+<button type="button" id="secureClearFocused">Удалить номер / очистить поле</button>
 <button type="button" id="secureEnter">Enter</button>
 <button type="button" id="secureTab">Tab ↹</button><button type="button" id="secureReload">Обновить страницу</button><button type="button" id="secureLeft" aria-label="Прокрутить страницу влево">⇠ Влево</button><button type="button" id="secureRight" aria-label="Прокрутить страницу вправо">Вправо ⇢</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
 <button type="button" id="secureFinish" style="margin-top:10px">Закончить вход и сохранить авторизацию</button>
@@ -676,7 +678,7 @@ a{color:#93c9ff}
    secureStatus('Действие выполнено · обновляю изображение…');
    // The frame is the priority on Android. Do not block it behind field
    // enumeration and titles, which can be expensive on Telegram Web.
-   if(['click','key','telegram_open','navigate','back','reload'].includes(action))
+   if(['click','key','clear_focused','type_focused','fill_field','telegram_open','navigate','back','reload'].includes(action))
     void Promise.allSettled([secureFields(),refreshSecureTabs()]);
    await secureFrame();
   }catch(e){secureStatus('Ошибка: '+String(e.message||e).slice(0,180))}
@@ -755,6 +757,8 @@ a{color:#93c9ff}
   }catch(error){secureStatus('Ошибка поиска или адреса: '+String(error.message||error).slice(0,100))}
  };
  $('secureBackspace').onclick=()=>secureAction('key',{key:'Backspace'});
+ $('secureClearFocused').onclick=()=>secureAction('clear_focused',{});
+ $('secureClearDraft').onclick=()=>{$('secureValue').value='';$('secureValue').focus()};
  $('secureEnter').onclick=()=>secureAction('key',{key:'Enter'});
  $('secureTab').onclick=()=>secureAction('key',{key:'Tab'});
  $('secureBack').onclick=()=>secureAction('back',{});
