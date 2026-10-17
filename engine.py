@@ -162,7 +162,10 @@ class BrowserEngine:
     async def _launch(self) -> None:
         if self._browser is None:
             self._pw = await async_playwright().start()
-            self._browser = await self._pw.chromium.launch(headless=True, args=['--disable-dev-shm-usage'])
+            self._browser = await self._pw.chromium.launch(headless=True, args=[
+                '--disable-dev-shm-usage', '--disable-extensions',
+                '--disable-background-networking', '--disable-default-apps',
+                '--no-first-run', '--disable-component-update'])
 
     async def _route(self, route):
         # Check every subresource and redirect, not only top-level navigations.
@@ -198,15 +201,16 @@ class BrowserEngine:
                 raise RuntimeError('Render Free поддерживает один браузер одновременно. Закройте предыдущую сессию в панели MiniFish перед открытием другого сайта.')
             await self._launch()
             assert self._browser is not None
-            # Telegram Web K relies on service workers in addition to
-            # IndexedDB/localStorage. Keep blocking them for other websites.
+            # Block service workers on EVERY website: their cache interception
+            # bypasses frame routing and raises memory pressure above Render's
+            # 512 MiB limit. Telegram login already runs without service workers.
             is_telegram = urlsplit(url).hostname == 'web.telegram.org'
             restored = dict(storage_state) if storage_state is not None else None
             session_values = (restored.pop('_minifish_session_storage', None)
                               if isinstance(restored, dict) else None)
             context = await self._browser.new_context(
                     accept_downloads=False,
-                    service_workers='allow' if is_telegram else 'block',
+                    service_workers='block',
                     viewport={'width': 960, 'height': 675},
                     **({'storage_state': restored} if restored is not None else {}))
             await context.route('**/*', self._route)
@@ -581,7 +585,9 @@ class BrowserEngine:
         The caller encrypts the returned data immediately; no tokens are sent
         through MCP results. Never capture a different website's sessionStorage.
         """
-        state = await session.context.storage_state(indexed_db=True, opfs=True)
+        # IndexedDB is required for Telegram. OPFS export duplicates large
+        # buffers under memory pressure; do not snapshot it on the free tier.
+        state = await session.context.storage_state(indexed_db=True)
         for page in self._telegram_pages(session):
             try:
                 values = await page.evaluate("""() => {
