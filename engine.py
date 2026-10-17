@@ -675,6 +675,38 @@ class BrowserEngine:
                 continue
         return state
 
+    async def _telegram_indexeddb_auth_ready(self, page: Page) -> bool | None:
+        """Check *only* presence of saved Web K session records, never their values.
+
+        False means a visible chat UI has not yet persisted its auth keys.
+        None means inspection unsupported, so other clients can fall back to
+        the existing snapshot path without accessing private content.
+        """
+        try:
+            return await asyncio.wait_for(page.evaluate("""async () => {
+                if(typeof indexedDB.databases !== 'function') return null;
+                const dbs=await indexedDB.databases();
+                if(!dbs.some(db=>db.name==='telegram')) return false;
+                return await new Promise(resolve => {
+                    const req=indexedDB.open('telegram');
+                    req.onerror=()=>resolve(null);
+                    req.onsuccess=()=>{
+                        const db=req.result;
+                        if(!db.objectStoreNames.contains('session')){
+                            db.close();resolve(false);return;
+                        }
+                        const tx=db.transaction('session','readonly');
+                        const count=tx.objectStore('session').count();
+                        count.onsuccess=()=>{const ready=count.result>0;db.close();resolve(ready)};
+                        count.onerror=()=>{db.close();resolve(null)};
+                    };
+                });
+            }"""),timeout=4)
+        except (Exception, asyncio.CancelledError) as exc:
+            if isinstance(exc, asyncio.CancelledError):
+                raise
+            return None
+
     async def telegram_authenticated_state(self, sid: str) -> dict | None:
         """Export signed-in Telegram state only for encrypted server-side saving."""
         session = self._sessions.get(sid)
@@ -686,6 +718,13 @@ class BrowserEngine:
                 try:
                     if (await page.locator('#column-left').is_visible() and
                             not await page.locator('#auth-pages').is_visible()):
+                        ready = await self._telegram_indexeddb_auth_ready(page)
+                        if ready is False:
+                            # The UI can be visible before the authentication
+                            # database write completes. Wait for next 3s watch
+                            # rather than replacing a durable profile with
+                            # an incomplete browser state.
+                            return None
                         return await self._encrypted_profile_state(session)
                 except Exception:
                     continue
