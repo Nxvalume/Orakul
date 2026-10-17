@@ -176,3 +176,16 @@
 **Фактическая проверка:** GitHub HEAD SHA `152d89f5af1b849abea3990e7c66adc3280565f0`: 3 workflows `MiniFish CI`, `MiniFish checks`, `MiniFish stability CI` success. Render deploy `dep-db99pnlg1s2s73ft5id0` перешёл в **live**, finishedAt 2026-10-16T21:55:11Z. После деплоя реальный `browser_telegram_status` показал `login_required,logged_in=false,saved=false,storage=ok`, Telegram browser session `4bb600fe-b9ed-4dda-805b-19e6bb53974a`. `browser_tabs` показал Telegram Web в активной вкладке; вызван `browser_window(session_id)`, ChatGPT сообщил `embedded UI displayed`.
 
 **Остаётся неподтверждённым:** скорость кадров и тап кнопок в настоящем Android ChatGPT WebView; действительно ли localStorage доверия доступен и переживает закрытие/повторное открытие iframe; реальный Telegram login и сохранение auth после перезапуска Render. Backend и Chromium tests не подменяют полевой Android тест. `main` не тронута, платные ресурсы не созданы.
+
+
+## 2026-10-17 10:15 МСК — Android v14: восстановление сеанса после перезапуска Render
+
+**Полевой симптом:** Android ChatGPT показывал интерфейс MiniFish, но кадр и вкладки выдавали `INVALID_ARGUMENT; Error calling MCP tool`. Проверка `browser_attach` подтвердила отсутствие живой сессии (`attached=false, reason=not_open`); действующий Render v13 оставался `live`. Причина: iframe продолжал использовать старый ID после перезапуска/истечения in-memory browser session.
+
+**Изменение в ветке `minifish-v02`:** новый default MCP Apps resource `ui://minifish/browser-v14.html` (`chat_ui.py`); сервер сохраняет совместимый v13 resource. Клиент распознаёт потерю сеанса по ошибкам от backend, повторно использует `browser_attach`, а при подтверждённом `not_open` открывает одну безопасную публичную стартовую страницу `https://example.com/` через `browser_open`. Одновременные попытки объединяются, добавлено ограничение повторов и игнорирование позднего старого `toolInput`; табы и кадр перестают постоянно использовать прежний ID. При `private_mode` и `ambiguous` автоматическое создание новой страницы запрещено; секретные поля Telegram через MCP не раскрываются.
+
+**Тесты:** обновлены прежние ожидания `tests/test_chat_ui_private_mode.py`, `tests/test_mcp_apps_window.py`; добавлен `tests/test_android_reconnect_widget.py`, реальный Chromium тест воспроизводит старый ID и убеждается в создании только одного публичного сеанса. 3 GitHub Actions workflows `MiniFish CI`, `MiniFish checks`, `MiniFish stability CI` = `success` на commit `f6fe94d7d7797f9322501dcf6d64a3e62244fb64`. Render Docker: 158 passed, 4 skipped.
+
+**Деплой:** `dep-db9hvq3rjlhs73et962g` = **live**, finishedAt `2026-10-17T07:13:55.022154Z`. После деплоя `browser_attach` вернул `not_open`; `browser_open(https://example.com/)` создал session `380335e5-4cc4-431b-b65c-63535ee18caf`, `browser_tabs` показал 1 вкладку, `browser_snapshot` прочитал Example Domain. Вызван `browser_window`, ChatGPT подтвердил показ встроенного UI в диалоге.
+
+**Не подтверждено:** что старое окно на Samsung Android автоматически восстановится после истечения/перезапуска (Chromium CI не равен Android E2E); пользователь должен проверить новое окно на телефоне. Не подтверждены Telegram login/profile после перезапуска. `main` не тронута; платные ресурсы не создавались.
