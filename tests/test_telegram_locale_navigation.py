@@ -62,3 +62,11 @@ async def test_json_documents_on_other_websites_are_not_redirected(monkeypatch):
     await BrowserEngine()._route(route)
     route.continue_.assert_awaited_once()
     route.fulfill.assert_not_awaited()
+
+
+def test_inline_android_window_has_safe_one_tap_telegram_recovery():
+    from chat_ui import CHAT_HTML, CHAT_UI_URI
+    assert 'id="telegramHome"' in CHAT_HTML
+    assert "$('telegramHome').onclick=()=>act('browser_goto'" in CHAT_HTML
+    assert "url:'https://web.telegram.org/k/'" in CHAT_HTML
+    assert CHAT_UI_URI == 'ui://minifish/browser-v18.html'
