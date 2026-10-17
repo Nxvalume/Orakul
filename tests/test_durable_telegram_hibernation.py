@@ -13,6 +13,7 @@ async def test_idle_telegram_hibernation_after_save(monkeypatch):
     ctx=SimpleNamespace(pages=[page],close=AsyncMock())
     ses=Session(context=ctx,page=page)
     ses.touched=time.monotonic()-125
+    ses.last_interaction=time.monotonic()-125
     b._sessions["fixture"]=ses
     b._browser=SimpleNamespace(close=AsyncMock())
     b._pw=SimpleNamespace(stop=AsyncMock())
@@ -32,6 +33,7 @@ async def test_failed_save_never_closes_user_browser(monkeypatch):
     ctx=SimpleNamespace(pages=[page],close=AsyncMock())
     ses=Session(context=ctx,page=page)
     ses.touched=time.monotonic()-125
+    ses.last_interaction=time.monotonic()-125
     b._sessions["fixture"]=ses
     b._browser=SimpleNamespace(close=AsyncMock())
     b.telegram_authenticated_state=AsyncMock(return_value={"cookies":[],"origins":[]})
