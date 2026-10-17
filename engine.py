@@ -150,7 +150,13 @@ def trim(value: str, limit: int = MAX_TEXT) -> str:
 
 
 def sensitive_action(label: str) -> bool:
-    pattern = r'\b(pay|purchase|checkout|buy now|delete|remove account|transfer|submit payment|send|publish|post now|approve|confirm|authorize|accept|оплатить|купить|удалить|перевести деньги|списать|отправить|опубликовать|подтвердить|подтверждаю|разрешить|согласиться)\b'
+    """Require owner approval for consequential actions, not ordinary messages.
+
+    A generic Send/Submit button is not automatically high-risk: owners can
+    explicitly delegate routine correspondence and form submissions. Monetary,
+    destructive, credential/ownership, and publish actions remain protected.
+    """
+    pattern = r'\b(pay|payment|purchase|checkout|buy now|delete|remove|erase|revoke|transfer|submit payment|publish|post now|approve|confirm|authorize|accept|оплатить|купить|удалить|стереть|отозвать|передать права|перевести деньги|списать|опубликовать|подтвердить|подтверждаю|разрешить|согласиться)\b'
     return bool(re.search(pattern, label.lower()))
 
 
@@ -563,7 +569,9 @@ class BrowserEngine:
             el = s.page.locator(selector).first
             label = trim(((await el.inner_text(timeout=TIMEOUT_MS)) or '') + ' ' + ((await el.get_attribute('aria-label')) or ''), 300)
             typ = (await el.get_attribute('type') or '').lower()
-            sensitive = typ == 'submit' or sensitive_action(label)
+            # Do not require /live for routine Send or Submit actions.
+            # Sensitive labels still require one-time owner approval.
+            sensitive = sensitive_action(label)
             if sensitive:
                 now = time.monotonic()
                 approved = s.approved_click
