@@ -59,6 +59,21 @@ async def _checkpoint_browser_profile(name: str, state: dict):
     else:
         record = await asyncio.to_thread(store.get_profile, name)
         site = record['site']
+    if name == 'telegram':
+        try:
+            old_record = await asyncio.to_thread(store.get_profile, name)
+        except ValueError:
+            old_record = None
+        if old_record is not None:
+            old = _telegram_state_shape(old_record.get('state'))
+            new = _telegram_state_shape(state)
+            # Keep a previously usable checkpoint if a transient browser
+            # export drops all persistent origin/IndexedDB auth material.
+            if ((old['origins'] > 0 and new['origins'] == 0)
+                    or (old['indexed_db'] > 0 and new['indexed_db'] == 0)
+                    or (old['cookies'] > 0 and new['cookies'] == 0
+                        and new['session_keys'] == 0)):
+                raise RuntimeError('IncompleteTelegramSnapshot')
     await asyncio.to_thread(store.save_profile, name, site, state)
     loaded = await asyncio.to_thread(store.get_profile, name)
     if loaded['site'] != site or loaded['state'] != state:
