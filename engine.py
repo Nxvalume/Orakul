@@ -775,11 +775,22 @@ class BrowserEngine:
                             not await page.locator('#auth-pages').is_visible()):
                         ready = await self._telegram_indexeddb_auth_ready(page)
                         if ready is False:
-                            # The UI can be visible before the authentication
-                            # database write completes. Wait for next 3s watch
-                            # rather than replacing a durable profile with
-                            # an incomplete browser state.
-                            return None
+                            # Older/restored Web K profiles may authenticate
+                            # from other durable stores even when the expected
+                            # "telegram/session" IndexedDB path is absent.
+                            # Never allow this fallback for a *new* login:
+                            # its first checkpoint must contain the confirmed
+                            # Telegram session record.
+                            if session.profile_name != 'telegram':
+                                return None
+                            state = await self._encrypted_profile_state(session)
+                            if not any(
+                                origin.get('indexedDB')
+                                for origin in state.get('origins', [])
+                                if isinstance(origin, dict)
+                            ):
+                                return None
+                            return state
                         return await self._encrypted_profile_state(session)
                 except Exception:
                     continue
