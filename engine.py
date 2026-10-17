@@ -749,7 +749,7 @@ class BrowserEngine:
         """
         s = self.get(sid, owner=True)
         if action not in ('click', 'click_element', 'navigate', 'back', 'reload',
-                          'scroll', 'type', 'type_focused', 'key', 'fill_field', 'telegram_next'):
+                          'scroll', 'type', 'type_focused', 'clear_focused', 'key', 'fill_field', 'telegram_next'):
             raise ValueError('Неизвестное действие управления')
         if action == 'navigate':
             await asyncio.to_thread(validate_url, url)
@@ -807,31 +807,50 @@ class BrowserEngine:
                 await s.page.mouse.wheel(pixels if axis == 'horizontal' else 0,
                                          pixels if axis == 'vertical' else 0)
                 s.last_action = 'Владелец прокрутил страницу'
-            elif action == 'type_focused':
-                # The user selected the target by tapping the live screenshot.
-                # This works for changing/hidden OTP fields without reading or
-                # enumerating input values. No text goes through MCP/logs.
-                if not isinstance(text, str) or not 0 < len(text) <= 1000:
+            elif action in ('type_focused', 'clear_focused'):
+                # Never read field values or forward private text through MCP.
+                # Phone entry is a replacement, whereas OTP multi-box widgets
+                # require sequential keystrokes to advance between cells.
+                if action == 'type_focused' and (
+                        not isinstance(text, str) or not 0 < len(text) <= 1000):
                     raise ValueError('Введите текст от 1 до 1000 символов')
-                editable = await s.page.evaluate("""() => {
+                field = await s.page.evaluate("""() => {
                     const el = document.activeElement;
-                    if (!el || el.isContentEditable && el.closest('[contenteditable="false"]'))
-                        return false;
-                    if (el.isContentEditable) return true;
+                    if (!el || (el.isContentEditable && el.closest('[contenteditable="false"]')))
+                        return {editable: false, phone: false};
+                    if (el.isContentEditable)
+                        return {editable: true, phone: false};
                     if (!el.matches('input, textarea') || el.disabled || el.readOnly)
-                        return false;
-                    if (el.tagName === 'TEXTAREA') return true;
-                    return !['hidden','file','button','submit','reset','checkbox',
-                             'radio','range','color','date','datetime-local',
-                             'month','week','time'].includes((el.type||'text').toLowerCase());
+                        return {editable: false, phone: false};
+                    const excluded = ['hidden','file','button','submit','reset',
+                        'checkbox','radio','range','color','date','datetime-local',
+                        'month','week','time'];
+                    if (el.tagName === 'INPUT' && excluded.includes((el.type||'text').toLowerCase()))
+                        return {editable: false, phone: false};
+                    const hints = [
+                        el.getAttribute('type'), el.getAttribute('inputmode'),
+                        el.getAttribute('autocomplete'), el.getAttribute('name'),
+                        el.getAttribute('id'), el.getAttribute('placeholder'),
+                        el.getAttribute('aria-label')
+                    ].filter(Boolean).join(' ').toLowerCase();
+                    const phone = el.tagName === 'INPUT' &&
+                        ((el.type||'').toLowerCase() === 'tel' ||
+                         /(?:^|[^a-z])(phone|telephone|mobile|tel)(?:$|[^a-z])|телефон|номер телефона/i.test(hints));
+                    return {editable: true, phone};
                 }""")
-                if not editable:
+                if not field['editable']:
                     raise ValueError('Коснитесь поля прямо на изображении браузера, затем повторите ввод')
-                # Real keydown/input/keyup events let controlled React inputs,
-                # one-time-code widgets, and multi-box code fields move focus
-                # between digits. insert_text() emits only a single input event.
-                await s.page.keyboard.type(text, delay=25)
-                s.last_action = 'Владелец ввёл текст в выбранное поле'
+                if action == 'clear_focused' or field['phone']:
+                    # Clear via keyboard events so controlled inputs observe the
+                    # empty state; typing a new +country prefix lets the website
+                    # update its country selector instead of appending old digits.
+                    await s.page.keyboard.press('ControlOrMeta+A')
+                    await s.page.keyboard.press('Backspace')
+                if action == 'type_focused':
+                    await s.page.keyboard.type(text, delay=25)
+                    s.last_action = 'Владелец заменил номер' if field['phone'] else 'Владелец ввёл текст в выбранное поле'
+                else:
+                    s.last_action = 'Владелец очистил выбранное поле'
             elif action == 'type':
                 if not isinstance(text, str) or not 0 < len(text) <= 1000:
                     raise ValueError('Текст должен содержать от 1 до 1000 символов')
