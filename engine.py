@@ -265,6 +265,34 @@ class BrowserEngine:
             s = self._sessions.pop(sid)
             await self._close_session_context(s)
 
+    async def reclaim_chromium_memory(self) -> dict:
+        """Proactively request JS heap GC under Render memory pressure.
+
+        This does not navigate, close tabs, inspect Telegram contents, or expose
+        credentials. Avoid creating a CDP session while a user action is running.
+        """
+        if not memory_pressure():
+            return {'attempted': False}
+        reclaimed = 0
+        for session in list(self._sessions.values()):
+            if session.page.is_closed() or session.lock.locked():
+                continue
+            try:
+                async with asyncio.timeout(6):
+                    async with session.lock:
+                        cdp = await session.context.new_cdp_session(session.page)
+                        try:
+                            await cdp.send('HeapProfiler.collectGarbage')
+                            reclaimed += 1
+                        finally:
+                            await cdp.detach()
+            except (Exception, asyncio.CancelledError) as exc:
+                if isinstance(exc, asyncio.CancelledError):
+                    raise
+                # No user text, profile state, or browser URL in diagnostics.
+                continue
+        return {'attempted': True, 'pages': reclaimed}
+
     async def reap_idle(self) -> dict:
         """Reap expired contexts even without new browser_open calls.
 
