@@ -472,3 +472,22 @@ def test_mobile_telegram_password_has_explicit_next_button():
     assert "ownerAction('telegram_next')" in PAGE
     assert "if(ok)input.value='';" in PAGE
     assert 'Ввод подтверждён браузером' in PAGE
+
+
+@pytest.mark.asyncio
+async def test_telegram_global_search_result_uses_dom_click_when_offscreen():
+    engine, page = mock_browser()
+    page.url = 'https://web.telegram.org/a/'
+    target = SimpleNamespace(
+        inner_text=AsyncMock(return_value='Verto Studio Менеджер'),
+        get_attribute=AsyncMock(return_value=None),
+        evaluate=AsyncMock(),
+        scroll_into_view_if_needed=AsyncMock(),
+        click=AsyncMock())
+    page.locator = lambda selector: SimpleNamespace(first=target)
+    selector = '#LeftColumn-main > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1)'
+    outcome = await engine.click('session', selector)
+    assert outcome['clicked'] == selector
+    target.evaluate.assert_awaited_once()
+    target.click.assert_not_awaited()
+    target.scroll_into_view_if_needed.assert_not_awaited()
