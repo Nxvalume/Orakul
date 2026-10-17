@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v18.html"
+CHAT_UI_URI = "ui://minifish/browser-v19.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -132,7 +132,7 @@ a{color:#93c9ff}
 (()=>{
  const $=id=>document.getElementById(id);
  const pending=new Map();let nextId=1,session='',busy=false,ready=null,attaching=false;
- let queuedAction=null,recovering=null,lastRecovery=0;
+ let queuedAction=null,recovering=null,lastRecovery=0,recoveryUrl='';
  const invalidSessionIds=new Set();
  let secureToken='',secureViewport={width:960,height:675},securePoll=null,privateLocked=false;
  let secureFrameBusy=false,resuming=false;
@@ -334,6 +334,9 @@ a{color:#93c9ff}
  }
  function inputFrom(payload){
   if(!payload)return;
+  const info=data(payload);
+  if(info.site==='web.telegram.org'||info.url?.startsWith('https://web.telegram.org/'))
+   recoveryUrl='https://web.telegram.org/k/';
   const next=sessionFrom(payload);
   if(next && next!==session && !invalidSessionIds.has(next) && !secureToken && !privateLocked){
    session=next;
@@ -417,7 +420,13 @@ a{color:#93c9ff}
     lockPrivateView('Личный сеанс защищён. Для просмотра требуется защищённый доступ владельца.');
     return false;
    }
-   if(info.attached&&info.session_id)return replaceSession(info.session_id);
+   if(info.attached&&info.session_id){
+    // Android v17 used to create an unrelated example.com placeholder.
+    // Only replace that exact public tab when restoring an owner-requested Telegram session.
+    if(recoveryUrl==='https://web.telegram.org/k/' && info.site==='example.com'){
+     await call('browser_close',{session_id:info.session_id});
+    }else return replaceSession(info.session_id);
+   }
    if(info.reason==='ambiguous'){
     status('Найдено несколько сеансов. Автоматическое восстановление остановлено.');
     return false;
@@ -427,9 +436,11 @@ a{color:#93c9ff}
     status('Нет ответа от инструмента подключения ChatGPT. Переподключаю…');
     return false;
    }
-   // Only when no browser exists. Never reopen Telegram automatically or
-   // expose a private owner session. Safe default has no account credentials.
-   const opened=data(await call('browser_open',{url:'https://example.com/'}));
+   // Recover the actual last owner-requested site, including encrypted
+   // Telegram storage. Never create an unrelated example.com placeholder.
+   // The private owner session is never exposed to this recovery path.
+   if(!recoveryUrl){status('Нет открытого браузера. Откройте MiniFish через чат.');return false}
+   const opened=data(await call('browser_open',{url:recoveryUrl}));
    if(!opened.session_id)throw new Error('Сервер не выдал новый сеанс');
    return replaceSession(opened.session_id);
   })().catch(e=>{
@@ -484,6 +495,20 @@ a{color:#93c9ff}
     throw new Error('ChatGPT не передал изображение браузера');
    }
    const result=data(await call('browser_snapshot',{session_id:session}));
+   if(typeof result.url==='string'){
+    try{
+     const parsed=new URL(result.url);
+     if(parsed.protocol==='https:'&&parsed.hostname){
+      if(parsed.hostname==='web.telegram.org'){
+       recoveryUrl='https://web.telegram.org/k/';
+       if(/^\\/js\\/locales\\/[^/]+[.]json$/i.test(parsed.pathname)){
+        status('Служебный файл Telegram — возвращаю страницу…');
+        queuedAction={name:'browser_goto',args:{session_id:session,url:recoveryUrl}};
+       }
+      }else recoveryUrl=parsed.origin+parsed.pathname;
+     }
+    }catch(ignore){}
+   }
    $('site').textContent=(()=>{try{return new URL(result.url).hostname}catch(e){return 'Страница'}})();
    // Keep user-typed words while the 4.6s frame polling runs. Never
    // replace the active text field with a URL during Android keyboard input.
@@ -566,6 +591,7 @@ a{color:#93c9ff}
    // Keep the address/search box above the frame and render results within it.
    $('navUrl').blur();
    status('Открываю страницу или результаты поиска…');
+   recoveryUrl=url;
    act('browser_goto',{session_id:session,url});
   }catch(error){status('Ошибка поиска или адреса: '+String(error.message||error).slice(0,110))}
  };
