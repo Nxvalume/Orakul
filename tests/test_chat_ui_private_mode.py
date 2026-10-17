@@ -18,7 +18,7 @@ def test_protected_mode_hides_public_controls_and_restores_only_after_release():
     assert "queuedAction=null;" in CHAT_HTML
     assert "if(session&&!busy&&!secureToken&&!privateLocked" in CHAT_HTML
     assert "if(ownerDenied(e))lockPrivateView(" in CHAT_HTML
-    assert "if(next && next!==session && !secureToken && !privateLocked)" in CHAT_HTML
+    assert "invalidSessionIds.has(next)" in CHAT_HTML
 
 
 def test_private_frame_does_not_embed_owner_token_in_image_url_or_mcp():
