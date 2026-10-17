@@ -202,3 +202,21 @@
 **Проверки:** GitHub Actions `MiniFish CI`, `MiniFish checks`, `MiniFish stability CI` успешны на SHA `ca5a01c0086075cf73020af06e183e4c52a77b86`. Docker Build Render: **160 passed, 4 skipped**. Деплой `dep-db9jbf3rjlhs73f1utpg` = **live**, finishedAt `2026-10-17T08:47:27.956448Z`. После деплоя `browser_attach()` вернул `not_open` (ожидаемый сброс in-memory браузера при рестарте), `browser_open(example.com)` создал session `ee396661-80fa-4aa3-9439-5e97cdee0149`; `browser_tabs` показал страницу, `browser_snapshot` прочитал Example Domain, `browser_screenshot` вернул реальный PNG (~89KB base64). `browser_window` вызван один раз; хост подтвердил встроенное UI в чате.
 
 **Не подтверждено:** фактический v15 Android WebView после нового окна показал кадр и сам сделал attach; нужен свежий скрин или user tap. Telegram login/restart persistence не проверены, никаких кодов/паролей в chat не запрашивали. `main` не менялась, новый платный ресурс не создавался.
+
+
+## 2026-10-17 13:10 МСК — Android v16: универсальный защищённый ввод для Telegram OTP и любых форм
+
+**Проблема со скриншота:** Telegram Web отображал форму из пяти отдельных ячеек для кода, но MiniFish показывал только список полей с прежней подсказкой «Phone Number, не Country». Универсальный ввод в выбранную касанием ячейку отсутствовал. Пользователь хочет печатать без выбора списка, как в обычном браузере.
+
+**Причина:** `chat_ui.py` `secureForm` требовал `field_ref`; форма Telegram динамическая, у одноразового кода поля могут быть скрыты, перерисованы или разбиты на несколько односимвольных элементов. В `engine.py` уже существовала функция `keyboard.insert_text`, но она не была подключена к защищённой форме и не воспроизводит посимвольные keydown/keyup для React OTP.
+
+**Исправление:**
+- `engine.py`: действие `type_focused` в owner-only `owner_control`. Безопасно проверяет `document.activeElement` (только доступный редактируемый `input`, `textarea`, `contenteditable`; запрещает checkbox/radio/button/file и без фокуса), затем вызывает `Playwright keyboard.type(text, delay=25)` для натуральных событий клавиатуры и React auto-advance. Текст и коды не включены в `return` и логи. При отсутствии выбора — безопасный отказ с просьбой нажать поле на кадре.
+- `chat_secure.py`: пропускает `type_focused` только через уже защищённый owner HTTPS `/chat/secure/control`, а НЕ через MCP.
+- `chat_ui.py`: новый ресурс `ui://minifish/browser-v16.html`. Универсальная защищённая строка и кнопка расположены СРАЗУ под canvas страницы, до множества вторичных кнопок. Если владелец коснулся поля на изображении, введённый в локальной password-строке текст передаётся только по прямому HTTPS как `type_focused`; старый выбор `field_ref` сохранён во вложенном дополнительном меню, необязателен. После касания выделенный select сбрасывается.
+- `server.py`: совместимый старый URI v15 оставлен для клиентов ChatGPT с кэшем.
+- `tests/test_owner_universal_input.py`: настоящий Playwright Chromium синтетические пять полей с auto-advance; результат [2,4,6,8,0] распределяется по пяти полям, Country остаётся пустым; обычное поле на другом сайте заполняется; попытка без фокуса отклоняется; приватный текст не содержится в возврате. Обновлены тесты layout, URI, старого nested summary.
+
+**Фактическое состояние:** коммит приложения/тестов `c2f2fdd3d961bb184a9e29ea13bf417b5837cc26`, GitHub workflows MiniFish CI, MiniFish checks, MiniFish stability CI — все SUCCESS. Docker Render: 163 passed, 4 skipped. Деплой `dep-db9kh3jrjlhs73f5u3gg` = **live**. После перезапуска safe-only `browser_telegram_status` показал `not_open;logged_in=false;saved=false;storage=ok`; новый `browser_open(web.telegram.org/k/)` создал session `2ae3d98e-0d39-4d47-9605-665ba337dac1`; `browser_window` отобразил встроенный MiniFish UI в чате.
+
+**Ограничение:** текущая Telegram-авторизация не сохранена (переход к экрану кода был до рестарта, логин не завершался). Не раскрывать телефон, OTP/пароли или содержимое приватного кадра через MCP. Прямое нажатие/ввод именно на Samsung Android ещё требует подтверждения, хотя синтетические Playwright-тесты прошли. Рабочая ветка `minifish-v02`; `main` не тронута. Новых платных ресурсов не создано.
