@@ -91,7 +91,7 @@ async def test_android_successful_owner_unlock_opens_private_browser_panel():
             await page.route('https://minifish-ui-test.invalid/', lambda route: route.fulfill(
                 status=200, content_type='text/html', body=CHAT_HTML))
             await page.goto('https://minifish-ui-test.invalid/')
-            await page.locator('#securePanel summary').click()
+            await page.locator('#securePanel > summary').click()
             await page.locator('#ownerKey').fill('test-password-not-real')
             await page.locator('#unlock').click()
             await page.wait_for_function(
@@ -105,7 +105,7 @@ async def test_android_successful_owner_unlock_opens_private_browser_panel():
             assert await page.locator('#ownerKey').input_value() == ''
 
             # A mis-tap on the summary must not remove the only private screen.
-            await page.locator('#securePanel summary').click()
+            await page.locator('#securePanel > summary').click()
             await page.wait_for_timeout(120)
             assert await page.locator('#securePanel').evaluate('(el)=>el.open') is True
             assert await page.locator('#secureShot').is_visible()
