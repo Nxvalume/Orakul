@@ -192,7 +192,7 @@ def create_owner_routes(engine):
                 return JSONResponse(result, headers=headers)
             if operation == 'control':
                 action = data.get('action', '')
-                if action not in {'click', 'fill_field', 'key', 'scroll', 'telegram_open', 'navigate', 'back', 'reload'}:
+                if action not in {'click', 'fill_field', 'type_focused', 'key', 'scroll', 'telegram_open', 'navigate', 'back', 'reload'}:
                     return JSONResponse({'error': 'Неизвестное действие'}, status_code=400, headers=headers)
                 if action == 'telegram_open':
                     # Owner-requested navigation only; never expose this private page via MCP.
