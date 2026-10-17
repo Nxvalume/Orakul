@@ -812,6 +812,7 @@ async def _browser_maintenance():
         await asyncio.sleep(35)
         try:
             await engine.reap_idle()
+            await engine.reclaim_chromium_memory()
         except asyncio.CancelledError:
             raise
         except Exception as exc:
