@@ -87,7 +87,7 @@ async def test_indexeddb_readiness_uses_record_counts_not_secret_values():
     assert await BrowserEngine()._telegram_indexeddb_auth_ready(page) is False
     page.evaluate=AsyncMock(return_value=True)
     assert await BrowserEngine()._telegram_indexeddb_auth_ready(page) is True
-    assert 'count.result>0' in page.evaluate.await_args.args[0]
+    assert 'count.result > 0' in page.evaluate.await_args.args[0]
     assert 'getAll()' not in page.evaluate.await_args.args[0]
 
 
