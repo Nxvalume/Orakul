@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v14.html"
+CHAT_UI_URI = "ui://minifish/browser-v15.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -280,13 +280,31 @@ a{color:#93c9ff}
   return r;
  }
  function data(result){
-  const r=result?.result||result;
-  if(r?.structuredContent && typeof r.structuredContent==='object')return r.structuredContent;
-  for(const el of r?.content||r?.content_items||[])if(el.type==='text'){
-   try{return JSON.parse(el.text)}catch(e){}
+  // Android ChatGPT and MCP Apps v3 may wrap the same backend result as
+  // structuredContent.result, result.content, output, or text content.
+  // Unwrap data, never evaluate source text. Respect private-mode results.
+  const seen=new Set();
+  function unwrap(value,depth=0){
+   if(value===null||value===undefined||depth>9)return null;
+   if(typeof value==='string'){
+    if(value.length>64000)return null;
+    try{return unwrap(JSON.parse(value),depth+1)}catch(e){return null}
+   }
+   if(typeof value!=='object'||seen.has(value))return null;
+   seen.add(value);
+   if(Array.isArray(value)){
+    for(const item of value){const found=unwrap(item,depth+1);if(found)return found}
+    return null;
+   }
+   // Only real data keys determine a valid response, not an empty envelope.
+   if(['session_id','attached','reason','tabs','url','elements','ok','private_mode','phase']
+        .some(key=>Object.prototype.hasOwnProperty.call(value,key)))return value;
+   for(const key of ['structuredContent','result','output','data','content','content_items','text']){
+    const found=unwrap(value[key],depth+1);if(found)return found;
+   }
+   return null;
   }
-  if(typeof r?.text==='string'){try{return JSON.parse(r.text)}catch(e){}}
-  return {};
+  return unwrap(result)||{};
  }
  // Some clients deliver the session only in text MCP content or later globals.
  function sessionFrom(payload,depth=0){
@@ -398,7 +416,8 @@ a{color:#93c9ff}
     return false;
    }
    if(info.reason!=='not_open'&&info.reason!=='expired'){
-    status('Браузер временно недоступен. Повторите подключение.');
+    // Keep a diagnostic about the bridge, not a misleading server outage.
+    status('Нет ответа от инструмента подключения ChatGPT. Переподключаю…');
     return false;
    }
    // Only when no browser exists. Never reopen Telegram automatically or
