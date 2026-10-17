@@ -450,10 +450,22 @@ a{color:#93c9ff}
   let frameReady=false,recovered=false;
   try{
    const shot=await call('browser_screenshot',{session_id:session});
-   const sr=shot?.result||shot;
-   const images=Array.isArray(sr?.content)?sr.content:
-    (Array.isArray(sr?.content_items)?sr.content_items:[]);
-   const im=images.find(i=>i.type==='image');
+   // Image content may also be nested by the Android ChatGPT tool host.
+   const seenImages=new Set();
+   function findImage(value,depth=0){
+    if(!value||depth>9||typeof value!=='object'||seenImages.has(value))return null;
+    seenImages.add(value);
+    if(Array.isArray(value)){
+     for(const item of value){const found=findImage(item,depth+1);if(found)return found}
+     return null;
+    }
+    if(value.type==='image'&&typeof value.data==='string')return value;
+    for(const key of ['result','output','content','content_items','structuredContent','data']){
+     const found=findImage(value[key],depth+1);if(found)return found;
+    }
+    return null;
+   }
+   const im=findImage(shot);
    if(im?.data && /^(image\/png|image\/jpeg)$/.test(im.mimeType||'')){
     const raw=atob(im.data),bytes=new Uint8Array(raw.length);
     for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
