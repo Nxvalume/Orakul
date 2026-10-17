@@ -72,6 +72,10 @@ async def _checkpoint_browser_profile(name: str, state: dict):
             # export drops all persistent origin/IndexedDB auth material.
             if ((old['origins'] > 0 and new['origins'] == 0)
                     or (old['indexed_db'] > 0 and new['indexed_db'] == 0)
+                    # Never destroy a proven tweb login by overwriting its
+                    # IndexedDB session store with a partially loaded snapshot.
+                    or (old['telegram_session_records'] > 0
+                        and new['telegram_session_records'] == 0)
                     or (old['cookies'] > 0 and new['cookies'] == 0
                         and new['session_keys'] == 0)):
                 raise RuntimeError('IncompleteTelegramSnapshot')
