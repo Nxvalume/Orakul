@@ -128,6 +128,16 @@ def register_webhook() -> None:
             api("setWebhook", {"url": PUBLIC_URL + "/telegram", "secret_token": SECRET,
                                "allowed_updates": ["message"], "drop_pending_updates": False})
             logging.info("Webhook registered")
+            try:
+                api("setMyShortDescription", {"short_description": "Разработка Telegram-ботов под задачи бизнеса."})
+                api("setMyDescription", {"description": "Закажите Telegram-бота для записи клиентов, заявок и автоматизации. Опишите задачу одним сообщением: необходимые функции, сроки, бюджет. Заявка поступит разработчику для оценки."})
+                api("setMyCommands", {"commands": [
+                    {"command": "start", "description": "Оставить заявку"},
+                    {"command": "help", "description": "Как оформить заявку"},
+                    {"command": "id", "description": "Мой Telegram ID"}]})
+                logging.info("Telegram bot profile configured")
+            except RuntimeError:
+                logging.warning("Bot profile setup deferred")
             return
         except RuntimeError:
             logging.warning("Webhook registration retry")
