@@ -188,7 +188,8 @@ def test_android_ui_auto_recovers_missing_tool_input_without_new_session():
     assert "if(!session)await attachExisting();" in CHAT_HTML
     assert "const ok=await recoverSession();" in CHAT_HTML
     assert 'window.openai?.toolInput' in CHAT_HTML
-    assert "call('browser_open',{url:'https://example.com/'})" in CHAT_HTML
+    assert "call('browser_open',{url:recoveryUrl})" in CHAT_HTML
+    assert "call('browser_open',{url:'https://example.com/'})" not in CHAT_HTML
 
 
 def test_mobile_tabs_load_independently_of_slow_page_snapshot():
