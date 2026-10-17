@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v15.html"
+CHAT_UI_URI = "ui://minifish/browser-v16.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -108,14 +108,18 @@ a{color:#93c9ff}
 <button class="primary" type="submit">Найти</button></div></form>
 <div id="secureTabs" class="tabstrip" role="group" aria-label="Личные вкладки">Загрузка вкладок…</div>
 <div class="screen" style="margin-top:8px"><canvas id="secureShot" role="img" aria-label="Защищённый браузер — только владельцу"></canvas></div>
+<form id="secureForm"><label for="secureValue">Ввод в любое поле сайта</label>
+<small>Коснитесь нужного поля на изображении выше, затем введите текст здесь. Подходит для кодов из нескольких ячеек.</small>
+<input id="secureValue" type="password" autocomplete="off" inputmode="text" spellcheck="false" placeholder="Текст или код — только MiniFish" aria-label="Защищённый ввод в выбранное касанием поле">
+<button type="submit" class="primary">Ввести в выбранное поле</button>
+<details id="secureFieldAdvanced"><summary>Дополнительно: выбрать поле из списка</summary>
+<label for="secureField">Поле страницы (необязательно)</label>
+<select id="secureField"><option value="">Касание на экране (универсальный ввод)</option></select>
+</details></form>
 <div class="controls"><button type="button" id="secureTelegram" class="primary">Открыть Telegram Web</button><button type="button" id="secureRefresh">Кадр</button>
 <button type="button" id="secureBackspace">Backspace</button>
 <button type="button" id="secureEnter">Enter</button>
 <button type="button" id="secureTab">Tab ↹</button><button type="button" id="secureReload">Обновить страницу</button><button type="button" id="secureLeft" aria-label="Прокрутить страницу влево">⇠ Влево</button><button type="button" id="secureRight" aria-label="Прокрутить страницу вправо">Вправо ⇢</button><button type="button" id="secureUp">↑</button><button type="button" id="secureDown">↓</button></div>
-<form id="secureForm"><label for="secureField">Поле страницы</label>
-<select id="secureField"><option value="">Выберите поле телефона, а не страну</option></select>
-<input id="secureValue" type="password" autocomplete="off" spellcheck="false" placeholder="Ввод только на сервер MiniFish">
-<button type="submit" class="primary">Вставить в браузер (без отправки в ChatGPT)</button></form>
 <button type="button" id="secureFinish" style="margin-top:10px">Закончить вход и сохранить авторизацию</button>
 </div>
 </details>
@@ -633,7 +637,7 @@ a{color:#93c9ff}
    select.replaceChildren();
    // Never silently default to Country after Telegram reorders visible inputs.
    const hint=document.createElement('option');hint.value='';
-   hint.textContent='Выберите поле (Phone Number, не Country)';
+   hint.textContent='Касание на экране (универсальный ввод)';
    select.appendChild(hint);
    for(const fld of (data.fields||[])){
     const type=(fld.kind||'text').toLowerCase();
@@ -762,12 +766,18 @@ $('secureLeft').onclick=()=>secureAction('scroll',{pixels:-420,axis:'horizontal'
  $('secureDown').onclick=()=>secureAction('scroll',{pixels:460});
  $('secureForm').onsubmit=e=>{
   e.preventDefault();
-  const field_ref=$('secureField').value,value=$('secureValue').value;
+  const field_ref=$('secureField').value;
+  const value=$('secureValue').value;
   $('secureValue').value='';
-  if(!field_ref){secureStatus('Выберите поле Phone Number, а не Country');return}
   if(!value)return;
-  secureAction('fill_field',{field_ref,text:value});
+  // Private HTTPS only: never call MCP with the input. Default to keyboard
+  // events sent to whichever real page field the owner last tapped.
+  if(field_ref)secureAction('fill_field',{field_ref,text:value});
+  else secureAction('type_focused',{text:value});
  };
+ $('secureValue').addEventListener('focus',()=>{
+  if(!$('secureFieldAdvanced').open)$('secureField').value='';
+ });
  $('secureShot').onclick=e=>{
   if(!secureToken)return;
   const p=positionOnCanvas($('secureShot'),e);
@@ -775,6 +785,8 @@ $('secureLeft').onclick=()=>secureAction('scroll',{pixels:-420,axis:'horizontal'
   const canvas=$('secureShot');
   const x=p.x/canvas.width*secureViewport.width;
   const y=p.y/canvas.height*secureViewport.height;
+  // Tapping the canvas is the universal way to choose a destination.
+  $('secureField').value='';
   secureAction('click',{x,y});
  };
  $('secureFinish').onclick=async()=>{
