@@ -106,3 +106,27 @@ async def test_durable_telegram_checkpoint_preserves_complete_backup(monkeypatch
         await server._checkpoint_browser_profile(
             'telegram', {'cookies': [], 'origins': []})
     assert not saved
+
+
+@pytest.mark.asyncio
+async def test_verified_tweb_checkpoint_survives_empty_session_snapshot(monkeypatch):
+    import server
+    old = {'cookies': [{'name': 'fixture'}],
+           'origins': [{'origin': 'https://web.telegram.org',
+                        'indexedDB': [{'name': 'tweb-account-1',
+                                       'stores': [{'name': 'session',
+                                                   'records': [{'value': 'fake-auth'}]}]}]}]}
+    new = {'cookies': [{'name': 'fixture'}],
+           'origins': [{'origin': 'https://web.telegram.org',
+                        'indexedDB': [{'name': 'tweb-account-1',
+                                       'stores': [{'name': 'session', 'records': []}]}]}]}
+    written = []
+    monkeypatch.setattr(server.store, 'durable', True, raising=False)
+    monkeypatch.setattr(server.store, 'degraded', False, raising=False)
+    monkeypatch.setattr(server.store, 'get_profile',
+                        lambda name: {'site': 'web.telegram.org', 'state': old})
+    monkeypatch.setattr(server.store, 'save_profile',
+                        lambda *args: written.append(args))
+    with pytest.raises(RuntimeError, match='IncompleteTelegramSnapshot'):
+        await server._checkpoint_browser_profile('telegram', new)
+    assert not written
