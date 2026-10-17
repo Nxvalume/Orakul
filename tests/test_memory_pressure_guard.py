@@ -43,3 +43,26 @@ async def test_memory_pressure_aborts_only_optional_assets(monkeypatch):
     await browser._route(text_route)
     text_route.continue_.assert_awaited_once()
     text_route.abort.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_gc_is_skipped_below_memory_threshold(monkeypatch):
+    monkeypatch.setattr(engine_module, 'memory_pressure', lambda: False)
+    browser = BrowserEngine()
+    result = await browser.reclaim_chromium_memory()
+    assert result == {'attempted': False}
+
+
+@pytest.mark.asyncio
+async def test_gc_runs_without_closing_user_session(monkeypatch):
+    monkeypatch.setattr(engine_module, 'memory_pressure', lambda: True)
+    cdp = SimpleNamespace(send=AsyncMock(), detach=AsyncMock())
+    context = SimpleNamespace(new_cdp_session=AsyncMock(return_value=cdp))
+    page = SimpleNamespace(is_closed=lambda: False)
+    browser = BrowserEngine()
+    browser._sessions['owned'] = Session(context=context, page=page)
+    result = await browser.reclaim_chromium_memory()
+    assert result == {'attempted': True, 'pages': 1}
+    cdp.send.assert_awaited_once_with('HeapProfiler.collectGarbage')
+    cdp.detach.assert_awaited_once()
+    assert 'owned' in browser._sessions
