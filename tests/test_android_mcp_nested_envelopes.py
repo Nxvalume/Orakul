@@ -61,7 +61,10 @@ async def test_android_widget_decodes_multiple_host_response_shapes():
             await page.route("https://minifish.test/", lambda route: route.fulfill(
                 status=200, content_type="text/html", body=CHAT_HTML))
             await page.goto("https://minifish.test/")
-            results = await page.evaluate("""() => {
+            # The production decoder is scoped inside the widget closure;
+            # evaluate that exact function source rather than assuming a global.
+            decoder = "function data(result){" + CHAT_HTML.split(" function data(result){", 1)[1].split("\n // Some clients", 1)[0]
+            results = await page.evaluate("(function(){\n" + decoder + "\n" + """ 
               const response={attached:true,session_id:'example-session-12'};
               const text={type:'text',text:JSON.stringify(response)};
               const variants=[
@@ -71,7 +74,7 @@ async def test_android_widget_decodes_multiple_host_response_shapes():
                 {data:{text:JSON.stringify(response)}}
               ];
               return variants.map(v=>data(v)?.session_id||null);
-            }""")
+            })();""")
             assert results == ["example-session-12"] * 7
         finally:
             await browser.close()
