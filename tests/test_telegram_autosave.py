@@ -55,3 +55,37 @@ async def test_telegram_autosave_does_not_persist_qr_login_page(monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await server._telegram_profile_watch()
     save.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_telegram_does_not_save_visible_chat_until_auth_database_is_durable(monkeypatch):
+    from engine import BrowserEngine, Session
+    browser = BrowserEngine()
+    page = SimpleNamespace(
+        url='https://web.telegram.org/k/', is_closed=lambda:False,
+        locator=lambda selector:SimpleNamespace(
+            is_visible=AsyncMock(return_value=selector == '#column-left')))
+    context=SimpleNamespace(pages=[page])
+    browser._sessions['telegram']=Session(context=context,page=page)
+    durable = {'origins':[{'origin':'https://web.telegram.org'}], 'cookies':[]}
+    export = AsyncMock(return_value=durable)
+    checks = AsyncMock(side_effect=[False, True])
+    monkeypatch.setattr(browser, '_encrypted_profile_state', export)
+    monkeypatch.setattr(browser, '_telegram_indexeddb_auth_ready', checks)
+
+    assert await browser.telegram_authenticated_state('telegram') is None
+    export.assert_not_awaited()
+    assert await browser.telegram_authenticated_state('telegram') == durable
+    export.assert_awaited_once()
+    assert checks.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_indexeddb_readiness_uses_record_counts_not_secret_values():
+    from engine import BrowserEngine
+    page=SimpleNamespace(evaluate=AsyncMock(return_value=False))
+    assert await BrowserEngine()._telegram_indexeddb_auth_ready(page) is False
+    page.evaluate=AsyncMock(return_value=True)
+    assert await BrowserEngine()._telegram_indexeddb_auth_ready(page) is True
+    assert 'count.result>0' in page.evaluate.await_args.args[0]
+    assert 'getAll()' not in page.evaluate.await_args.args[0]
