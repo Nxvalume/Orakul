@@ -332,7 +332,21 @@ def browser_chat_app_v16() -> str:
                         ["https://nxval-minifish-2026.onrender.com"]},
                     "openai/widgetPrefersBorder": True})
 def browser_chat_app_v17() -> str:
-    """Preserve old Android v17 resources while new widgets use v18."""
+    """Preserve old Android v17 resources while new widgets use v19."""
+    return CHAT_HTML
+
+
+@mcp.resource("ui://minifish/browser-v18.html", name="minifish-chat-browser-v18",
+              mime_type=CHAT_UI_MIME,
+              meta={"ui": {"csp": CHAT_UI_CSP, "prefersBorder": True},
+                    "openai/ui": {"availableDisplayModes": ["inline", "fullscreen"]},
+                    "openai/widgetCSP": {"connect_domains":
+                        ["https://nxval-minifish-2026.onrender.com"],
+                        "redirect_domains":
+                        ["https://nxval-minifish-2026.onrender.com"]},
+                    "openai/widgetPrefersBorder": True})
+def browser_chat_app_v18() -> str:
+    """Keep cached Android v18 tools compatible with the v19 UI."""
     return CHAT_HTML
 
 
@@ -497,7 +511,7 @@ async def browser_screenshot(session_id: str) -> Image:
     """Return a PNG of the current browser viewport."""
     return Image(data=await engine.screenshot(session_id), format='png')
 
-@mcp.tool()
+@mcp.tool(meta=CHAT_ACTION_META)
 async def browser_close(session_id: str) -> dict:
     """Close a browser session only when owner private mode is off."""
     engine.get(session_id)
