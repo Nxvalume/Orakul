@@ -68,3 +68,20 @@ async def test_status_no_live_session_missing_saved_profile(monkeypatch):
     result = await server.browser_telegram_status()
     assert result == {'phase':'not_open','logged_in':False,
                       'saved':False,'storage':'ok','session_id':None}
+
+
+def test_profile_shape_reports_counts_without_exposing_secret_material():
+    from server import _telegram_state_shape
+    secret = 'PRIVATE_TOKEN_MUST_NOT_LEAK'
+    state = {'cookies':[{'value': secret}],
+             'origins':[{'origin':'https://web.telegram.org',
+                         'localStorage':[{'value':secret}],
+                         'indexedDB':[{'name':secret}],
+                         'opfs':[{'path':secret}]}],
+             '_minifish_session_storage':{'https://web.telegram.org':{'secret':secret}}}
+    result = _telegram_state_shape(state)
+    assert result == {'cookies':1,'origins':1,'indexed_db':1,
+                      'opfs':1,'session_keys':1}
+    assert secret not in str(result)
+    assert _telegram_state_shape({}) == {
+        'cookies':0,'origins':0,'indexed_db':0,'opfs':0,'session_keys':0}
