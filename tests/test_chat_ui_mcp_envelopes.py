@@ -13,7 +13,8 @@ def test_inline_view_can_use_delayed_chatgpt_globals_and_mcp_text():
     assert "globals.toolInput" in CHAT_HTML
     assert "globals.toolOutput" in CHAT_HTML
     assert "const next=sessionFrom(payload);" in CHAT_HTML
-    assert "const images=Array.isArray(sr?.content)" in CHAT_HTML
+    assert "const im=findImage(shot);" in CHAT_HTML
+    assert "function findImage(value,depth=0)" in CHAT_HTML
     assert "Array.isArray(sr?.content_items)" in CHAT_HTML
     assert "ChatGPT не передал изображение браузера" in CHAT_HTML
     assert "Не получен ID браузера" in CHAT_HTML
