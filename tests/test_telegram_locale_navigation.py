@@ -67,4 +67,4 @@ def test_inline_android_window_has_safe_one_tap_telegram_recovery():
     assert 'id="telegramHome"' in CHAT_HTML
     assert "$('telegramHome').onclick=()=>act('browser_goto'" in CHAT_HTML
     assert "url:'https://web.telegram.org/k/'" in CHAT_HTML
-    assert CHAT_UI_URI == 'ui://minifish/browser-v19.html'
+    assert CHAT_UI_URI == 'ui://minifish/browser-v20.html'
