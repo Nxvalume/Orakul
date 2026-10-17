@@ -312,6 +312,54 @@ class BrowserEngine:
                 continue
         return {'attempted': True, 'pages': reclaimed}
 
+    async def hibernate_telegram_if_needed(self) -> dict:
+        """Save encrypted Telegram state before Chromium exhausts Render memory.
+
+        Keep a recently active window open. Close the heavy Chromium context
+        only after an authenticated, non-private Telegram profile has passed
+        the durable callback's encrypt/write/readback verification. A failed
+        checkpoint NEVER loses the existing browser session.
+        """
+        if not memory_pressure(0.82):
+            return {'hibernated': False, 'reason': 'memory_ok'}
+        async with self._lock:
+            if len(self._sessions) != 1 or self.profile_save_callback is None:
+                return {'hibernated': False, 'reason': 'not_eligible'}
+            sid, session = next(iter(self._sessions.items()))
+            if session.private_mode or session.page.is_closed() or session.lock.locked():
+                return {'hibernated': False, 'reason': 'busy_or_private'}
+            idle = time.monotonic() - session.touched
+            # Proactive reclamation at 82%; emergency at 92%. Never interrupt
+            # an actively used browser or an owner-controlled login.
+            if idle < (20 if memory_pressure(0.92) else 90):
+                return {'hibernated': False, 'reason': 'in_use'}
+            if not self._telegram_pages(session):
+                return {'hibernated': False, 'reason': 'not_telegram'}
+            try:
+                state = await self.telegram_authenticated_state(sid)
+                if state is None:
+                    return {'hibernated': False, 'reason': 'not_authenticated'}
+                await self.profile_save_callback('telegram', state)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Do not expose any storage values or checkpoint exceptions.
+                return {'hibernated': False, 'reason': 'checkpoint_failed'}
+            async with session.lock:
+                if self._sessions.get(sid) is not session or session.private_mode:
+                    return {'hibernated': False, 'reason': 'changed'}
+                self._sessions.pop(sid, None)
+                # Already checkpointed successfully. Do not duplicate the
+                # expensive IndexedDB export during context shutdown.
+                await session.context.close()
+            if not self._sessions and self._browser is not None:
+                await self._browser.close()
+                self._browser = None
+                if self._pw is not None:
+                    await self._pw.stop()
+                    self._pw = None
+            return {'hibernated': True, 'reason': 'durable_checkpoint_verified'}
+
     async def reap_idle(self) -> dict:
         """Reap expired contexts even without new browser_open calls.
 
