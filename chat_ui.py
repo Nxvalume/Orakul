@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v17.html"
+CHAT_UI_URI = "ui://minifish/browser-v18.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -73,6 +73,7 @@ a{color:#93c9ff}
 <p class="status">Нажимай прямо на экран браузера. Для выбора полей и кнопок используется настоящий курсор Playwright. Изображение обновляется автоматически, пока окно открыто.</p>
 <div class="controls" id="publicControls">
 <button id="refresh" class="primary">Обновить экран</button>
+<button id="telegramHome" type="button">Вернуться в Telegram</button>
 <button id="reload">Перезагрузить</button>
 <button type="button" id="left" aria-label="Прокрутить страницу влево">⇠ Влево</button><button type="button" id="right" aria-label="Прокрутить страницу вправо">Вправо ⇢</button>
 <button id="up">↑</button><button id="down">↓</button>
@@ -578,6 +579,7 @@ a{color:#93c9ff}
   if(session&&!busy&&!secureToken&&!privateLocked&&document.visibilityState!=='hidden')
     render();
  },4600);
+ $('telegramHome').onclick=()=>act('browser_goto',{session_id:session,url:'https://web.telegram.org/k/'});
  $('back').onclick=()=>act('browser_back',{session_id:session});
  $('forward').onclick=()=>act('browser_tab_action',{session_id:session,action:'forward'});
  $('reload').onclick=()=>act('browser_tab_action',{session_id:session,action:'reload'});
