@@ -425,6 +425,8 @@ a{color:#93c9ff}
     // Only replace that exact public tab when restoring an owner-requested Telegram session.
     if(recoveryUrl==='https://web.telegram.org/k/' && info.site==='example.com'){
      await call('browser_close',{session_id:info.session_id});
+     const reopened=data(await call('browser_open',{url:recoveryUrl}));
+     return !!reopened.session_id && replaceSession(reopened.session_id);
     }else return replaceSession(info.session_id);
    }
    if(info.reason==='ambiguous'){
