@@ -89,3 +89,43 @@ async def test_indexeddb_readiness_uses_record_counts_not_secret_values():
     assert await BrowserEngine()._telegram_indexeddb_auth_ready(page) is True
     assert 'count.result>0' in page.evaluate.await_args.args[0]
     assert 'getAll()' not in page.evaluate.await_args.args[0]
+
+
+@pytest.mark.asyncio
+async def test_restored_telegram_can_refresh_legacy_authenticated_storage(monkeypatch):
+    from engine import BrowserEngine, Session
+    b = BrowserEngine()
+    page = SimpleNamespace(
+        url='https://web.telegram.org/k/', is_closed=lambda: False,
+        locator=lambda selector: SimpleNamespace(
+            is_visible=AsyncMock(return_value=selector == '#column-left')))
+    state = {'cookies': [], 'origins': [
+        {'origin': 'https://web.telegram.org',
+         'indexedDB': [{'name': 'legacy-fixture', 'stores': []}]}]}
+    b._sessions['restored'] = Session(
+        context=SimpleNamespace(pages=[page]), page=page,
+        profile_name='telegram')
+    monkeypatch.setattr(b, '_telegram_indexeddb_auth_ready',
+                        AsyncMock(return_value=False))
+    backup = AsyncMock(return_value=state)
+    monkeypatch.setattr(b, '_encrypted_profile_state', backup)
+    assert await b.telegram_authenticated_state('restored') == state
+    backup.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_restored_telegram_rejects_empty_storage_despite_visible_chat(monkeypatch):
+    from engine import BrowserEngine, Session
+    b = BrowserEngine()
+    page = SimpleNamespace(
+        url='https://web.telegram.org/k/', is_closed=lambda: False,
+        locator=lambda selector: SimpleNamespace(
+            is_visible=AsyncMock(return_value=selector == '#column-left')))
+    b._sessions['restored'] = Session(
+        context=SimpleNamespace(pages=[page]), page=page,
+        profile_name='telegram')
+    monkeypatch.setattr(b, '_telegram_indexeddb_auth_ready',
+                        AsyncMock(return_value=False))
+    monkeypatch.setattr(b, '_encrypted_profile_state',
+                        AsyncMock(return_value={'cookies': [], 'origins': []}))
+    assert await b.telegram_authenticated_state('restored') is None
