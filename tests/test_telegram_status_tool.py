@@ -87,3 +87,22 @@ def test_profile_shape_reports_counts_without_exposing_secret_material():
     assert _telegram_state_shape({}) == {
         'cookies':0,'origins':0,'indexed_db':0,'opfs':0,'session_keys':0,
         'telegram_session_db':False,'telegram_session_records':0}
+
+
+@pytest.mark.asyncio
+async def test_durable_telegram_checkpoint_preserves_complete_backup(monkeypatch):
+    import server
+    prior = {'cookies': [{'name': 'fixture'}],
+             'origins': [{'origin': 'https://web.telegram.org',
+                          'indexedDB': [{'name': 'fixture-db'}]}]}
+    saved = []
+    monkeypatch.setattr(server.store, 'durable', True, raising=False)
+    monkeypatch.setattr(server.store, 'degraded', False, raising=False)
+    monkeypatch.setattr(server.store, 'get_profile',
+                        lambda name: {'site': 'web.telegram.org', 'state': prior})
+    monkeypatch.setattr(server.store, 'save_profile',
+                        lambda *args: saved.append(args))
+    with pytest.raises(RuntimeError, match='IncompleteTelegramSnapshot'):
+        await server._checkpoint_browser_profile(
+            'telegram', {'cookies': [], 'origins': []})
+    assert not saved
