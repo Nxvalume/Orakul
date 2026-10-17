@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import ipaddress
 import os
 import secrets
@@ -197,11 +198,30 @@ class BrowserEngine:
                 raise RuntimeError('Render Free поддерживает один браузер одновременно. Закройте предыдущую сессию в панели MiniFish перед открытием другого сайта.')
             await self._launch()
             assert self._browser is not None
-            context = await self._browser.new_context(accept_downloads=False, service_workers='block',
+            # Telegram Web K relies on service workers in addition to
+            # IndexedDB/localStorage. Keep blocking them for other websites.
+            is_telegram = urlsplit(url).hostname == 'web.telegram.org'
+            restored = dict(storage_state) if storage_state is not None else None
+            session_values = (restored.pop('_minifish_session_storage', None)
+                              if isinstance(restored, dict) else None)
+            context = await self._browser.new_context(
+                    accept_downloads=False,
+                    service_workers='allow' if is_telegram else 'block',
                     viewport={'width': 960, 'height': 675},
-                    **({'storage_state': storage_state} if storage_state is not None else {}))
+                    **({'storage_state': restored} if restored is not None else {}))
             await context.route('**/*', self._route)
             await context.add_init_script(CURSOR_INIT)
+            if is_telegram and isinstance(session_values, dict):
+                # The payload is only ever injected into its exact original
+                # trusted HTTPS origin. It never enters MCP / URLs / logs.
+                restored_telegram = session_values.get('https://web.telegram.org')
+                if isinstance(restored_telegram, dict):
+                    await context.add_init_script(
+                        "(() => { if(location.origin !== 'https://web.telegram.org') return;"
+                        "const saved = " + json.dumps(restored_telegram, ensure_ascii=True) + ";"
+                        "for(const [k,v] of Object.entries(saved)){"
+                        "if(typeof k==='string' && typeof v==='string')"
+                        "sessionStorage.setItem(k,v); } })();")
             page = await context.new_page()
             sid = str(uuid4())
             self._sessions[sid] = Session(context=context, page=page, profile_name=profile_name)
@@ -555,6 +575,31 @@ class BrowserEngine:
                     continue
             return False
 
+    async def _encrypted_profile_state(self, session: Session) -> dict:
+        """Export complete supported browser state, including sessionStorage.
+
+        The caller encrypts the returned data immediately; no tokens are sent
+        through MCP results. Never capture a different website's sessionStorage.
+        """
+        state = await session.context.storage_state(indexed_db=True, opfs=True)
+        for page in self._telegram_pages(session):
+            try:
+                values = await page.evaluate("""() => {
+                    const out={};
+                    for(let i=0;i<sessionStorage.length;i++){
+                        const key=sessionStorage.key(i);
+                        if(key !== null)out[key]=sessionStorage.getItem(key);
+                    }
+                    return out;
+                }""")
+                if values:
+                    state['_minifish_session_storage'] = {
+                        'https://web.telegram.org': values}
+                break
+            except Exception:
+                continue
+        return state
+
     async def telegram_authenticated_state(self, sid: str) -> dict | None:
         """Export signed-in Telegram state only for encrypted server-side saving."""
         session = self._sessions.get(sid)
@@ -566,7 +611,7 @@ class BrowserEngine:
                 try:
                     if (await page.locator('#column-left').is_visible() and
                             not await page.locator('#auth-pages').is_visible()):
-                        return await session.context.storage_state(indexed_db=True)
+                        return await self._encrypted_profile_state(session)
                 except Exception:
                     continue
             return None
@@ -616,7 +661,7 @@ class BrowserEngine:
         """Get browser storage for encryption; owner-only private-mode export."""
         s = self.get(sid, owner=owner)
         async with s.lock:
-            return await s.context.storage_state(indexed_db=True)
+            return await self._encrypted_profile_state(s)
 
     def set_profile_name(self, sid: str, name: str) -> None:
         session = self._sessions.get(sid)
@@ -653,7 +698,7 @@ class BrowserEngine:
                         if signed_in:
                             if self.profile_save_callback is None:
                                 raise RuntimeError('Постоянное хранилище недоступно')
-                            state = await s.context.storage_state(indexed_db=True)
+                            state = await self._encrypted_profile_state(s)
                             await self.profile_save_callback('telegram', state)
                             s.profile_name = 'telegram'
                             profile_saved = True
@@ -938,7 +983,7 @@ class BrowserEngine:
                     elif name == 'telegram':
                         name = None  # never replace a saved login with QR state
                 if name:
-                    state = await session.context.storage_state(indexed_db=True)
+                    state = await self._encrypted_profile_state(session)
                     await self.profile_save_callback(name, state)
                     updated = True
         except Exception:
