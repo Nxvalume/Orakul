@@ -355,7 +355,7 @@ async def test_tap_never_bypasses_sensitive_click_confirmation():
     engine, page = mock_browser()
     page.evaluate = AsyncMock(return_value='#send')
     target = SimpleNamespace(
-        inner_text=AsyncMock(return_value='Send'),
+        inner_text=AsyncMock(return_value='Delete Bot'),
         get_attribute=AsyncMock(return_value=None),
         click=AsyncMock())
     page.locator = lambda css: SimpleNamespace(first=target)
@@ -363,6 +363,53 @@ async def test_tap_never_bypasses_sensitive_click_confirmation():
         await engine.tap('session', 20, 40)
     target.click.assert_not_awaited()
     assert engine._sessions['session'].pending_click
+
+
+@pytest.mark.asyncio
+async def test_routine_telegram_send_does_not_require_live_approval():
+    engine, page = mock_browser()
+    target = SimpleNamespace(
+        inner_text=AsyncMock(return_value=''),
+        get_attribute=AsyncMock(side_effect=lambda name: 'submit' if name == 'type' else 'Send Message' if name == 'aria-label' else None),
+        scroll_into_view_if_needed=AsyncMock(),
+        bounding_box=AsyncMock(return_value=None),
+        click=AsyncMock())
+    page.locator = lambda selector: SimpleNamespace(first=target)
+    engine._move_cursor = AsyncMock()
+    result = await engine.click('session', "button[aria-label='Send Message']")
+    assert result['clicked'] == "button[aria-label='Send Message']"
+    target.click.assert_awaited_once()
+    assert engine._sessions['session'].pending_click is None
+
+
+@pytest.mark.asyncio
+async def test_routine_send_uses_normal_tap_path():
+    engine, page = mock_browser()
+    page.evaluate = AsyncMock(return_value='#send')
+    target = SimpleNamespace(
+        inner_text=AsyncMock(return_value='Send'),
+        get_attribute=AsyncMock(return_value=None),
+        scroll_into_view_if_needed=AsyncMock(),
+        bounding_box=AsyncMock(return_value=None),
+        click=AsyncMock())
+    page.locator = lambda selector: SimpleNamespace(first=target)
+    engine._move_cursor = AsyncMock()
+    result = await engine.tap('session', 20, 40)
+    assert result['clicked'] == '#send'
+    target.click.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_payment_submission_still_requires_approval():
+    engine, page = mock_browser()
+    target = SimpleNamespace(
+        inner_text=AsyncMock(return_value='Pay now'),
+        get_attribute=AsyncMock(side_effect=lambda name: 'submit' if name == 'type' else None),
+        click=AsyncMock())
+    page.locator = lambda selector: SimpleNamespace(first=target)
+    with pytest.raises(PermissionError, match='подтверждение владельца'):
+        await engine.click('session', '#pay', confirm_sensitive=True)
+    target.click.assert_not_awaited()
 
 
 @pytest.mark.asyncio
