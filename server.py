@@ -887,6 +887,7 @@ async def _browser_maintenance():
     while True:
         await asyncio.sleep(35)
         try:
+            await engine.hibernate_telegram_if_needed()
             await engine.reap_idle()
             await engine.reclaim_chromium_memory()
         except asyncio.CancelledError:
