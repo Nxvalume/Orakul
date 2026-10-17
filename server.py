@@ -739,8 +739,8 @@ async def _telegram_profile_watch():
         now = asyncio.get_running_loop().time()
         s = engine._sessions.get(sid)
         # Do not delay first save or owner handoff; after that checkpoint every
-        # 60 seconds to refresh Telegram's persistent IndexedDB state.
-        if s is not None and not s.private_mode and now - last_saved.get(sid, 0) < 60:
+        # 180 seconds to refresh Telegram's IndexedDB without OOM thrashing.
+        if s is not None and not s.private_mode and now - last_saved.get(sid, 0) < 180:
             continue
         try:
             state = await engine.telegram_authenticated_state(sid)
