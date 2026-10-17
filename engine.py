@@ -160,6 +160,7 @@ class Session:
     page: Page
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     touched: float = field(default_factory=time.monotonic)
+    last_interaction: float = field(default_factory=time.monotonic)
     last_action: str = 'Открыта страница'
     profile_name: str | None = None
     cursor: tuple[float, float] = (640.0, 450.0)
@@ -328,10 +329,10 @@ class BrowserEngine:
             sid, session = next(iter(self._sessions.items()))
             if session.private_mode or session.page.is_closed() or session.lock.locked():
                 return {'hibernated': False, 'reason': 'busy_or_private'}
-            idle = time.monotonic() - session.touched
+            idle = time.monotonic() - session.last_interaction
             # Proactive reclamation at 82%; emergency at 92%. Never interrupt
             # an actively used browser or an owner-controlled login.
-            if idle < (20 if memory_pressure(0.92) else 90):
+            if idle < (20 if memory_pressure(0.92) else 60):
                 return {'hibernated': False, 'reason': 'in_use'}
             if not self._telegram_pages(session):
                 return {'hibernated': False, 'reason': 'not_telegram'}
@@ -493,6 +494,7 @@ class BrowserEngine:
                 'forward': 'Вперёд по истории',
                 'reload': 'Обновлена страница',
             }[action]
+            session.last_interaction = time.monotonic()
             current = self._tab_pages(session)
             return {'ok': True, 'action': action, 'active': current.index(session.page),
                     'count': len(current), 'site': urlsplit(session.page.url).hostname or ''}
@@ -503,6 +505,7 @@ class BrowserEngine:
         async with s.lock:
             await s.page.goto(url, timeout=TIMEOUT_MS, wait_until='domcontentloaded')
             s.last_action = 'Переход на сайт'
+            s.last_interaction = time.monotonic()
             return {'url': s.page.url, 'title': await s.page.title()}
 
     async def back(self, sid: str) -> dict:
@@ -510,6 +513,7 @@ class BrowserEngine:
         async with s.lock:
             await s.page.go_back(timeout=TIMEOUT_MS, wait_until='domcontentloaded')
             s.last_action = 'Возврат на предыдущую страницу'
+            s.last_interaction = time.monotonic()
             return {'url': s.page.url, 'title': await s.page.title()}
 
     async def snapshot(self, sid: str) -> dict:
@@ -585,6 +589,7 @@ class BrowserEngine:
             if popups:
                 s.page = popups[-1]
             s.last_action = 'Нажатие: ' + (label.strip()[:80] or selector[:80])
+            s.last_interaction = time.monotonic()
             return {'clicked': selector, 'url': s.page.url, 'label': label}
 
     async def tap(self, sid: str, x: float, y: float) -> dict:
@@ -638,6 +643,7 @@ class BrowserEngine:
             await el.fill(value, timeout=TIMEOUT_MS)
             # Deliberately do not echo sensitive field values.
             s.last_action = 'Заполнение поля'
+            s.last_interaction = time.monotonic()
             return {'filled': selector, 'length': len(value)}
 
     async def select(self, sid: str, selector: str, value: str) -> dict:
@@ -650,6 +656,7 @@ class BrowserEngine:
                                         bounds['y'] + bounds['height'] / 2)
             await el.select_option(value, timeout=TIMEOUT_MS)
             s.last_action = 'Выбор значения'
+            s.last_interaction = time.monotonic()
             return {'selected': selector, 'value': value}
 
     def live_sessions(self) -> list[dict]:
@@ -798,6 +805,7 @@ class BrowserEngine:
                     session.pending_click = None
                     session.approved_click = None
                     session.last_action = 'Telegram: вход сохранён, управление возвращено ассистенту'
+                    session.last_interaction = time.monotonic()
                     return True
             return False
 
@@ -894,12 +902,14 @@ class BrowserEngine:
             # and allow the owner to retry without a second login.
             if save_error:
                 s.last_action = 'Telegram: вход пока не сохранён; личный режим включён'
+                s.last_interaction = time.monotonic()
                 return {'private_mode': True,
                         'profile_saved': False, 'save_error': save_error}
             s.private_mode = bool(enabled)
             s.pending_click = None
             s.approved_click = None
             s.last_action = ('Личный режим владельца' if enabled else 'Управление ассистента разрешено')
+            s.last_interaction = time.monotonic()
             return {'private_mode': s.private_mode,
                     'profile_saved': profile_saved, 'save_error': save_error}
 
@@ -1005,6 +1015,7 @@ class BrowserEngine:
                 await self._move_cursor(s, float(x), float(y))
                 await s.page.mouse.click(float(x), float(y))
                 s.last_action = 'Владелец нажал на экране'
+                s.last_interaction = time.monotonic()
             elif action == 'click_element':
                 if (type(element_index) is not int or not 0 <= element_index < 50):
                     raise ValueError('Выберите кнопку на странице')
@@ -1017,15 +1028,19 @@ class BrowserEngine:
                 element = actions.nth(element_index)
                 await element.click(timeout=5000)
                 s.last_action = 'Владелец нажал кнопку сайта'
+                s.last_interaction = time.monotonic()
             elif action == 'navigate':
                 await s.page.goto(url, timeout=TIMEOUT_MS, wait_until='domcontentloaded')
                 s.last_action = 'Владелец перешёл на сайт'
+                s.last_interaction = time.monotonic()
             elif action == 'back':
                 await s.page.go_back(timeout=TIMEOUT_MS, wait_until='domcontentloaded')
                 s.last_action = 'Владелец вернулся назад'
+                s.last_interaction = time.monotonic()
             elif action == 'reload':
                 await s.page.reload(timeout=TIMEOUT_MS, wait_until='domcontentloaded')
                 s.last_action = 'Владелец обновил страницу'
+                s.last_interaction = time.monotonic()
             elif action == 'scroll':
                 if (type(pixels) is not int or not -3000 <= pixels <= 3000):
                     raise ValueError('Некорректная прокрутка')
@@ -1034,6 +1049,7 @@ class BrowserEngine:
                 await s.page.mouse.wheel(pixels if axis == 'horizontal' else 0,
                                          pixels if axis == 'vertical' else 0)
                 s.last_action = 'Владелец прокрутил страницу'
+                s.last_interaction = time.monotonic()
             elif action in ('type_focused', 'clear_focused'):
                 # Never read field values or forward private text through MCP.
                 # Phone entry is a replacement, whereas OTP multi-box widgets
@@ -1076,13 +1092,16 @@ class BrowserEngine:
                 if action == 'type_focused':
                     await s.page.keyboard.type(text, delay=25)
                     s.last_action = 'Владелец заменил номер' if field['phone'] else 'Владелец ввёл текст в выбранное поле'
+                    s.last_interaction = time.monotonic()
                 else:
                     s.last_action = 'Владелец очистил выбранное поле'
+                    s.last_interaction = time.monotonic()
             elif action == 'type':
                 if not isinstance(text, str) or not 0 < len(text) <= 1000:
                     raise ValueError('Текст должен содержать от 1 до 1000 символов')
                 await s.page.keyboard.insert_text(text)
                 s.last_action = 'Владелец ввёл текст'
+                s.last_interaction = time.monotonic()
             elif action == 'fill_field':
                 # Fail closed for older Android widgets using unstable numeric
                 # indices. Otherwise a dynamic country picker can shift the
@@ -1110,6 +1129,7 @@ class BrowserEngine:
                 if not accepted:
                     raise ValueError('Поле не приняло ввод; обновите поля и попробуйте снова')
                 s.last_action = 'Владелец заполнил поле'
+                s.last_interaction = time.monotonic()
             elif action == 'telegram_next':
                 if urlsplit(s.page.url).hostname != 'web.telegram.org':
                     raise ValueError('Продолжить вход можно только в Telegram Web')
@@ -1118,6 +1138,7 @@ class BrowserEngine:
                     raise ValueError('Кнопка NEXT не найдена; обновите экран Telegram')
                 await next_button.click(timeout=TIMEOUT_MS)
                 s.last_action = 'Владелец подтвердил ввод в Telegram'
+                s.last_interaction = time.monotonic()
             else:
                 allowed = {'Tab', 'Enter', 'Escape', 'Backspace', 'Delete',
                            'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
@@ -1126,6 +1147,7 @@ class BrowserEngine:
                     raise ValueError('Клавиша не разрешена')
                 await s.page.keyboard.press(key)
                 s.last_action = 'Владелец нажал клавишу'
+                s.last_interaction = time.monotonic()
             popups = [p for p in self._tab_pages(s) if all(p is not previous for previous in prior_pages)]
             if popups:
                 s.page = popups[-1]
@@ -1140,6 +1162,7 @@ class BrowserEngine:
             await s.page.mouse.wheel(pixels if axis == 'horizontal' else 0,
                                      pixels if axis == 'vertical' else 0)
             s.last_action = 'Прокрутка страницы'
+            s.last_interaction = time.monotonic()
             return {'scroll_pixels': pixels, 'axis': axis, 'url': s.page.url}
 
     async def _close_session_context(self, session: Session) -> dict:
