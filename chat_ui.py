@@ -503,7 +503,7 @@ a{color:#93c9ff}
      if(parsed.protocol==='https:'&&parsed.hostname){
       if(parsed.hostname==='web.telegram.org'){
        recoveryUrl='https://web.telegram.org/k/';
-       if(/^\\/js\\/locales\\/[^/]+[.]json$/i.test(parsed.pathname)){
+       if(parsed.pathname.startsWith('/js/locales/') && parsed.pathname.endsWith('.json')){
         status('Служебный файл Telegram — возвращаю страницу…');
         queuedAction={name:'browser_goto',args:{session_id:session,url:recoveryUrl}};
        }
