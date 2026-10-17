@@ -42,6 +42,8 @@ async def test_chat_window_is_discoverable_as_mcp_app():
     assert legacy_v14.mimeType == CHAT_UI_MIME
     legacy_v15 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v15.html')
     assert legacy_v15.mimeType == CHAT_UI_MIME
+    legacy_v16 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v16.html')
+    assert legacy_v16.mimeType == CHAT_UI_MIME
     html = await mcp.read_resource(CHAT_UI_URI)
     assert 'ui/notifications/initialized' in str(html)
     assert 'tools/call' in str(html)
