@@ -6,7 +6,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from playwright.async_api import async_playwright
 
 import engine
 from engine import BrowserEngine
@@ -14,30 +13,24 @@ from engine import BrowserEngine
 
 @pytest.mark.asyncio
 async def test_accidental_telegram_locale_document_returns_to_app(monkeypatch):
+    # Exercise the real routing handler using a synthetic document request.
+    # Chromium's redirect handling can bypass catch-all fixture routes and
+    # contact Telegram; unit-level routing prevents touching a real account.
     monkeypatch.setattr(engine, 'memory_pressure', lambda: False)
     monkeypatch.setattr(engine, 'validate_url', lambda url: url)
-    browser_engine = BrowserEngine()
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True, args=['--disable-dev-shm-usage'])
-        try:
-            context = await browser.new_context(service_workers='block')
-            async def fixture_route(route):
-                # A single catch-all route intercepts *redirected* requests too:
-                # no test browser is allowed to contact real Telegram endpoints.
-                if route.request.url.split('?', 1)[0] == 'https://web.telegram.org/k/':
-                    await route.fulfill(
-                        status=200, content_type='text/html',
-                        body='<title>Telegram fixture</title><h1>Telegram home</h1>')
-                else:
-                    await browser_engine._route(route)
-            await context.route('**/*', fixture_route)
-            page = await context.new_page()
-            await page.goto('https://web.telegram.org/js/locales/en-us.json')
-            assert page.url == 'https://web.telegram.org/k/'
-            assert await page.locator('h1').inner_text() == 'Telegram home'
-            await context.close()
-        finally:
-            await browser.close()
+    route = SimpleNamespace(
+        request=SimpleNamespace(
+            url='https://web.telegram.org/js/locales/en-us.json',
+            resource_type='document', is_navigation_request=lambda: True),
+        fulfill=AsyncMock(), continue_=AsyncMock(), abort=AsyncMock())
+    await BrowserEngine()._route(route)
+    route.fulfill.assert_awaited_once_with(
+        status=302,
+        headers={'Location': 'https://web.telegram.org/k/',
+                 'Cache-Control': 'no-store'},
+        body='')
+    route.continue_.assert_not_awaited()
+    route.abort.assert_not_awaited()
 
 
 @pytest.mark.asyncio
