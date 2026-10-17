@@ -78,4 +78,8 @@ def test_private_widget_requires_explicit_field_pick_and_identity():
     assert "field_index:index,text:value" not in CHAT_HTML
     assert "select.value=previous;" in CHAT_HTML
     assert "else select.value='';" in CHAT_HTML
-    assert "Выберите поле (Phone Number, не Country)" in CHAT_HTML
+    assert "Касание на экране (универсальный ввод)" in CHAT_HTML
+    assert "secureAction('type_focused',{text:value})" in CHAT_HTML
+    assert 'id="secureValue"' in CHAT_HTML
+    assert CHAT_HTML.index('id="secureShot"') < CHAT_HTML.index('id="secureForm"')
+    assert CHAT_HTML.index('id="secureForm"') < CHAT_HTML.index('id="secureTelegram"')
