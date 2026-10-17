@@ -5,6 +5,7 @@ import os
 import secrets
 import asyncio
 import logging
+import re
 from contextlib import asynccontextmanager
 from urllib.parse import urlsplit
 
@@ -110,9 +111,15 @@ def _telegram_state_shape(state: dict) -> dict:
         return len(value) if isinstance(value, (list, dict)) else 0
     databases = [db for origin in origins if isinstance(origin, dict)
                  for db in (origin.get('indexedDB') or []) if isinstance(db, dict)]
-    telegram_dbs = [db for db in databases if db.get('name') == 'telegram']
+    # Telegram Web K uses tweb-common and tweb-account-N, in addition to
+    # legacy DBs. The encrypted session store is not a username or token.
+    telegram_dbs = [db for db in databases
+                    if isinstance(db.get('name'), str) and
+                    re.fullmatch(r'(telegram|tweb|tweb-common|tweb-account-[1-4])',
+                                 db['name'])]
     session_stores = [st for db in telegram_dbs for st in (db.get('stores') or [])
-                      if isinstance(st, dict) and st.get('name') == 'session']
+                      if isinstance(st, dict) and
+                      st.get('name') in ('session', 'session__encrypted')]
     return {
         'cookies': size(state.get('cookies')),
         'origins': len(origins),
