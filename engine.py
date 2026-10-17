@@ -824,6 +824,12 @@ class BrowserEngine:
                             await telegram_page.locator('#column-left').is_visible()
                             and not await telegram_page.locator('#auth-pages').is_visible())
                         if signed_in:
+                            ready = await self._telegram_indexeddb_auth_ready(telegram_page)
+                            if ready is False:
+                                # Do not release the owner or overwrite stored
+                                # auth before Telegram's IndexedDB transaction
+                                # has persisted the actual session record.
+                                raise RuntimeError('TelegramIndexedDBNotReady')
                             if self.profile_save_callback is None:
                                 raise RuntimeError('Постоянное хранилище недоступно')
                             state = await self._encrypted_profile_state(s)
