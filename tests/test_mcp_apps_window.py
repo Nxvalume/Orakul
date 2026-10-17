@@ -101,7 +101,7 @@ async def test_mcp_v3_browser_tap_metadata_and_fullscreen():
     assert opened.meta['ui']['visibility'] == ['model', 'app']
     assert tapped.meta['openai/widgetAccessible'] is True
     assert 'resourceUri' not in tapped.meta['ui']  # tapping should update current window
-    assert CHAT_UI_URI.endswith('browser-v16.html')
+    assert CHAT_UI_URI.endswith('browser-v17.html')
     resources = await mcp.list_resources()
     window = next(resource for resource in resources if str(resource.uri) == CHAT_UI_URI)
     assert window.meta['openai/ui']['availableDisplayModes'] == ['inline', 'fullscreen']
