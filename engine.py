@@ -586,13 +586,23 @@ class BrowserEngine:
                 # A prior owner approval is consumed once before interacting with the page.
                 s.approved_click = None
                 s.pending_click = None
-            await el.scroll_into_view_if_needed(timeout=TIMEOUT_MS)
-            bounds = await el.bounding_box(timeout=TIMEOUT_MS)
-            if bounds:
-                await self._move_cursor(s, bounds['x'] + bounds['width'] / 2,
-                                        bounds['y'] + bounds['height'] / 2)
             prior_pages = self._tab_pages(s)
-            await el.click(timeout=TIMEOUT_MS)
+            # Telegram WebA renders global-search results in a transformed mobile
+            # panel. Playwright reports them outside the viewport even when the
+            # result is visibly tappable. Only for these non-sensitive results,
+            # dispatch a normal DOM click instead of endless scroll attempts.
+            is_telegram_global_result = (urlsplit(s.page.url).hostname == 'web.telegram.org'
+                and selector.startswith('#LeftColumn-main > div:nth-of-type(2) > div:nth-of-type(2)')
+                and not sensitive)
+            if is_telegram_global_result:
+                await el.evaluate('(node) => node.click()', timeout=TIMEOUT_MS)
+            else:
+                await el.scroll_into_view_if_needed(timeout=TIMEOUT_MS)
+                bounds = await el.bounding_box(timeout=TIMEOUT_MS)
+                if bounds:
+                    await self._move_cursor(s, bounds['x'] + bounds['width'] / 2,
+                                            bounds['y'] + bounds['height'] / 2)
+                await el.click(timeout=TIMEOUT_MS)
             popups = [p for p in self._tab_pages(s) if all(p is not previous for previous in prior_pages)]
             if popups:
                 s.page = popups[-1]
