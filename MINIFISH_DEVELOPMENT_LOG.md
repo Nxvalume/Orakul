@@ -234,3 +234,15 @@ Implemented **on minifish-v02 only**:
 - Code milestone: `dda945d7d71751e999a0a3d9c005e2d7c04c9605`. Latest test and deploy status must be verified from GitHub Actions and Render; do not count synthetic country logic as proof of Telegram Web's live behavior.
 - Pending hands-on acceptance: Android must render v17, selected phone must be replaced (not appended), and Telegram Web should show country matching the entered `+` prefix. Do not request OTP or passwords in chat.
 
+
+## 2026-10-17 — Telegram restoration investigation after owner sign-in (v18 candidate)
+
+- Owner reported successfully signing in via Android MiniFish. `browser_telegram_status` subsequently returned `not_open` with encrypted profile `saved=true`. `browser_profiles` confirmed persistent `telegram` profile; `browser_open_profile('telegram')` completed but `browser_telegram_status` returned `login_required`. Therefore **no verified assistant access to Telegram yet**; do not read/send chat or claim authorization.
+- Render logs confirmed `MINIFISH_TELEGRAM_PROFILE_CHECKPOINT_OK` at 2026-10-17T12:02:27Z, followed by new process startup around 12:03Z. Storage encryption roundtrip is working; a saved record alone is **not** proof of re-authentication.
+- Reviewed official Telegram Web K architecture: IndexedDB, CacheStorage, localStorage and Web Workers. Reviewed Playwright 1.63 storageState capabilities, including OPFS support and separate sessionStorage handling. Root cause within persisted state vs Telegram re-authentication is not yet fully proven.
+- Implemented on `minifish-v02` without changing `main`:
+  - `engine.py`: for Telegram origin allow its Service Worker; other origins remain blocked. Request validation remains on the browser context routing handler. Export IndexedDB + OPFS and encrypted owner-only Telegram sessionStorage; restore sessionStorage only on exact `https://web.telegram.org` origin before navigation.
+  - `tests/test_telegram_complete_restore.py`: genuine Chromium synthetic Telegram-origin login roundtrip verifies sessionStorage + localStorage persistence without real credentials; existing privacy handoff expectation updated for `opfs=True`.
+  - No codes, passwords, cookies or raw storage exported via MCP tools or logs.
+- Commits: `35f8004`, `de9bc29`, `9df5660`. Three GitHub Actions workflows pass at `9df5660` (MiniFish CI, checks, stability CI).
+- Remaining: production Render latest observed `dep-db9luanbtjjs73c7g3ug` on old HEAD `ac06dc4`; verify new deploy. Only after deploying, test `browser_open_profile('telegram')`, `browser_telegram_status` and restart persistence without requesting secrets. Existing saved state may be incomplete and require new owner login if server cannot recover.
