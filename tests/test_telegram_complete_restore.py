@@ -71,9 +71,9 @@ async def test_telegram_owner_sessionstorage_restores_with_indexeddb_profile(mon
             await browser.close()
 
 
-def test_telegram_service_workers_are_enabled_only_for_telegram():
+def test_service_workers_remain_blocked_to_prevent_excess_memory_and_routing_bypass():
     import inspect
     from engine import BrowserEngine
     code = inspect.getsource(BrowserEngine.open)
-    assert "service_workers='allow' if is_telegram else 'block'" in code
+    assert "service_workers='block'" in code
     assert "location.origin !== 'https://web.telegram.org'" in code
