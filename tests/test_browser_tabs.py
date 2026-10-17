@@ -118,6 +118,28 @@ async def test_new_mcp_tabs_tools_are_widget_callable_without_spawning_duplicate
         assert "resourceUri" not in meta["ui"]
 
 
+async def seed_synthetic_telegram_indexeddb(page):
+    """Only a local fixture: one fake auth record, never a real login secret."""
+    await page.evaluate("""async () => {
+        await new Promise((resolve, reject) => {
+            const request = indexedDB.open('telegram', 1);
+            request.onupgradeneeded = () => {
+                request.result.createObjectStore('session');
+            };
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                const db = request.result;
+                const tx = db.transaction('session', 'readwrite');
+                tx.objectStore('session').put('synthetic-nonsecret', 'fixture');
+                tx.oncomplete = () => { db.close(); resolve(); };
+                tx.onerror = () => { db.close(); reject(tx.error); };
+            };
+        });
+    }""")
+
+
+
+
 @pytest.mark.asyncio
 async def test_background_authenticated_telegram_tab_is_checkpointed_before_owner_release():
     from unittest.mock import AsyncMock
@@ -130,6 +152,7 @@ async def test_background_authenticated_telegram_tab_is_checkpointed_before_owne
                 body="<title>Telegram</title><aside id='column-left'>test chat sidebar</aside>"))
             telegram = await context.new_page()
             await telegram.goto("https://web.telegram.org/k/", wait_until="domcontentloaded")
+            await seed_synthetic_telegram_indexeddb(telegram)
             unrelated = await context.new_page()
             await unrelated.set_content("<title>Other website</title>")
             eng = BrowserEngine()
@@ -182,6 +205,7 @@ async def test_background_telegram_tab_still_reports_login_and_storage_without_s
                 body="<title>Telegram test</title><aside id='column-left'>Test only</aside>"))
             telegram = await context.new_page()
             await telegram.goto('https://web.telegram.org/k/')
+            await seed_synthetic_telegram_indexeddb(telegram)
             other = await context.new_page()
             await other.set_content('<title>Other tab</title>')
             eng = BrowserEngine()
