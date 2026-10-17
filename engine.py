@@ -207,7 +207,7 @@ class BrowserEngine:
         target = urlsplit(request.url)
         if (request.is_navigation_request()
                 and target.hostname == 'web.telegram.org'
-                and re.fullmatch(r'/js/locales/[a-z0-9_-]+\\.json', target.path, re.I)):
+                and re.fullmatch(r'/js/locales/[a-z0-9_-]+[.]json', target.path, re.I)):
             await route.fulfill(
                 status=302,
                 headers={'Location': 'https://web.telegram.org/k/',
