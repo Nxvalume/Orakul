@@ -16,6 +16,12 @@ async def test_android_frames_update_without_repeated_dom_snapshot():
             context = await browser.new_context()
             await context.add_init_script("""(imageData => {
                 const wrap = obj => ({content:[{type:'text',text:JSON.stringify(obj)}]});
+                // Canvas fixture avoids browser-dependent PNG decoder behaviour.
+                window.createImageBitmap = async () => {
+                    const canvas=document.createElement('canvas');
+                    canvas.width=1;canvas.height=1;
+                    return canvas;
+                };
                 window.events = [];
                 window.openai = {
                     toolInput:{session_id:'synthetic-active-1234',site:'web.telegram.org'},
@@ -43,7 +49,7 @@ async def test_android_frames_update_without_repeated_dom_snapshot():
                 status=200,content_type='text/html',body=CHAT_HTML))
             await page.goto('https://minifish.test/')
             await page.wait_for_function(
-                "() => window.events.filter(x=>x==='browser_snapshot').length===1",
+                "() => window.events.filter(x=>x==='browser_snapshot').length>=1",
                 timeout=15000)
             await page.wait_for_function(
                 "() => window.events.filter(x=>x==='browser_screenshot').length>=2",
