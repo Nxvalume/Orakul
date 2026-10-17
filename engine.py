@@ -33,7 +33,7 @@ def session_idle_limit(session) -> int:
 TIMEOUT_MS = 15000
 
 
-def memory_pressure() -> bool:
+def memory_pressure(threshold: float = 0.80) -> bool:
     """Best-effort memory guard for 512-MiB Render instances; fail open elsewhere."""
     try:
         with open('/sys/fs/cgroup/memory.max', encoding='ascii') as f:
@@ -45,7 +45,7 @@ def memory_pressure() -> bool:
             return False
         with open('/sys/fs/cgroup/memory.current', encoding='ascii') as f:
             used = int(f.read(32).strip())
-        return used >= capacity * 0.80
+        return used >= capacity * threshold
     except (OSError, ValueError):
         return False
 
@@ -249,7 +249,8 @@ class BrowserEngine:
             context = await self._browser.new_context(
                     accept_downloads=False,
                     service_workers='block',
-                    viewport={'width': 960, 'height': 675},
+                    viewport={'width': 800, 'height': 560},
+                    device_scale_factor=1,
                     **({'storage_state': restored} if restored is not None else {}))
             await context.route('**/*', self._route)
             await context.add_init_script(CURSOR_INIT)
@@ -743,6 +744,16 @@ class BrowserEngine:
             raise ValueError('Браузерная сессия не найдена')
         # Background autosave should not keep an abandoned session alive.
         session.profile_name = name
+
+    async def screenshot_jpeg(self, sid: str) -> bytes:
+        """Compact CSS-pixel JPEG for Android: lower wire and worker memory than PNG."""
+        s = self.get(sid)
+        if memory_pressure(0.94):
+            raise TimeoutError('Недостаточно памяти для кадра')
+        async with s.lock:
+            return await s.page.screenshot(type='jpeg', quality=42,
+                                           scale='css', full_page=False,
+                                           timeout=TIMEOUT_MS)
 
     async def screenshot(self, sid: str) -> bytes:
         s = self.get(sid)
