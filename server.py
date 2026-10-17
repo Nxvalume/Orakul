@@ -81,6 +81,27 @@ mcp = FastMCP(
     ),
 )
 
+def _telegram_state_shape(state: dict) -> dict:
+    """Opaque, counts-only profile diagnostics, never expose stored auth values."""
+    if not isinstance(state, dict):
+        return {'cookies': 0, 'origins': 0, 'indexed_db': 0, 'opfs': 0, 'session_keys': 0}
+    origins = state.get('origins') or []
+    if not isinstance(origins, list):
+        origins = []
+    sessions = state.get('_minifish_session_storage') or {}
+    if not isinstance(sessions, dict):
+        sessions = {}
+    def size(value):
+        return len(value) if isinstance(value, (list, dict)) else 0
+    return {
+        'cookies': size(state.get('cookies')),
+        'origins': len(origins),
+        'indexed_db': sum(size(o.get('indexedDB')) for o in origins if isinstance(o, dict)),
+        'opfs': sum(size(o.get('opfs')) for o in origins if isinstance(o, dict)),
+        'session_keys': sum(size(v) for v in sessions.values()),
+    }
+
+
 async def _open_telegram(url: str) -> dict:
     """Attach to the live Telegram Chromium context before restoring a profile.
 
@@ -110,6 +131,11 @@ async def _open_telegram(url: str) -> dict:
     except ValueError:
         saved = None
     if saved and saved['site'] == 'web.telegram.org':
+        counts = _telegram_state_shape(saved.get('state'))
+        # Counts only; never log key names, cookies or storage content.
+        _log.info('MINIFISH_TELEGRAM_PROFILE_SHAPE cookies=%d origins=%d indexed_db=%d opfs=%d session_keys=%d',
+                  counts['cookies'], counts['origins'], counts['indexed_db'],
+                  counts['opfs'], counts['session_keys'])
         return await engine.open(url, storage_state=saved['state'], profile_name='telegram')
     return await engine.open(url)
 
