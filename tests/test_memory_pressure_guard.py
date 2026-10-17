@@ -66,3 +66,29 @@ async def test_gc_runs_without_closing_user_session(monkeypatch):
     cdp.send.assert_awaited_once_with('HeapProfiler.collectGarbage')
     cdp.detach.assert_awaited_once()
     assert 'owned' in browser._sessions
+
+
+@pytest.mark.asyncio
+async def test_compact_android_frame_uses_jpeg_at_css_scale(monkeypatch):
+    monkeypatch.setattr(engine_module, 'memory_pressure', lambda threshold=0.80: False)
+    page = SimpleNamespace(is_closed=lambda:False,
+                           screenshot=AsyncMock(return_value=b'jpeg-fixture'))
+    browser=BrowserEngine()
+    browser._sessions['frame']=Session(context=SimpleNamespace(),page=page)
+    result=await browser.screenshot_jpeg('frame')
+    assert result == b'jpeg-fixture'
+    page.screenshot.assert_awaited_once_with(
+        type='jpeg', quality=42, scale='css', full_page=False,
+        timeout=engine_module.TIMEOUT_MS)
+
+
+@pytest.mark.asyncio
+async def test_compact_android_frame_refuses_only_critical_memory(monkeypatch):
+    monkeypatch.setattr(engine_module, 'memory_pressure',
+                        lambda threshold=0.80: threshold <= 0.80)
+    page=SimpleNamespace(is_closed=lambda:False,
+                         screenshot=AsyncMock(return_value=b'jpeg'))
+    browser=BrowserEngine()
+    browser._sessions['frame']=Session(context=SimpleNamespace(),page=page)
+    assert await browser.screenshot_jpeg('frame') == b'jpeg'
+    page.screenshot.assert_awaited_once()
