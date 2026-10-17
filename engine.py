@@ -198,6 +198,22 @@ class BrowserEngine:
         except (ValueError, TypeError, asyncio.TimeoutError):
             await route.abort('blockedbyclient')
             return
+        # A Telegram locale JSON is a subresource, not an interactive page.
+        # Android touch/cached tabs may navigate directly to it and display
+        # thousands of untranslated strings. Redirect ONLY document navigation
+        # here; regular locale fetch/XHR must continue unchanged. Retain this
+        # in the one existing browser context (never create another session).
+        request = route.request
+        target = urlsplit(request.url)
+        if (request.is_navigation_request()
+                and target.hostname == 'web.telegram.org'
+                and re.fullmatch(r'/js/locales/[a-z0-9_-]+\\.json', target.path, re.I)):
+            await route.fulfill(
+                status=302,
+                headers={'Location': 'https://web.telegram.org/k/',
+                         'Cache-Control': 'no-store'},
+                body='')
+            return
         await route.continue_()
 
     async def open(self, url: str, *, storage_state: dict | None = None,
