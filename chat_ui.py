@@ -6,7 +6,7 @@ other secrets through model-visible tools. Private login stays owner-only.
 """
 from __future__ import annotations
 
-CHAT_UI_URI = "ui://minifish/browser-v20.html"
+CHAT_UI_URI = "ui://minifish/browser-v21.html"
 CHAT_UI_MIME = "text/html;profile=mcp-app"
 CHAT_UI_CSP = {"connectDomains": ["https://nxval-minifish-2026.onrender.com"]}
 # Helper tools are callable from the inline widget but do not open new widgets.
@@ -28,63 +28,90 @@ CHAT_HTML = r"""<!doctype html>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MiniFish в чате</title>
 <style>
-:root{color-scheme:dark;--bg:#111b27;--panel:#1d2939;--fg:#f2f6fc;--muted:#becbd9;--accent:#54b0fd}
+:root{color-scheme:dark;--bg:#111820;--panel:#253444;--fg:#f2f6fc;--muted:#b4c7d7;--accent:#69c4ff}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{font:14px/1.42 system-ui,sans-serif;margin:0;padding:12px;color:var(--fg);background:var(--bg)}
-header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between}
-h1{font-size:18px;margin:0}.status{font-size:12px;color:var(--muted);margin:7px 0}
+body{font:14px/1.42 system-ui,sans-serif;margin:0;padding:10px;color:var(--fg);background:var(--bg)}
+header{display:flex;align-items:center;gap:10px;justify-content:space-between}
+h1{font-size:17px;margin:0;letter-spacing:-.3px}.status{font-size:12px;color:var(--muted);margin:6px 0}
 aside{font-size:12px;color:#ffd5a4;margin:6px 0}
-.screen{position:relative;background:#0c121d;min-height:160px;border-radius:12px;overflow:hidden;display:grid;place-items:center}
-.screen canvas{display:block;width:100%;height:auto;max-height:420px;object-fit:contain;touch-action:manipulation}
-.controls{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
-.navtools{display:flex;gap:8px;margin:10px 0 2px}
-.navtools button{min-height:46px;flex:1;font-weight:600}
-button{background:var(--panel);color:var(--fg);border:1px solid #52657c;border-radius:9px;padding:10px 12px;min-height:42px;font:inherit;cursor:pointer}
+.browser-shell{border:1px solid #3f5367;border-radius:16px;overflow:hidden;background:#182430;box-shadow:0 8px 30px #0004}
+.browser-shell header,.browser-shell>#status{padding-left:10px;padding-right:10px}
+.screen{position:relative;background:#0c121d;min-height:220px;overflow:hidden;display:grid;place-items:center;border-top:1px solid #34495e}
+.screen canvas{display:block;width:100%;height:auto;max-height:min(62vh,610px);object-fit:contain;touch-action:none;cursor:crosshair}
+.screenhint{font-size:11px;color:var(--muted);margin:6px 10px}
+.controls{display:flex;gap:6px;flex-wrap:wrap;margin:8px 10px}
+.topbar{display:flex;align-items:center;gap:5px;margin:5px 8px 8px}
+.navtools{display:flex;gap:4px;flex:none}
+.topbar .navtools button{font-size:0;min-width:33px;width:33px;padding:0}
+.topbar #back::before{content:'←';font-size:19px}
+.topbar #forward::before{content:'→';font-size:19px}
+.topbar #reload{min-width:33px;width:33px;padding:0;font-size:21px}
+.topbar #navForm{min-width:0;flex:1;margin:0;display:block}
+.topbar #navForm>div{gap:4px!important}
+.topbar #navForm input{min-width:0;min-height:38px;background:#0f1b27;border-radius:18px;padding:8px 12px}
+.topbar #navForm button{min-height:38px;border-radius:18px;padding:8px 10px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+button{background:var(--panel);color:var(--fg);border:1px solid #52657c;border-radius:9px;padding:8px 11px;min-height:40px;font:inherit;cursor:pointer}
 button.primary{background:#24619b}
 button:disabled{opacity:.55;cursor:wait}
 input,select{border-radius:8px;border:1px solid #4b657f;background:#101927;color:var(--fg);min-height:42px;width:100%;padding:9px;font:inherit}
 form{margin-top:10px;display:grid;gap:8px}
 #actions{margin:9px 0;display:flex;gap:6px;flex-wrap:wrap;max-height:148px;overflow:auto}
 #actions button{font-size:12px;min-height:35px;padding:7px 10px}
-.tabstrip{display:flex;gap:5px;overflow-x:auto;align-items:center;margin:8px 0;padding:3px 0;scrollbar-width:thin}
+.tabstrip{display:flex;gap:5px;overflow-x:auto;align-items:center;margin:4px 8px;padding:3px 0;scrollbar-width:thin}
 .tabpill{display:flex;flex:none;max-width:175px;border:1px solid #52657c;border-radius:9px;overflow:hidden}
 .tabpill.active{border-color:#58acff;background:#213d5c}
 .tabpill button{border:0;border-radius:0;min-height:36px;font-size:12px;padding:7px}
 .tabpill button.tabname{max-width:138px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
 .tabpill button.tabclose{padding:7px;min-width:30px}
 .tabstrip>button{min-width:39px;flex:none;min-height:36px;padding:7px}
+.typebar{display:flex;gap:5px;align-items:center;margin:7px 8px 10px}
+.typebar select{max-width:30%;min-width:85px;min-height:38px;font-size:12px}
+.typebar input{min-width:0;min-height:38px;flex:1}
+.typebar button{min-height:38px;flex:none}
+.page-actions{margin:7px 10px}
+.page-actions summary{cursor:pointer;color:var(--muted);font-size:12px;padding:6px 0}
+.secure-navtools{margin:8px 0;display:flex;gap:6px}
+.secure-navtools button{flex:1}
+@media(max-width:410px){body{padding:5px}.topbar{margin:5px}.topbar .navtools button{min-width:30px;width:30px}.topbar #navForm button{padding:8px}.typebar select{min-width:78px}.typebar button{padding:8px}}
 small{color:var(--muted)}
 a{color:#93c9ff}
 </style></head>
 <body>
+<div class="browser-shell">
 <header><h1>MiniFish · браузер</h1><span id="site" class="status">Подключение…</span></header>
 <p id="status" class="status" role="status">Подключаю интерфейс ChatGPT…</p>
+<div id="tabs" class="tabstrip" role="group" aria-label="Вкладки браузера">Загрузка вкладок…</div>
+<div id="topbar" class="topbar">
 <nav id="navigationBar" class="navtools" aria-label="История посещений">
 <button id="back" type="button" aria-label="Назад на предыдущую страницу">← Назад</button>
 <button id="forward" type="button" aria-label="Вперёд на следующую страницу">Вперёд →</button>
 </nav>
-<form id="navForm"><label for="navUrl">Поиск или адрес сайта</label>
+<form id="navForm"><label class="sr-only" for="navUrl">Поиск или адрес сайта</label>
 <div style="display:flex;gap:7px;align-items:center">
 <input id="navUrl" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Поиск, например: телеграмм" required>
 <button class="primary" type="submit">Найти</button></div></form>
-<div id="tabs" class="tabstrip" role="group" aria-label="Вкладки браузера">Загрузка вкладок…</div>
+<button id="reload" type="button" aria-label="Перезагрузить страницу" title="Перезагрузить">⟳</button>
+</div>
 <div class="screen" id="screen"><canvas id="shot" role="img" aria-label="Интерактивный кадр браузера MiniFish" style="cursor:crosshair"></canvas><span id="noimage" class="status">Загрузка кадра…</span></div>
-<p class="status">Нажимай прямо на экран браузера. Для выбора полей и кнопок используется настоящий курсор Playwright. Изображение обновляется автоматически, пока окно открыто.</p>
+<p class="screenhint">Касание — нажать на странице · жест вверх/вниз — прокрутить · колёсико мыши тоже работает.</p>
+<form id="form" class="typebar">
+<label class="sr-only" for="field">Поле страницы — обычный текст</label>
+<select id="field" aria-label="Поле страницы"><option value="">Загружаю поля…</option></select>
+<input id="text" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Текст в поле страницы">
+<button id="fill" type="submit" class="primary">Ввести</button>
+</form>
 <div class="controls" id="publicControls">
 <button id="refresh" class="primary">Обновить экран</button>
 <button id="telegramHome" type="button">Вернуться в Telegram</button>
-<button id="reload">Перезагрузить</button>
 <button type="button" id="left" aria-label="Прокрутить страницу влево">⇠ Влево</button><button type="button" id="right" aria-label="Прокрутить страницу вправо">Вправо ⇢</button>
 <button id="up">↑</button><button id="down">↓</button>
 </div>
+<details class="page-actions" id="pageActions"><summary>Кнопки и ссылки на странице</summary>
 <div id="actions" aria-label="Доступные действия на странице"></div>
-<form id="form">
-<label for="field">Поле страницы — обычный текст</label>
-<select id="field"><option value="">Сначала загрузите страницу</option></select>
-<input id="text" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Тестовый текст или поисковый запрос">
-<button id="fill" type="submit">Ввести в выбранное поле</button>
-</form>
+</details>
+</div>
 <details id="securePanel" style="margin-top:14px;padding:12px;border:1px solid #647b94;border-radius:12px">
 <summary style="font-weight:600;cursor:pointer;padding:5px">Защищённый ввод · Telegram и другие сайты</summary>
 <p class="status">Вход в этом окне отправляется напрямую по HTTPS в MiniFish, мимо инструментов модели. Пароли и коды не публикуются в чате.</p>
@@ -99,7 +126,7 @@ a{color:#93c9ff}
 </div>
 <div id="secureTools" hidden>
 <p id="secureStatus" class="status" role="status">Личный режим включён</p>
-<nav id="secureNavigationBar" class="navtools" aria-label="История личного браузера">
+<nav id="secureNavigationBar" class="secure-navtools" aria-label="История личного браузера">
 <button id="secureBack" type="button" aria-label="Назад на предыдущую страницу">← Назад</button>
 <button id="secureForward" type="button" aria-label="Вперёд на следующую страницу">Вперёд →</button>
 </nav>
@@ -159,6 +186,7 @@ a{color:#93c9ff}
  function publicView(enabled){
   $('screen').hidden=!enabled;$('publicControls').hidden=!enabled;
   $('tabs').hidden=!enabled;
+  $('topbar').hidden=!enabled;$('pageActions').hidden=!enabled;
   $('navigationBar').hidden=!enabled;
   $('navForm').hidden=!enabled;
   $('actions').hidden=!enabled;$('form').hidden=!enabled;
@@ -265,6 +293,42 @@ a{color:#93c9ff}
   const x=(event.clientX-left)/w*canvas.width;
   const y=(event.clientY-top)/h*canvas.height;
   return x>=0&&y>=0&&x<canvas.width&&y<canvas.height?{x,y}:null;
+ }
+ function bindRemoteGesture(canvas,onTap,onScroll){
+  // The canvas is a remote browser viewport, not an image to pan locally.
+  // Pointer capture means an Android swipe still finishes outside the image.
+  let start=null,suppressClickUntil=0,lastWheel=0;
+  canvas.addEventListener('pointerdown',event=>{
+   if(!event.isPrimary)return;
+   start={id:event.pointerId,x:event.clientX,y:event.clientY};
+   try{canvas.setPointerCapture(event.pointerId)}catch(ignore){}
+  });
+  canvas.addEventListener('pointercancel',()=>{start=null});
+  canvas.addEventListener('pointerup',event=>{
+   if(!start||event.pointerId!==start.id)return;
+   const dx=event.clientX-start.x,dy=event.clientY-start.y;
+   start=null;suppressClickUntil=Date.now()+550;
+   if(Math.hypot(dx,dy)<24){onTap(event);return}
+   event.preventDefault();
+   const rect=canvas.getBoundingClientRect();
+   const scale=Math.min(rect.width/canvas.width,rect.height/canvas.height)||1;
+   const horizontal=Math.abs(dx)>Math.abs(dy)*1.15;
+   const pixels=Math.round(Math.max(-900,Math.min(900,-(horizontal?dx:dy)/scale)));
+   if(Math.abs(pixels)>20)onScroll(pixels,horizontal?'horizontal':'vertical');
+  });
+  canvas.addEventListener('click',event=>{
+   if(Date.now()>=suppressClickUntil)onTap(event);
+  });
+  canvas.addEventListener('wheel',event=>{
+   // Wheel / trackpad scrolling should move the page inside Chromium.
+   if(event.ctrlKey)return;
+   event.preventDefault();
+   if(Date.now()-lastWheel<120)return;
+   lastWheel=Date.now();
+   const horizontal=Math.abs(event.deltaX)>Math.abs(event.deltaY);
+   const pixels=Math.round(Math.max(-900,Math.min(900,horizontal?event.deltaX:event.deltaY)));
+   if(pixels)onScroll(pixels,horizontal?'horizontal':'vertical');
+  },{passive:false});
  }
  function bridge(method,params){
   const id=nextId++;return Promise.race([new Promise((resolve,reject)=>{
@@ -540,15 +604,18 @@ a{color:#93c9ff}
     b.onclick=()=>act('browser_click',{session_id:session,css_selector:el.selector});
     actions.appendChild(b);
    }
-   const select=$('field');select.replaceChildren();
+   const select=$('field'),previous=select.value;select.replaceChildren();
    const fields=arr.filter(e=>(e.tag==='input'||e.tag==='textarea')&&
-     !['password','hidden','submit','button','checkbox','radio','file'].includes(e.type));
+     !['password','hidden','submit','button','checkbox','radio','file'].includes(e.type)&&
+     !/password|passwd|otp|one.time|pin|secret|token|card|cvv|cvc/i.test(
+       [e.name,e.id,e.placeholder].filter(Boolean).join(' ')));
    for(const el of fields.slice(0,25)){
     const opt=document.createElement('option');opt.value=el.selector;
     opt.textContent=el.placeholder||el.name||el.id||'Поле '+(el.i+1);
     select.appendChild(opt);
    }
    if(!select.options.length){const opt=document.createElement('option');opt.value='';opt.textContent='Нет обычных полей';select.appendChild(opt)}
+   else if(previous&&Array.from(select.options).some(opt=>opt.value===previous))select.value=previous;
    status('Готово · '+(result.title||$('site').textContent));
   }catch(e){
    if(ownerDenied(e)){lockPrivateView('Личный режим активен — просмотр только после входа владельца MiniFish.');}
@@ -589,7 +656,15 @@ a{color:#93c9ff}
   }
   busy=true;status('Выполняю действие…');
   try{
-   await call(name,args);needsDomRead=true;status('Выполнено');busy=false;await render();
+   const outcome=data(await call(name,args));
+   if(name==='browser_tap'&&outcome.clicked){
+    const field=$('field');
+    if(Array.from(field.options).some(opt=>opt.value===outcome.clicked)){
+     field.value=outcome.clicked;
+     $('text').focus(); // Open Android keyboard for the selected ordinary field.
+    }
+   }
+   needsDomRead=true;status('Выполнено');busy=false;await render();
   }catch(e){busy=false;if(ownerDenied(e))lockPrivateView('Личный режим активен — управление через защищённую панель.');
    else if(!secureToken&&!privateLocked)status('Ошибка: '+String(e.message||e).slice(0,140))}
  }
@@ -613,12 +688,13 @@ a{color:#93c9ff}
    act('browser_goto',{session_id:session,url});
   }catch(error){status('Ошибка поиска или адреса: '+String(error.message||error).slice(0,110))}
  };
- $('shot').onclick=e=>{
+ bindRemoteGesture($('shot'),e=>{
   if(!session||busy||secureToken)return;
   const p=positionOnCanvas($('shot'),e);
   if(!p)return;
   act('browser_tap',{session_id:session,x:Math.floor(p.x),y:Math.floor(p.y)});
- };
+ },(pixels,axis)=>{if(session&&!secureToken&&!privateLocked)
+  act('browser_scroll',{session_id:session,pixels,axis});});
  setInterval(()=>{
   if(session&&!busy&&!secureToken&&!privateLocked&&document.visibilityState!=='hidden')
     render();
@@ -828,7 +904,7 @@ $('secureLeft').onclick=()=>secureAction('scroll',{pixels:-420,axis:'horizontal'
  $('secureValue').addEventListener('focus',()=>{
   if(!$('secureFieldAdvanced').open)$('secureField').value='';
  });
- $('secureShot').onclick=e=>{
+ bindRemoteGesture($('secureShot'),e=>{
   if(!secureToken)return;
   const p=positionOnCanvas($('secureShot'),e);
   if(!p)return;
@@ -838,7 +914,7 @@ $('secureLeft').onclick=()=>secureAction('scroll',{pixels:-420,axis:'horizontal'
   // Tapping the canvas is the universal way to choose a destination.
   $('secureField').value='';
   secureAction('click',{x,y});
- };
+ },(pixels,axis)=>{if(secureToken)secureAction('scroll',{pixels,axis});});
  $('secureFinish').onclick=async()=>{
   if(!secureToken)return;
   try{

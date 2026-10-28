@@ -50,6 +50,8 @@ async def test_chat_window_is_discoverable_as_mcp_app():
     assert legacy_v18.mimeType == CHAT_UI_MIME
     legacy_v19 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v19.html')
     assert legacy_v19.mimeType == CHAT_UI_MIME
+    legacy_v20 = next(r for r in resources if str(r.uri) == 'ui://minifish/browser-v20.html')
+    assert legacy_v20.mimeType == CHAT_UI_MIME
     html = await mcp.read_resource(CHAT_UI_URI)
     assert 'ui/notifications/initialized' in str(html)
     assert 'tools/call' in str(html)
@@ -107,7 +109,7 @@ async def test_mcp_v3_browser_tap_metadata_and_fullscreen():
     assert opened.meta['ui']['visibility'] == ['model', 'app']
     assert tapped.meta['openai/widgetAccessible'] is True
     assert 'resourceUri' not in tapped.meta['ui']  # tapping should update current window
-    assert CHAT_UI_URI.endswith('browser-v20.html')
+    assert CHAT_UI_URI.endswith('browser-v21.html')
     resources = await mcp.list_resources()
     window = next(resource for resource in resources if str(resource.uri) == CHAT_UI_URI)
     assert window.meta['openai/ui']['availableDisplayModes'] == ['inline', 'fullscreen']
