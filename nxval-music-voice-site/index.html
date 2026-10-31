@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0d120f">
+  <meta name="description" content="NXVAL Music — независимая музыкальная студия с голосом, проектами, микшером и экспортом WAV.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <style>
+:root{color-scheme:dark;--bg:#0b100d;--panel:#171f19;--panel2:#202b22;--line:#394538;--ink:#f3f8f0;--muted:#91a290;--lime:#d4ff71;--lime2:#b5e54b;--red:#f1a6a4;--radius:17px;font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse 70% 480px at 50% -150px,#344b30 0%,var(--bg) 80%);color:var(--ink);font-size:15px;padding:0 0 100px}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}a{color:inherit;text-decoration:none}.shell{width:min(100%,900px);margin:auto;padding:0 18px}.header{height:76px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #293429}.brand{display:flex;align-items:center;gap:12px;letter-spacing:2px}.brand-symbol{display:grid;place-items:center;width:46px;height:46px;background:var(--lime);color:#12200f;border-radius:13px;font-size:25px;font-weight:900;letter-spacing:-4px;padding-right:4px}.brand-muted{color:#a3b09c}.brand small{display:block;color:var(--lime2);font:10px monospace;letter-spacing:2px;margin-top:4px}.status{display:flex;gap:8px;align-items:center;font:10px monospace;color:var(--lime);letter-spacing:1px}.led{width:7px;height:7px;background:var(--lime);border-radius:50%;box-shadow:0 0 9px var(--lime)}.hero{padding:50px 0 42px}.eyebrow,.kicker,.label-small{font:12px monospace;letter-spacing:2.4px;color:#b4d88b}.hero h1{font-size:clamp(37px,8vw,68px);letter-spacing:-2.5px;line-height:1.1;margin:15px 0 12px}.hero h1 em,.section-top h2 em{color:var(--lime);font-style:normal}.hero p{font-size:17px;color:#b3c0b1;line-height:1.55;max-width:500px}.hero-pill{display:inline-flex;align-items:center;gap:10px;font-size:12px;color:#baccaf;background:#18251c;padding:9px 13px;border:1px solid #2e4930;border-radius:30px}.hero-pill span{color:var(--lime)}.pane{display:none}.pane.active{display:block}.section-top{margin:24px 0 14px;display:flex;align-items:end;justify-content:space-between;gap:12px}.section-top h2{font-size:clamp(31px,6vw,41px);letter-spacing:-1.2px;margin:6px 0 0}.surface{background:linear-gradient(145deg,#1b271d,#182119 70%);border:1px solid #354534;border-radius:20px;padding:clamp(16px,4vw,28px);box-shadow:0 16px 55px #050a0560}.gap{display:flex;flex-direction:column;gap:16px}.field-label-line{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.field-label-line label,.surface>label:not(.btn):not(.check),.config-grid label,.compact-label{font:12px monospace;letter-spacing:1px;color:#b9c5b7}.field-tools{display:flex;align-items:center;gap:7px}.field-link,.clear-btn{border:1px solid #506047;background:#263126;color:#c9e1c2;padding:7px 10px;border-radius:8px;font-size:12px}.clear-btn{color:#f1b3b0;border-color:#654340}.clear-btn:hover{background:#452d2b}.field-link:hover{color:var(--lime)}textarea,input:not([type="checkbox"]):not([type="file"]):not([type="range"]),select{width:100%;color:var(--ink);background:#101711;border:1px solid #3d503c;border-radius:11px;padding:14px 16px;outline:none}textarea:focus,input:focus,select:focus{border-color:var(--lime);box-shadow:0 0 0 3px #bdf96520}textarea{resize:vertical;line-height:1.65;min-height:150px}.longfield{min-height:180px}.lyrics-field{min-height:330px}.delivery-field{min-height:320px}.hintline{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;color:#8e9d8b;font-size:12px;line-height:1.45}.divider{height:1px;background:#384738;margin:5px 0}.label-small{margin:0}.genre-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.chip{min-height:65px;padding:10px;background:#243027;color:#aab8a8;border:1px solid #41513f;border-radius:11px;font-weight:550;text-align:center}.chip.active{background:#334c2b;border:1px solid var(--lime);color:var(--lime);box-shadow:0 0 0 1px #d4ff7142 inset}.config-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px}.config-grid label{display:flex;flex-direction:column;gap:9px}.config-grid input,.config-grid select{height:52px}.surface>label:not(.btn):not(.check){display:block}.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #52654c;border-radius:11px;padding:13px 16px;background:transparent;color:var(--ink);font-size:14px;font-weight:700;min-height:49px;text-align:center}.btn.primary{background:var(--lime);color:#17230d;border-color:var(--lime);font-weight:800}.btn.primary:hover{background:#e3ff9b}.btn.secondary{background:#263027}.btn.subtle{font-weight:550;min-height:40px;color:var(--lime)}.btn.danger{background:#663c3b;color:#fff;border-color:#bb6462}.btn.xl{min-height:59px;font-size:16px}.action-stack{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 28px}.buttons-pair{display:flex;gap:10px;flex-wrap:wrap}.buttons-pair>*{flex:1;min-width:125px}.upload-label{cursor:pointer}.toolbar-line{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}.check{display:flex;align-items:center;gap:9px;color:#d7e7cf}.check input{accent-color:var(--lime);width:19px;height:19px}.compact-label{display:flex;align-items:center;gap:10px}.compact-label select{padding:9px;min-width:104px}.flow-status{font:12px/1.6 monospace;color:#a4d78b;background:#233023;border:1px solid #3c5940;border-radius:10px;padding:12px}.callout{background:linear-gradient(145deg,#2a3b27,#202e21);padding:17px;border-radius:13px;border:1px solid #465d3b;line-height:1.52}.callout strong{color:#e4f6d5}.callout p{color:#adbda9;margin:7px 0 0}.muted{color:#9db099;line-height:1.55}.surface h3{font-size:18px;margin:4px 0}.asset-list{display:flex;flex-direction:column;gap:11px}.asset{border:1px solid #435840;background:#121b14;padding:13px;border-radius:13px}.asset-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.asset-head strong{overflow-wrap:anywhere}.asset small{color:#9caf99}.asset-buttons{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.asset-buttons .btn{min-height:35px;padding:8px 10px;font-size:12px}.asset audio{width:100%;margin-top:8px;height:41px}.empty{color:#8ba085;font-style:italic;margin:0}.record-info{font-size:12px;color:#acc19d;background:#121a14;border-radius:9px;padding:11px;border:1px solid #344434}.record-info.recording{border-color:#d55c5c;color:#ffbbb8}.panel-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.tag{font:10px monospace;color:var(--lime);letter-spacing:2px}.time-display{font:24px monospace;color:var(--lime)}.transport{display:flex;align-items:center;gap:12px}.transport-main{display:grid;place-items:center;width:60px;height:60px;border:0;border-radius:50%;background:var(--lime);color:#111b0d;font-size:27px}.song-map{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;max-height:190px;overflow:auto}.bar{height:35px;background:#405c3b;border:1px solid #627e54;border-radius:4px;display:grid;place-items:center;color:#d7efcc;font:10px monospace}.bar.chorus{background:#6d7034;border-color:#a0a54a}.bar.current{border:2px solid var(--lime);box-shadow:0 0 12px #d4ff7199}.mix-tracks{display:flex;flex-direction:column;gap:12px}.mix-row{padding:13px;border:1px solid #394b36;border-radius:12px;background:#172218}.mix-row>div{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}.mix-row strong{font-size:14px}.mix-actions{display:flex;gap:6px}.mix-actions button{min-width:34px;border:1px solid #52684b;border-radius:6px;background:#253326;color:#ecf5e5;padding:6px}.mix-actions button.active{background:var(--lime);color:#0e1709}.mix-row input[type="range"],#masterVol{width:100%;accent-color:var(--lime)}.link-button{display:flex}footer{margin-top:40px;display:flex;justify-content:space-between;align-items:center;padding:25px 0;border-top:1px solid #273628;color:#9cac94;font:11px monospace;letter-spacing:2px}footer strong{color:var(--lime);font-size:23px}footer span{color:#6d8468}.bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:space-around;gap:3px;background:#121914ee;border-top:1px solid #2c3a2d;backdrop-filter:blur(18px);padding:8px max(6px,env(safe-area-inset-right)) calc(9px + env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));box-shadow:0 -12px 30px #050a059a}.tab{flex:1;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;padding:9px 2px;border:0;background:transparent;color:#8da188;border-radius:14px;max-width:100px}.tab.active{background:#263628;color:var(--lime)}.tab span{font-size:23px}.tab small{font-size:10px}.toast{position:fixed;z-index:90;left:50%;transform:translateX(-50%);bottom:100px;padding:13px 18px;border:1px solid #6d8b51;border-radius:12px;background:#273c26;color:#e5ffd1;box-shadow:0 6px 30px #0009;min-width:min(90vw,280px);text-align:center}.modal{padding:0;background:#1c281e;color:var(--ink);border:1px solid #628052;border-radius:18px;max-width:min(92vw,530px);width:100%;box-shadow:0 20px 70px #000a}.modal::backdrop{background:#010701b8}.modal-body{padding:20px;display:flex;flex-direction:column;gap:18px}.modal-body p{color:#a7b6a3;line-height:1.55}.editor-modal{width:96vw;max-width:100vw;height:94dvh;max-height:94dvh}.editor-modal .modal-body{height:100%;padding:15px}.editor-modal textarea{flex:1;min-height:0;resize:none;font-size:16px}.editor-modal h3{margin:0}.hidden{display:none!important}@media(max-width:560px){.shell{padding:0 14px}.status{font-size:9px}.hero{padding:34px 0 24px}.hero p{font-size:15px}.section-top{align-items:center}.section-top .btn{font-size:12px;padding:10px}.genre-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.chip{min-height:56px}.config-grid{gap:11px}.config-grid label{font-size:10px}.config-grid input,.config-grid select{font-size:14px;padding:10px}.field-tools{margin-left:auto}.action-stack{grid-template-columns:1fr}.bottom-nav{gap:0}.tab small{font-size:9px}.tab span{font-size:21px}.transportDesc{font-size:11px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+.mic-steps{font-size:14px;line-height:1.55;color:#d9e5d5;background:#121a14;padding:14px;border:1px solid #50634a;border-radius:11px;white-space:pre-line}.record-info.error{border-color:#bc6b67;color:#ffd5d0;background:#382522}.record-info a{color:var(--lime)}
+
+</style>
+  <title>NXVAL Music · Voice Studio</title>
+</head>
+<body>
+  <div class="shell">
+    <header class="header">
+      <a class="brand" href="#create" aria-label="NXVAL Music, создать"><span class="brand-symbol">N.</span><span><strong>NXVAL</strong> <span class="brand-muted">MUSIC</span><small>VOICE STUDIO · V1</small></span></a>
+      <span class="status"><span class="led"></span><span>FREE · LOCAL-FIRST</span></span>
+    </header>
+    <main>
+      <section class="hero">
+        <div class="eyebrow">ТВОЯ МУЗЫКА · ТВОЙ ГОЛОС</div>
+        <h1>Создавай. <em>Звучишь ты.</em></h1>
+        <p>Минус, текст, подача, записи и проекты — в одной студии. Без обязательной регистрации.</p>
+        <div class="hero-pill"><span>✦</span> Всё сохраняется в этом браузере</div>
+      </section>
+      <section id="pane-create" class="pane active" aria-labelledby="tab-create">
+        <div class="section-top"><div><span class="kicker">01 / SOUND DESIGN</span><h2>Создать трек.</h2></div><button class="btn subtle" id="surprise" type="button">✦ Удиви меня</button></div>
+        <div class="surface gap">
+          <div class="field-label-line"><label for="stylePrompt">МИНУС / СТИЛЬ МУЗЫКИ</label><div class="field-tools"><button class="field-link" data-expand="stylePrompt" type="button">⤢ Развернуть</button><button class="clear-btn" type="button" data-clear="stylePrompt">✕ Очистить</button></div></div>
+          <textarea id="stylePrompt" class="longfield" rows="5" placeholder="Опиши минус: темп, инструменты, бас, атмосферу..."></textarea>
+          <div class="hintline"><span>Детальные настройки можно писать без жёсткого лимита.</span><span data-count="stylePrompt">0 симв.</span></div>
+          <div class="divider"></div>
+          <p class="label-small">ВЫБЕРИ АТМОСФЕРУ</p>
+          <div class="genre-grid" id="genreGrid">
+            <button class="chip" type="button" data-genre="Indie Pop">✳ Indie Pop</button>
+            <button class="chip" type="button" data-genre="Afro House">◎ Afro House</button>
+            <button class="chip" type="button" data-genre="Cinematic">◇ Cinematic</button>
+            <button class="chip" type="button" data-genre="Lo-Fi">♫ Lo-Fi</button>
+            <button class="chip" type="button" data-genre="Synthwave">◌ Synthwave</button>
+            <button class="chip" type="button" data-genre="Hip-Hop">▥ Hip-Hop</button>
+            <button class="chip" type="button" data-genre="NXVAL Bass-Rap">ϟ NXVAL Bass-Rap</button>
+          </div>
+          <div class="config-grid">
+            <label>ТЕМП / BPM<input id="bpm" inputmode="numeric" type="number" min="60" max="200" value="92"></label>
+            <label>ТОНАЛЬНОСТЬ<select id="key"><option>Am</option><option>C</option><option>Dm</option><option>Em</option><option>G</option><option>F</option><option>Bm</option><option>D</option><option selected>Fm</option><option>Gm</option><option>C#m</option></select></label>
+            <label>ДЕМО-ДЛИНА<select id="bars"><option value="8">8 тактов</option><option value="16">16 тактов</option><option value="24" selected>24 такта</option></select></label>
+            <label>ДЛИНА AI-ПЕСНИ<select id="duration"><option value="30">30 секунд</option><option value="60">1 минута</option><option value="90">1:30</option><option value="120">2 минуты</option><option value="150">2:30</option><option value="180" selected>3 минуты</option></select></label>
+          </div>
+        </div>
+        <div class="section-top"><div><span class="kicker">02 / VOCAL DIRECTOR</span><h2>Текст <em>&</em> подача.</h2></div></div>
+        <div class="surface gap">
+          <div class="field-label-line"><label for="lyrics">ТЕКСТ ПЕСНИ / LYRICS</label><div class="field-tools"><button class="field-link" data-expand="lyrics" type="button">⤢ Развернуть</button><button class="clear-btn" type="button" data-clear="lyrics">✕ Очистить</button></div></div>
+          <textarea id="lyrics" class="longfield lyrics-field" rows="11" placeholder="[Verse 1]&#10;Напиши текст песни...&#10;&#10;[Chorus]&#10;Припев..."></textarea>
+          <div class="hintline"><span>Метки [Verse], [Chorus], [Final Chorus]</span><span data-count="lyrics">0 симв.</span></div>
+          <div class="toolbar-line"><label class="check"><input id="noTalk" type="checkbox" checked> NO TALK · без разговоров</label><label class="compact-label">СТРОКА <select id="lineBars"><option value="1" selected>1 такт</option><option value="2">2 такта</option></select></label></div>
+          <div class="flow-status" id="flowStatus">Вставь текст — здесь появится оценка длительности.</div>
+          <div class="divider"></div>
+          <p class="label-small">РЕЖИССУРА ВОКАЛА</p>
+          <div class="config-grid config-grid-two">
+            <label>МАНЕРА<select id="delivery"><option>Мелодично / певуче</option><option selected>Рэп / чёткий флоу</option><option>Мощно / вокальный надрыв</option><option>Разговорный речитатив</option></select></label>
+            <label>ТИП ГОЛОСА<select id="voiceType"><option>На усмотрение AI</option><option selected>Мужской</option><option>Женский</option><option>Низкий / бархатный</option></select></label>
+            <label>ЭМОЦИЯ<select id="emotion"><option>Искренне / тепло</option><option selected>Уверенно / дерзко</option><option>Драматично / напряжённо</option><option>Светло / вдохновляюще</option></select></label>
+            <label>ЯЗЫК<select id="language"><option>Автоматически</option><option selected>Русский</option><option>English</option><option>Deutsch</option><option>Français</option></select></label>
+          </div>
+          <div class="field-label-line"><label for="deliveryPrompt">СВОИ УКАЗАНИЯ ПО ПОДАЧЕ</label><div class="field-tools"><button class="field-link" data-expand="deliveryPrompt" type="button">⤢ Развернуть</button><button class="clear-btn" data-clear="deliveryPrompt" type="button">✕ Очистить</button></div></div>
+          <textarea id="deliveryPrompt" class="longfield delivery-field" rows="9" placeholder="Тембр, дикция, смены флоу, ограничения, акценты..."></textarea>
+          <div class="hintline"><span>Большое поле с изменяемой высотой. Настройки — подсказка модели, не гарантия.</span><span data-count="deliveryPrompt">0 симв.</span></div>
+        </div>
+        <div class="action-stack"><button id="saveProjectFromCreate" class="btn primary xl" type="button">✦ Сохранить проект</button><button id="createDemo" class="btn secondary xl" type="button">◉ Создать демо-аранжировку</button></div>
+      </section>
+      <section id="pane-voice" class="pane" aria-labelledby="tab-voice">
+        <div class="section-top"><div><span class="kicker">03 / MY VOICE</span><h2>Мой <em>голос.</em></h2></div></div>
+        <div class="surface gap">
+          <div class="callout"><strong>Используй собственный вокал.</strong><p>Запиши голос с микрофона или загрузи аудиофайл. Записи можно сохранить, прослушать и добавить к минусу. Загрузка образца сама по себе не создаёт AI-клон голоса: для этого нужна совместимая модель с поддержкой voice cloning.</p></div>
+          <label for="voiceName">ИМЯ ГОЛОСА</label><input id="voiceName" placeholder="Например: NXVAL — основной голос" value="Мой голос">
+          <div class="buttons-pair"><button id="recordVoice" class="btn secondary" type="button">● Записать голос</button><label class="btn secondary upload-label" for="uploadVoice">↑ Загрузить аудио<input id="uploadVoice" type="file" accept="audio/*" hidden></label></div>
+          <div id="recordInfo" class="record-info" aria-live="polite">Для записи открой студию по HTTPS или через localhost, затем разреши микрофон. Если открыта скачанная HTML-страница, запись может блокироваться браузером.</div>
+          <h3>Мои образцы голоса</h3><div id="voiceList" class="asset-list"><p class="empty">Пока нет сохранённых образцов.</p></div>
+        </div>
+        <div class="surface gap">
+          <h3>Запись вокала для трека</h3><p class="muted">Выбери готовый образец или запиши дубль. Аудио можно добавить в микшер, выставить начало и включить в экспорт.</p>
+          <label>НАЧАЛО ВОКАЛА, СЕКУНДЫ<input id="takeOffset" type="number" min="0" max="360" step="0.1" value="0"></label>
+          <button id="recordTake" class="btn primary" type="button">● Записать вокальный дубль</button>
+          <label class="btn secondary upload-label" for="uploadTake">↑ Или загрузить готовый вокал<input id="uploadTake" type="file" accept="audio/*" hidden></label>
+          <div id="takeInfo" class="record-info" aria-live="polite">При записи дубля запускается минус. Используй наушники. Для микрофона нужен HTTPS или localhost.</div>
+          <h3>Дубли в проекте</h3><div id="takesList" class="asset-list"><p class="empty">Вокальных дублей пока нет.</p></div>
+        </div>
+      </section>
+      <section id="pane-studio" class="pane" aria-labelledby="tab-studio">
+        <div class="section-top"><div><span class="kicker">04 / ARRANGEMENT</span><h2>Студия <em>аранжировки.</em></h2></div></div>
+        <div class="surface gap">
+          <div class="panel-row"><div><span class="tag">LIVE WEB AUDIO</span><h3 id="currentTrackName">Новая сессия</h3><p class="muted">Оригинальная синтезированная демо-аранжировка</p></div><div id="position" class="time-display">0:00</div></div>
+          <div class="transport"><button id="playBtn" class="transport-main" type="button">▶</button><button id="stopBtn" class="btn secondary" type="button">■ Стоп</button><span id="transportDesc" class="muted">24 такта · 92 BPM</span></div>
+          <div id="songMap" class="song-map" aria-label="Карта трека"></div>
+          <div class="buttons-pair"><button id="exportWav" class="btn primary" type="button">↓ Экспорт WAV</button><button id="saveProjectFromStudio" class="btn secondary" type="button">▢ Сохранить</button></div>
+          <div class="callout"><strong>Возможности экспорта</strong><p>WAV создаётся непосредственно в браузере. Инструменты синтезируются локально, а сохранённые вокальные дубли микшируются поверх аранжировки.</p></div>
+        </div>
+      </section>
+      <section id="pane-mixer" class="pane" aria-labelledby="tab-mixer">
+        <div class="section-top"><div><span class="kicker">05 / REAL-TIME MIXER</span><h2>Живой <em>микшер.</em></h2></div></div>
+        <div class="surface gap">
+          <p class="muted">Регулировки влияют на воспроизведение и WAV-экспорт.</p>
+          <div id="mixerTracks" class="mix-tracks"></div>
+          <label>ОБЩАЯ ГРОМКОСТЬ<input id="masterVol" type="range" min="0" max="100" value="85"></label>
+          <div class="buttons-pair"><button id="playMixer" class="btn secondary" type="button">▶ Слушать</button><button id="exportWavMixer" class="btn primary" type="button">↓ Экспорт WAV</button></div>
+        </div>
+      </section>
+      <section id="pane-projects" class="pane" aria-labelledby="tab-projects">
+        <div class="section-top"><div><span class="kicker">06 / MY WORK</span><h2>Мои <em>проекты.</em></h2></div></div>
+        <div class="surface gap">
+          <label for="projectName">НАЗВАНИЕ ПРОЕКТА</label><input id="projectName" value="Midnight Feelings" placeholder="Название проекта">
+          <div class="buttons-pair"><button id="saveProject" class="btn primary" type="button">▢ Сохранить</button><button id="newProject" class="btn secondary" type="button">＋ Новый</button></div>
+          <div class="buttons-pair"><button id="exportProject" class="btn secondary" type="button">↓ Скачать бэкап</button><label class="btn secondary upload-label" for="importProject">↑ Импорт бэкапа<input id="importProject" type="file" accept="application/json,.json" hidden></label></div>
+          <div class="callout"><strong>Где хранятся проекты?</strong><p>В IndexedDB этого браузера, включая записи и аудиофайлы. Браузерное хранилище может быть очищено пользователем или системой. Для резервного копирования скачивай бэкап проекта вместе с аудио.</p></div>
+          <h3>Сохранённые проекты</h3><div id="projectsList" class="asset-list"><p class="empty">Здесь появятся сохранённые проекты.</p></div>
+        </div>
+      </section>
+      <section id="pane-ai" class="pane" aria-labelledby="tab-ai">
+        <div class="section-top"><div><span class="kicker">07 / AI ENGINE</span><h2>AI <em>движок.</em></h2></div></div>
+        <div class="surface gap">
+          <div class="callout"><strong>ACE-Step · внешняя генерация</strong><p>Подготовь стиль, слова и подачу, скопируй их в совместимый генератор, затем импортируй готовый трек обратно. Эта версия не обещает AI-клонирования голоса и не передаёт записи третьим лицам автоматически.</p></div>
+          <div class="buttons-pair"><button id="copyStyle" class="btn secondary" type="button">⎘ Стиль</button><button id="copyLyrics" class="btn secondary" type="button">⎘ Текст</button><button id="copyDelivery" class="btn secondary" type="button">⎘ Подача</button></div>
+          <a class="btn primary link-button" target="_blank" rel="noopener noreferrer" href="https://huggingface.co/spaces/ACE-Step/Ace-Step-v1.5">✦ Открыть ACE-Step ZeroGPU ↗</a>
+          <a class="btn secondary link-button" target="_blank" rel="noopener noreferrer" href="https://acemusic.ai/playground/create">Открыть ACE Music ↗</a>
+          <label class="btn secondary upload-label" for="importAi">↑ Импортировать готовый AI-трек<input type="file" id="importAi" accept="audio/*" hidden></label>
+          <div id="aiResult" class="asset-list"><p class="empty">Импортированного AI-трека пока нет.</p></div>
+        </div>
+      </section>
+    </main>
+    <footer><strong>N.</strong> NXVAL MUSIC <span>CREATE WHAT YOU FEEL · VOICE EDITION</span></footer>
+  </div>
+  <nav class="bottom-nav" aria-label="Главное меню">
+    <button id="tab-create" data-tab="create" class="tab active" type="button"><span>✦</span><small>Создать</small></button>
+    <button id="tab-voice" data-tab="voice" class="tab" type="button"><span>◉</span><small>Мой голос</small></button>
+    <button id="tab-studio" data-tab="studio" class="tab" type="button"><span>▦</span><small>Студия</small></button>
+    <button id="tab-mixer" data-tab="mixer" class="tab" type="button"><span>☷</span><small>Микшер</small></button>
+    <button id="tab-projects" data-tab="projects" class="tab" type="button"><span>▢</span><small>Проекты</small></button>
+    <button id="tab-ai" data-tab="ai" class="tab" type="button"><span>⚙</span><small>AI</small></button>
+  </nav>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="confirmDialog" class="modal"><div class="modal-body"><h3 id="confirmTitle">Подтверждение</h3><p id="confirmText"></p><div class="buttons-pair"><button id="confirmCancel" class="btn secondary" type="button">Отмена</button><button id="confirmOK" class="btn danger" type="button">Очистить</button></div></div></dialog>
+  <dialog id="micDialog" class="modal" aria-labelledby="micTitle">
+    <div class="modal-body">
+      <h3 id="micTitle">Не удалось открыть микрофон</h3>
+      <p id="micExplanation">Проверяю доступ к микрофону.</p>
+      <div id="micSteps" class="mic-steps"></div>
+      <div class="buttons-pair">
+        <button id="micRetry" class="btn primary" type="button">Повторить запись</button>
+        <button id="micUpload" class="btn secondary" type="button">Загрузить аудио</button>
+      </div>
+      <button id="micClose" class="btn secondary" type="button">Закрыть</button>
+    </div>
+  </dialog>
+  <dialog id="expandDialog" class="modal editor-modal"><div class="modal-body"><div class="panel-row"><h3 id="expandTitle">Редактор</h3><button id="expandClose" class="btn secondary" type="button">Готово</button></div><textarea id="expandedText" spellcheck="false" placeholder="Введите текст..."></textarea></div></dialog>
+  <script>
+/* NXVAL Music Voice Edition — zero-dependency, local-first browser studio. */
+'use strict';
+(() => {
+  const $ = id => document.getElementById(id);
+  const ids = ['stylePrompt','lyrics','deliveryPrompt','bpm','key','bars','duration','noTalk','lineBars','delivery','voiceType','emotion','language','projectName','voiceName','takeOffset','masterVol'];
+  const savedDefault = {
+    stylePrompt:'Energetic Russian underground hip-hop fused with dark phonk, 92 BPM, F minor. Punchy boom-bap kick and snare, groovy sliding 808, swung hi-hats, catchy cowbell riff, gritty piano stabs. No intro, no bridge, no outro.',
+    lyrics:'',
+    deliveryPrompt:'Natural adult male Russian rap voice. Loud, clean resonant chest voice, clear diction, expressive rhythm and sarcastic punchlines. No hoarseness, rasp, growling, whispering or robotic intonation.',
+    bpm:92,key:'Fm',bars:'24',duration:'180',noTalk:true,lineBars:'1',
+    delivery:'Рэп / чёткий флоу',voiceType:'Мужской',emotion:'Уверенно / дерзко',language:'Русский',
+    projectName:'Midnight Feelings',voiceName:'Мой голос',takeOffset:0,masterVol:85,
+    genre:'Hip-Hop',mix:null,takeIds:[],aiId:null
+  };
+  const TRACKS = [
+    ['drums','◉','Ударные',82],['bass','≋','Бас / 808',78],['chords','▤','Аккорды',48],
+    ['arp','✳','Арпеджио',52],['melody','♫','Мелодия / cowbell',61],['atmos','◌','Атмосфера',30],
+    ['vocals','●','Мои вокальные дубли',94],['ai','✦','Импортированный AI-трек',0]
+  ];
+  const DBNAME='nxval-voice-studio-v1';
+  const draftsKey='nxval-music-voice-draft-v1';
+  const uid=()=>typeof crypto!=='undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  let db, state={...savedDefault,mix:Object.fromEntries(TRACKS.map(([id,,,vol])=>[id,{vol,muted:false,solo:false}]))};
+  let currentProjectId=null,record=null,transport=null,noticeTimer=null,expandedField=null,activeUrlMap=new Map(),savingDraft=false;
+  function alertToast(message){ const el=$('toast');el.textContent=message;el.hidden=false;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>el.hidden=true,4200);}
+  function safeText(v){return String(v??'').replace(/[<>&\"']/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','\"':'&quot;',"'":'&#39;'}[c]));}
+  function setTab(tab){
+    const pane=$(`pane-${tab}`);if(!pane)return;
+    document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active',p===pane));
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+    if(location.hash!==`#${tab}`) history.replaceState(null,'',`#${tab}`);
+    window.scrollTo({top:0,behavior:'instant'});
+    if(tab==='projects')refreshProjects();if(tab==='voice'){refreshVoices();refreshTakes();}if(tab==='studio')drawMap();if(tab==='ai')refreshAi();
+  }
+  function initDatabase(){
+    return new Promise((resolve,reject)=>{
+      if(!('indexedDB' in window))return reject(new Error('IndexedDB недоступна'));
+      const req=indexedDB.open(DBNAME,1);
+      req.onupgradeneeded=()=>{const d=req.result; for(const t of ['projects','voices','takes'])if(!d.objectStoreNames.contains(t))d.createObjectStore(t,{keyPath:'id'});};
+      req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+    });
+  }
+  function transaction(store,mode,doIt){return new Promise((resolve,reject)=>{
+    if(!db)return reject(Error('Хранилище недоступно'));
+    const tr=db.transaction(store,mode), req=doIt(tr.objectStore(store));
+    req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);tr.onabort=()=>reject(tr.error);
+  });}
+  const put=(store,v)=>transaction(store,'readwrite',s=>s.put(v));
+  const get=(store,id)=>transaction(store,'readonly',s=>s.get(id));
+  const all=store=>transaction(store,'readonly',s=>s.getAll());
+  const del=(store,id)=>transaction(store,'readwrite',s=>s.delete(id));
+  function collect(){const values={};for(const id of ids){const el=$(id);values[id]=el.type==='checkbox'?el.checked:el.value;}values.genre=state.genre;values.projectId=currentProjectId;values.mix=structuredClone(state.mix);values.takeIds=[...state.takeIds];values.aiId=state.aiId;return values;}
+  function apply(values){if(!values)return; for(const id of ids){if(values[id]===undefined||!$(id))continue;const el=$(id);if(el.type==='checkbox')el.checked=!!values[id];else el.value=values[id];}
+    currentProjectId=values.projectId||null;state.genre=values.genre||'Hip-Hop';state.mix=values.mix||state.mix;state.takeIds=Array.isArray(values.takeIds)?values.takeIds:[];state.aiId=values.aiId||null;
+    updateGenres();refreshMixer();refreshCounters();drawMap();refreshTakes();refreshAi();}
+  function saveDraft(){if(savingDraft)return;try{localStorage.setItem(draftsKey,JSON.stringify(collect()));}catch(e){console.warn('Cannot save draft',e);}}
+  function initFields(){
+    for(const id of ids){const el=$(id);if(!el)continue;el.addEventListener('input',()=>{refreshCounters();saveDraft();if(['bpm','bars','lyrics','lineBars'].includes(id))drawMap();});el.addEventListener('change',()=>{refreshCounters();saveDraft();drawMap();});}
+    document.querySelectorAll('[data-clear]').forEach(btn=>btn.addEventListener('click',()=>{
+      const id=btn.dataset.clear;const el=$(id);if(!el.value){alertToast('Поле уже пустое');return;}
+      ask('Очистить всё поле?',`Весь текст поля «${id==='lyrics'?'Текст песни':id==='stylePrompt'?'Минус / стиль':'Подача'}» будет удалён. Отменить действие можно только до закрытия этой страницы.`,()=>{
+        const prev=el.value;el.value='';el.dispatchEvent(new Event('input'));showUndo(prev, id);},'Очистить');
+    }));
+    document.querySelectorAll('[data-expand]').forEach(btn=>btn.addEventListener('click',()=>{
+      expandedField=btn.dataset.expand;$('expandTitle').textContent=expandedField==='lyrics'?'Текст песни':expandedField==='stylePrompt'?'Минус / стиль':'Указания по подаче';$('expandedText').value=$(expandedField).value;$('expandDialog').showModal();$('expandedText').focus();
+    }));
+    $('expandedText').addEventListener('input',()=>{if(expandedField){$(expandedField).value=$('expandedText').value;$(expandedField).dispatchEvent(new Event('input'));}});
+    $('expandClose').addEventListener('click',()=>{$('expandDialog').close();expandedField=null;});
+    $('confirmCancel').addEventListener('click',()=>$('confirmDialog').close());
+    $('surprise').addEventListener('click',()=>{const opts=[['NXVAL Bass-Rap','Dark Memphis phonk, Russian underground hip-hop, 100 BPM, heavy 808 slides, punchy drums, cowbell, gritty chopped samples.'],['Synthwave','Cinematic cyberpunk synthwave, 110 BPM, arpeggiated analog synths, warm bass, crisp drums, neon-night atmosphere.'],['Hip-Hop','Energetic old-school hip-hop meets bouncy phonk. 92 BPM, swing drums, strong snare, soulful chops, melodic cowbell.']];const choice=opts[Math.floor(Math.random()*opts.length)];state.genre=choice[0];$('stylePrompt').value=choice[1];updateGenres();refreshCounters();saveDraft();});
+    document.querySelectorAll('.chip[data-genre]').forEach(b=>b.addEventListener('click',()=>{state.genre=b.dataset.genre;updateGenres();saveDraft();}));
+  }
+  function ask(title,message,callback,ok='Удалить'){
+    $('confirmTitle').textContent=title;$('confirmText').textContent=message;$('confirmOK').textContent=ok;
+    const orig=$('confirmOK'), btn=orig.cloneNode(true);orig.replaceWith(btn);btn.addEventListener('click',()=>{$('confirmDialog').close();callback();},{once:true});$('confirmDialog').showModal();
+  }
+  function showUndo(previous,id){const el=$('toast');el.replaceChildren();const txt=document.createElement('span');txt.textContent='Поле очищено. ';const undo=document.createElement('button');undo.textContent='Отменить';undo.style='border:0;color:#d4ff71;background:none;text-decoration:underline;font:inherit';undo.addEventListener('click',()=>{$(id).value=previous;$(id).dispatchEvent(new Event('input'));el.hidden=true;});el.append(txt,undo);el.hidden=false;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>el.hidden=true,8500);}
+  function updateGenres(){document.querySelectorAll('[data-genre]').forEach(b=>b.classList.toggle('active',b.dataset.genre===state.genre));}
+  function lyricLines(){return $('lyrics').value.split('\n').map(x=>x.trim()).filter(x=>x&&!/^\[.*?\]$/.test(x));}
+  function refreshCounters(){for(const id of ['stylePrompt','lyrics','deliveryPrompt']){const el=document.querySelector(`[data-count="${id}"]`);if(el)el.textContent=`${$(id).value.length} симв.`;}
+    const lines=lyricLines(),bars=Math.max(1,Number($('lineBars').value)||1),bpm=bpmValue(), sec=lines.length*bars*240/bpm, m=Math.floor(sec/60),s=String(Math.round(sec%60)).padStart(2,'0');
+    $('flowStatus').textContent=lines.length?`${lines.length} строк × ${bars} такт(а) · ≈ ${m}:${s} при ${bpm} BPM${sec>180?' · длиннее 3 минут':''}. Это приблизительный расчёт, генератор может добавить паузы.`:'Вставь текст — здесь появится оценка длительности.';
+  }
+  const bpmValue=()=>Math.min(200,Math.max(60,Number($('bpm').value)||92));
+  function drawMap(){const bars=Math.max(8,Math.min(24,Number($('bars').value)||24)),map=$('songMap');map.replaceChildren();for(let i=0;i<bars;i++){const el=document.createElement('div');el.className='bar'+(Math.floor(i/8)%2?' chorus':'');el.textContent=i+1;el.dataset.index=i;map.append(el);}$('transportDesc').textContent=`${bars} тактов · ${bpmValue()} BPM`;
+    $('currentTrackName').textContent=$('projectName').value||'Новая сессия';}
+  function refreshMixer(){const box=$('mixerTracks');box.replaceChildren();for(const [id,icon,name]of TRACKS){if(!state.mix[id])state.mix[id]={vol:50,muted:false,solo:false};let s=state.mix[id];const row=document.createElement('div');row.className='mix-row';row.innerHTML=`<div><strong>${icon} ${name}</strong><span class="mix-actions"><button type="button" data-action="mute" class="${s.muted?'active':''}" aria-label="Выключить ${name}">M</button><button type="button" data-action="solo" class="${s.solo?'active':''}" aria-label="Соло ${name}">S</button></span></div><input type="range" min="0" max="100" value="${s.vol}" aria-label="Громкость ${name}"><small class="muted">${s.vol}%</small>`;
+    row.querySelector('input').addEventListener('input',e=>{s.vol=Number(e.target.value);row.querySelector('small').textContent=s.vol+'%';saveDraft();});
+    row.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const action=b.dataset.action;s[action==='mute'?'muted':'solo']=!s[action==='mute'?'muted':'solo'];refreshMixer();saveDraft();}));box.append(row);}}
+  async function refreshProjects(){if(!db)return;const list=$('projectsList');list.replaceChildren();const items=(await all('projects')).sort((a,b)=>b.updatedAt-a.updatedAt);if(!items.length){list.innerHTML='<p class="empty">Здесь появятся сохранённые проекты.</p>';return;}for(const p of items){const row=document.createElement('div');row.className='asset';row.innerHTML=`<div class="asset-head"><strong>${safeText(p.name)}</strong><small>${new Date(p.updatedAt).toLocaleDateString('ru-RU')}</small></div><div class="asset-buttons"></div>`;const buttons=row.querySelector('.asset-buttons');addButton(buttons,'Открыть',async()=>{currentProjectId=p.id;apply(p.values);saveDraft();setTab('create');alertToast('Проект открыт');});addButton(buttons,'Удалить',()=>ask('Удалить проект?',`Удалить «${p.name}»? Общие аудиофайлы в библиотеке не затрагиваются.`,async()=>{await del('projects',p.id);if(currentProjectId===p.id)currentProjectId=null;await refreshProjects();},'Удалить'));list.append(row);}}
+  function addButton(parent,label,fn,variant='secondary'){const b=document.createElement('button');b.className=`btn ${variant}`;b.textContent=label;b.type='button';b.addEventListener('click',fn);parent.append(b);return b;}
+  async function saveProject(){if(!db)return alertToast('Недоступно сохранение: нет IndexedDB');let name=$('projectName').value.trim()||'Без названия';const id=currentProjectId||uid(),item={id,name,values:collect(),updatedAt:Date.now()};await put('projects',item);currentProjectId=id;alertToast('Проект сохранён вместе с ссылками на записи');refreshProjects();}
+  function newProject(){ask('Создать новый проект?', 'Текущий черновик можно сначала сохранить. Новый проект очистит поля, но не удалит библиотеку голоса.',()=>{if(transport)stopPlaying();currentProjectId=null;apply({...savedDefault,projectName:'Новый трек',mix:Object.fromEntries(TRACKS.map(([id,,,vol])=>[id,{vol,muted:false,solo:false}]))});saveDraft();setTab('create');},'Новый проект');}
+  function blobUrl(item){if(!item||!item.blob)return '';if(!activeUrlMap.has(item.id))activeUrlMap.set(item.id,URL.createObjectURL(item.blob));return activeUrlMap.get(item.id);}
+  function playable(file){if(!(file instanceof Blob)||file.size===0)throw Error('Пустой или недоступный аудиофайл');if(file.size>100*1024*1024)throw Error('Аудиофайл больше 100 МБ. Нужен файл поменьше.');}
+  async function saveVoiceBlob(blob,name,kind='import'){playable(blob);const item={id:uid(),name:name.trim()||'Мой голос',createdAt:Date.now(),blob,kind,mime:blob.type};await put('voices',item);refreshVoices();alertToast('Голос сохранён в библиотеке');return item;}
+  async function saveTakeBlob(blob,name,offset=0,kind='vocal'){playable(blob);const item={id:uid(),name:name.trim()||'Вокальный дубль',createdAt:Date.now(),blob,offset:Number(offset)||0,kind,mime:blob.type};await put('takes',item);if(kind==='ai')state.aiId=item.id;else state.takeIds.push(item.id);saveDraft();refreshTakes();refreshAi();alertToast('Вокальная дорожка сохранена');return item;}
+  async function refreshVoices(){if(!db)return;const box=$('voiceList');box.replaceChildren();const items=(await all('voices')).sort((a,b)=>b.createdAt-a.createdAt);if(!items.length){box.innerHTML='<p class="empty">Пока нет сохранённых образцов.</p>';return;}
+    for(const v of items){const row=document.createElement('div');row.className='asset';const head=document.createElement('div');head.className='asset-head';const title=document.createElement('strong');title.textContent=v.name;const meta=document.createElement('small');meta.textContent=`${Math.max(1,Math.round(v.blob.size/1024))} КБ`;head.append(title,meta);row.append(head);
+      const audio=document.createElement('audio');audio.controls=true;audio.preload='none';audio.src=blobUrl(v);row.append(audio);const buttons=document.createElement('div');buttons.className='asset-buttons';addButton(buttons,'＋ В микшер',()=>saveTakeBlob(v.blob,v.name,Number($('takeOffset').value)||0));addButton(buttons,'↓ Скачать',()=>downloadBlob(v.blob,v.name+'.'+(v.blob.type.includes('wav')?'wav':'webm')));addButton(buttons,'Удалить',()=>ask('Удалить образец?',`Удалить «${v.name}» из библиотеки голосов?`,async()=>{await del('voices',v.id);releaseUrl(v.id);refreshVoices();},'Удалить'));row.append(buttons);box.append(row);}}
+  async function refreshTakes(){if(!db)return;const box=$('takesList');box.replaceChildren();const ids=state.takeIds||[];if(!ids.length){box.innerHTML='<p class="empty">Вокальных дублей пока нет.</p>';return;}
+    for(const id of [...ids]){const v=await get('takes',id);if(!v)continue;const row=document.createElement('div');row.className='asset';const title=document.createElement('strong');title.textContent=v.name;const head=document.createElement('div');head.className='asset-head';const offset=document.createElement('small');offset.textContent=`Начало: ${v.offset}s`;head.append(title,offset);row.append(head);const audio=document.createElement('audio');audio.controls=true;audio.preload='none';audio.src=blobUrl(v);row.append(audio);const buttons=document.createElement('div');buttons.className='asset-buttons';addButton(buttons,'Изменить начало',()=>{const val=prompt('Начало дорожки в секундах',String(v.offset));if(val===null)return;const newVal=Number(String(val).replace(',','.'));if(!Number.isFinite(newVal)||newVal<0)return alertToast('Неверная позиция');v.offset=newVal;put('takes',v).then(()=>{refreshTakes();saveDraft();});});addButton(buttons,'Убрать из проекта',()=>{state.takeIds=state.takeIds.filter(x=>x!==v.id);saveDraft();refreshTakes();});addButton(buttons,'↓ Скачать',()=>downloadBlob(v.blob,v.name+'.'+(v.blob.type.includes('wav')?'wav':'webm')));row.append(buttons);box.append(row);}}
+  async function refreshAi(){if(!db)return;const row=$('aiResult');row.replaceChildren();const item=state.aiId?await get('takes',state.aiId):null;if(!item){row.innerHTML='<p class="empty">Импортированного AI-трека пока нет.</p>';return;}const box=document.createElement('div');box.className='asset';const name=document.createElement('strong');name.textContent=item.name;box.append(name);const audio=document.createElement('audio');audio.controls=true;audio.src=blobUrl(item);box.append(audio);const buttons=document.createElement('div');buttons.className='asset-buttons';addButton(buttons,'Убрать из проекта',()=>{state.aiId=null;saveDraft();refreshAi();});addButton(buttons,'↓ Скачать',()=>downloadBlob(item.blob,item.name));box.append(buttons);row.append(box);}
+  function releaseUrl(id){const url=activeUrlMap.get(id);if(url){URL.revokeObjectURL(url);activeUrlMap.delete(id);}}
+  let micFailureKind='voice';
+  function showMicrophoneHelp(kind,reason,err){
+    micFailureKind=kind;
+    const isLocalFile=location.protocol==='file:';
+    const isTrusted=window.isSecureContext===true;
+    const browserBlocked=err && ['NotAllowedError','PermissionDeniedError','SecurityError'].includes(err.name);
+    const policy=document.permissionsPolicy||document.featurePolicy;
+    const policyBlocked=!!(policy&&typeof policy.allowsFeature==='function'&&policy.allowsFeature('microphone')===false);
+    let heading='Не удалось открыть микрофон';
+    let steps='';
+    if(isLocalFile || !isTrusted){
+      heading='Студия открыта без надёжного доступа к микрофону';
+      steps='1. Открой NXVAL Music через HTTPS либо http://localhost на этом телефоне.\n2. Нажми «Записать голос» ещё раз и разреши микрофон.\n3. Пока можно воспользоваться кнопкой «Загрузить аудио».\n\nОбычный скачанный HTML на Android часто работает без разрешения на запись.';
+    }else if(policyBlocked){
+      heading='Доступ заблокирован встроенным браузером';
+      steps='Открой сайт напрямую во внешнем Chrome или Samsung Internet по HTTPS, не во встроенном просмотрщике. Затем нажми «Записать голос».';
+    }else if(browserBlocked){
+      heading='Браузер запретил доступ к микрофону';
+      steps='1. Android → Настройки → Приложения → твой браузер → Разрешения → Микрофон → Разрешить.\n2. В браузере открой настройки сайта → Микрофон → Разрешить для NXVAL Music.\n3. Обнови страницу и нажми «Повторить запись».\n\nПроверь также системный переключатель «Доступ к микрофону».';
+    }else if(err?.name==='NotFoundError' || err?.name==='DevicesNotFoundError'){
+      heading='Микрофон не найден';
+      steps='Проверь наличие микрофона, отключи конфликтующую Bluetooth-гарнитуру и повтори попытку.';
+    }else if(err?.name==='NotReadableError' || err?.name==='TrackStartError'){
+      heading='Микрофон занят другим приложением';
+      steps='Закрой диктофон, Telegram-звонок или другую программу, которая использует микрофон, затем повтори попытку.';
+    }else{
+      steps='Открой студию через HTTPS или localhost, проверь разрешения микрофона Android и браузера, затем повтори попытку. Если не помогло, загрузи готовое аудио.';
+    }
+    $('micTitle').textContent=heading;
+    $('micExplanation').textContent=reason;
+    $('micSteps').textContent=steps;
+    const info=kind==='voice'?$('recordInfo'):$('takeInfo');
+    info.classList.add('error');info.textContent=heading+'. '+reason;
+    $('micDialog').showModal();
+  }
+  async function startRecorder(kind){
+    if(record){if(record.kind!==kind){alertToast('Сначала останови текущую запись');return;}record.recorder.stop();return;}
+    if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder){
+      showMicrophoneHelp(kind,'Этот браузер или способ открытия страницы не предоставляет функцию записи.',{name:'SecurityError'});return;
+    }
+    const btn=kind==='voice'?$('recordVoice'):$('recordTake'),info=kind==='voice'?$('recordInfo'):$('takeInfo');
+    btn.disabled=true;info.classList.remove('error');info.textContent='Запрашиваю разрешение на микрофон…';
+    let stream;
+    try{
+      try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:false}});}
+      catch(first){
+        if(first.name==='OverconstrainedError' || first.name==='NotSupportedError') stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        else throw first;
+      }
+    }catch(e){
+      btn.disabled=false;
+      showMicrophoneHelp(kind,e.message||e.name||'Доступ не предоставлен.',e);
+      return;
+    }
+    btn.disabled=false;
+    let mr;
+    try{const opts=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?{mimeType:'audio/webm;codecs=opus'}:{};mr=new MediaRecorder(stream,opts);}
+    catch(e){stream.getTracks().forEach(t=>t.stop());showMicrophoneHelp(kind,'Запись с этим аудиоформатом недоступна.',e);return;}
+    const chunks=[];let timer=null;
+    const obj={kind,recorder:mr,stream};record=obj;
+    mr.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    mr.onstop=async()=>{clearInterval(timer);stream.getTracks().forEach(t=>t.stop());if(kind==='take')stopPlaying();btn.textContent=kind==='voice'?'● Записать голос':'● Записать вокальный дубль';info.classList.remove('recording');info.textContent='Запись завершена. Файл сохраняется локально...';record=null;try{if(chunks.length===0)throw Error('Нет аудиоданных: попробуй повторить запись');const blob=new Blob(chunks,{type:mr.mimeType||'audio/webm'});if(kind==='voice')await saveVoiceBlob(blob,$('voiceName').value,'mic');else await saveTakeBlob(blob,'Дубль '+new Date().toLocaleTimeString('ru-RU'),Number($('takeOffset').value)||0);info.textContent='Запись сохранена. Можешь прослушать её ниже.';}catch(e){info.textContent=e.message;info.classList.add('error');}};
+    mr.onerror=()=>{info.textContent='Ошибка записи. Проверь микрофон и повтори.';info.classList.add('error');alertToast('Ошибка записи микрофона');};
+    try{mr.start(200);}catch(e){record=null;stream.getTracks().forEach(t=>t.stop());showMicrophoneHelp(kind,'Браузер не смог запустить запись.',e);return;}
+    if(kind==='take'){try{await startPlaying();}catch(e){console.warn(e);}}
+    btn.textContent='■ Остановить запись';info.classList.add('recording');const started=Date.now();timer=setInterval(()=>{info.textContent=`Идёт запись: ${Math.floor((Date.now()-started)/1000)} сек. Нажми ещё раз, чтобы завершить.`;},500);
+  }
+  function downloadBlob(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=(name||'nxval-export').replace(/[\\/:*?"<>|]/g,'_');document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);}
+  function blobToDataUrl(blob){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(blob);});}
+  async function exportProject(){if(!db)return alertToast('Сохранение недоступно');const values=collect();const audio=[];const takeIds=[...new Set([...(values.takeIds||[]),values.aiId].filter(Boolean))];for(const id of takeIds){const t=await get('takes',id);if(t)audio.push({...t,blob:await blobToDataUrl(t.blob)});}const voices=await all('voices');const voiceData=[];for(const item of voices)voiceData.push({...item,blob:await blobToDataUrl(item.blob)});
+    downloadBlob(new Blob([JSON.stringify({format:'nxval-voice-project-v1',name:values.projectName,values,takes:audio,voices:voiceData},null,2)],{type:'application/json'}),(values.projectName||'nxval-project')+'.nxval.json');alertToast('Бэкап с аудио скачан');}
+  async function importProject(file){try{if(file.size>250*1024*1024)throw Error('Слишком большой файл');const data=JSON.parse(await file.text());if(data.format!=='nxval-voice-project-v1')throw Error('Неизвестный формат бэкапа');
+    const newIds={};for(const type of ['voices','takes']){for(const t of data[type]||[]){if(typeof t.blob!=='string'||!t.blob.startsWith('data:'))continue;const id=uid();newIds[t.id]=id;const blob=await (await fetch(t.blob)).blob();await put(type,{...t,id,blob});}}
+    const values=data.values||{};values.projectId=null;values.takeIds=(values.takeIds||[]).map(id=>newIds[id]).filter(Boolean);values.aiId=newIds[values.aiId]||null;currentProjectId=null;apply(values);saveDraft();await saveProject();setTab('projects');alertToast('Бэкап проекта импортирован вместе с аудио');}catch(e){alertToast('Не удалось импортировать: '+e.message);}}
+  // Standalone audio engine: original algorithmic beat, never claimed as AI audio.
+  const pitchMap={Am:45,C:48,Dm:50,Em:52,G:43,F:41,Bm:47,D:50,Fm:41,Gm:43,'C#m':49};
+  const noiseCache=new WeakMap();
+  function getNoise(ctx){if(noiseCache.has(ctx))return noiseCache.get(ctx);const b=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate),a=b.getChannelData(0);let v=0;for(let i=0;i<a.length;i++){v=.88*v+.12*(Math.random()*2-1);a[i]=v;}noiseCache.set(ctx,b);return b;}
+  function gainEnv(ctx,dest,at,peak,duration,attack=.003){const g=ctx.createGain();g.gain.setValueAtTime(.0001,at);g.gain.exponentialRampToValueAtTime(Math.max(.0001,peak),at+attack);g.gain.exponentialRampToValueAtTime(.0001,at+Math.max(duration,attack+.02));g.connect(dest);return g;}
+  function tone(ctx,type,freq,at,dur,vol,dest){const o=ctx.createOscillator();o.type=type;o.frequency.setValueAtTime(freq,at);const g=gainEnv(ctx,dest,at,vol,dur,.006);o.connect(g);o.start(at);o.stop(at+dur+.04);return o;}
+  function noteFreq(midi){return 440*Math.pow(2,(midi-69)/12);}
+  function kick(ctx,at,dest){const o=ctx.createOscillator();o.type='sine';o.frequency.setValueAtTime(148,at);o.frequency.exponentialRampToValueAtTime(45,at+.13);const g=gainEnv(ctx,dest,at,.95,.32,.004);o.connect(g);o.start(at);o.stop(at+.35);}
+  function noiseHit(ctx,at,vol,dur,dest,hpf=1200){const src=ctx.createBufferSource();src.buffer=getNoise(ctx);const filt=ctx.createBiquadFilter();filt.type='highpass';filt.frequency.value=hpf;const g=gainEnv(ctx,dest,at,vol,dur,.002);src.connect(filt);filt.connect(g);src.start(at,Math.random()*.7,dur+.02);src.stop(at+dur+.03);}
+  function snare(ctx,at,dest){noiseHit(ctx,at,.6,.17,dest,1800);tone(ctx,'triangle',185,at,.13,.22,dest);}
+  function bass(ctx,midi,at,dur,dest){const o=ctx.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(noteFreq(midi+12),at);o.frequency.exponentialRampToValueAtTime(noteFreq(midi),at+.055);const filt=ctx.createBiquadFilter();filt.type='lowpass';filt.frequency.setValueAtTime(510,at);filt.frequency.exponentialRampToValueAtTime(95,at+dur);const g=gainEnv(ctx,dest,at,.58,dur,.008);o.connect(filt);filt.connect(g);o.start(at);o.stop(at+dur+.05);}
+  function cowbell(ctx,freq,at,dest){const duration=.17;const o1=ctx.createOscillator(),o2=ctx.createOscillator();o1.type='square';o2.type='square';o1.frequency.value=freq;o2.frequency.value=freq*1.47;const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=1100;f.Q.value=.8;const g=gainEnv(ctx,dest,at,.14,duration,.003);o1.connect(f);o2.connect(f);f.connect(g);o1.start(at);o2.start(at);o1.stop(at+duration+.04);o2.stop(at+duration+.04);}
+  function scheduleMusic(ctx,when,bars,bpm,dest){const beat=60/bpm,bar=beat*4;const root=pitchMap[$('key').value]||41;
+    for(let b=0;b<bars;b++){const start=when+b*bar,minor=[0,5,3,7][Math.floor(b/2)%4],midi=root+minor,chorus=Math.floor(b/8)%2===1;
+      for(let step=0;step<8;step++){const t=start+step*beat/2+((step%2)?beat*.07:0);noiseHit(ctx,t,.14,beat*.095,dest.drums,5500);}
+      for(let i=0;i<4;i++){const t=start+i*beat;if(i===0||i===2||((b%4===3)&&i===3))kick(ctx,t,dest.drums);if(i===1||i===3)snare(ctx,t,dest.drums);}
+      for(const n of [0,1.5,2.5,3.5])bass(ctx,midi+([0,0,7,3][[0,1.5,2.5,3.5].indexOf(n)]||0),start+n*beat,beat*.43,dest.bass);
+      for(const [i,iv]of [0,3,7].entries())tone(ctx,'triangle',noteFreq(midi+12+iv),start,beat*3.7,.055,dest.chords);
+      for(let n=0;n<8;n++)tone(ctx,'triangle',noteFreq(midi+24+[0,3,7,3][n%4]),start+n*beat/2,beat*.32,.037,dest.arp);
+      const phrase=chorus?[0,2,4,6]:[0,3,4,6];for(const n of phrase){cowbell(ctx,noteFreq(midi+36+([0,3,7,10][n%4])),start+n*beat/2,dest.melody);}
+      for(const iv of [0,7])tone(ctx,'sine',noteFreq(midi+12+iv),start,bar*.92,.015,dest.atmos);
+    }
+    return bar*bars;
+  }
+  async function decodeAudio(ctx,blob){try{return await ctx.decodeAudioData(await blob.arrayBuffer());}catch(e){throw Error('Формат аудио не декодируется этим браузером. Используй WAV, MP3 или совместимый M4A.');}}
+  async function collectAudioBuffers(ctx){const items=[];for(const id of state.takeIds||[]){const item=await get('takes',id);if(item){const buf=await decodeAudio(ctx,item.blob);items.push({item,buf,channel:'vocals'});}}
+    if(state.aiId){const item=await get('takes',state.aiId);if(item)items.push({item,buf:await decodeAudio(ctx,item.blob),channel:'ai'});}return items;}
+  function makeBus(ctx){const master=ctx.createGain();master.gain.value=Number($('masterVol').value)/100;master.connect(ctx.destination);const bus={};const someSolo=Object.values(state.mix).some(x=>x.solo);for(const [id]of TRACKS){const t=state.mix[id]||{vol:50,muted:false,solo:false};const g=ctx.createGain();g.gain.value=t.muted||(someSolo&&!t.solo)?0:(t.vol/100);g.connect(master);bus[id]=g;}return bus;}
+  async function startPlaying(){
+    if(transport){stopPlaying();return;}if(!db)throw Error('Недоступна база аудио');const C=window.AudioContext||window.webkitAudioContext;if(!C)throw Error('Web Audio недоступен');const ctx=new C();await ctx.resume();
+    const bars=Math.min(24,Math.max(8,Number($('bars').value)||24)),bpm=bpmValue();const audio=await collectAudioBuffers(ctx);const buses=makeBus(ctx);
+    const start=ctx.currentTime+.15,duration=scheduleMusic(ctx,start,bars,bpm,buses);const sources=[];let end=duration;
+    for(const {item,buf,channel}of audio){const src=ctx.createBufferSource();src.buffer=buf;src.connect(buses[channel]);src.start(start+Math.max(0,Number(item.offset)||0));sources.push(src);end=Math.max(end,Math.max(0,item.offset||0)+buf.duration);}
+    transport={ctx,start,end,sources,timer:null};transport.timer=setInterval(()=>{
+      if(!transport)return;const sec=Math.max(0,ctx.currentTime-start);$('position').textContent=`${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}`;
+      const barIndex=Math.floor(sec/(60/bpm*4));document.querySelectorAll('#songMap .bar').forEach(e=>e.classList.toggle('current',Number(e.dataset.index)===barIndex));if(sec>=end+.03)stopPlaying();
+    },140);$('playBtn').textContent='Ⅱ';$('playMixer').textContent='■ Остановить';alertToast('Воспроизведение запущено');
+  }
+  function stopPlaying(){if(!transport)return;const t=transport;transport=null;clearInterval(t.timer);try{t.sources.forEach(s=>s.stop());}catch{}t.ctx.close().catch(()=>{});$('playBtn').textContent='▶';$('playMixer').textContent='▶ Слушать';$('position').textContent='0:00';document.querySelectorAll('#songMap .bar').forEach(e=>e.classList.remove('current'));}
+  async function exportWav(){if(!db)return alertToast('Нет доступа к аудиофайлам');const buttons=[$('exportWav'),$('exportWavMixer')];buttons.forEach(b=>b.disabled=true);alertToast('Создаю WAV, включая вокальные дубли...');
+    try{const sampleRate=44100,bars=Math.min(24,Math.max(8,Number($('bars').value)||24)),bpm=bpmValue(),dur=bars*4*60/bpm;
+      const ctxDecode=new (window.AudioContext||window.webkitAudioContext)(),audio=await collectAudioBuffers(ctxDecode);await ctxDecode.close();let total=dur;
+      for(const {item,buf}of audio)total=Math.max(total,(Number(item.offset)||0)+buf.duration);
+      if(total>210)throw Error('Экспорт длиннее 3:30 не поддерживается на мобильном устройстве');
+      const offline=new OfflineAudioContext(2,Math.ceil((total+.2)*sampleRate),sampleRate);const buses=makeBus(offline);scheduleMusic(offline,.05,bars,bpm,buses);
+      for(const {item,buf,channel}of audio){const buffer=offline.createBuffer(buf.numberOfChannels,Math.ceil(buf.duration*sampleRate),sampleRate);for(let c=0;c<buf.numberOfChannels;c++){const ch=buf.getChannelData(c),target=buffer.getChannelData(c);for(let n=0;n<target.length;n++){const pos=n*buf.sampleRate/sampleRate,idx=Math.floor(pos),f=pos-idx;target[n]=(ch[idx]||0)*(1-f)+(ch[idx+1]||0)*f;}}const src=offline.createBufferSource();src.buffer=buffer;src.connect(buses[channel]);src.start(.05+Math.max(0,Number(item.offset)||0));}
+      const rendered=await offline.startRendering(),wav=toWave(rendered);downloadBlob(wav,($('projectName').value||'NXVAL Music')+'.wav');alertToast('WAV готов — файл скачан');
+    }catch(e){console.error(e);alertToast('Ошибка экспорта: '+e.message);}finally{buttons.forEach(b=>b.disabled=false);}}
+  function toWave(audio){const chans=audio.numberOfChannels,samples=audio.length,bytes=44+samples*chans*2,buf=new ArrayBuffer(bytes),view=new DataView(buf);let p=0;const write=s=>{for(let i=0;i<s.length;i++)view.setUint8(p++,s.charCodeAt(i));};write('RIFF');view.setUint32(p,bytes-8,true);p+=4;write('WAVEfmt ');view.setUint32(p,16,true);p+=4;view.setUint16(p,1,true);p+=2;view.setUint16(p,chans,true);p+=2;view.setUint32(p,audio.sampleRate,true);p+=4;view.setUint32(p,audio.sampleRate*chans*2,true);p+=4;view.setUint16(p,chans*2,true);p+=2;view.setUint16(p,16,true);p+=2;write('data');view.setUint32(p,samples*chans*2,true);p+=4;const data=Array.from({length:chans},(_,i)=>audio.getChannelData(i));for(let i=0;i<samples;i++)for(let ch=0;ch<chans;ch++){let x=Math.max(-1,Math.min(1,data[ch][i]));view.setInt16(p,x<0?x*32768:x*32767,true);p+=2;}return new Blob([buf],{type:'audio/wav'});}
+  async function copyText(txt){try{if(navigator.clipboard&&isSecureContext){await navigator.clipboard.writeText(txt);alertToast('Скопировано');return;}const a=document.createElement('textarea');a.value=txt;document.body.append(a);a.select();document.execCommand('copy');a.remove();alertToast('Скопировано');}catch(e){alertToast('Не удалось скопировать');}}
+  function styleText(){return `${$('stylePrompt').value}\nGenre: ${state.genre}. ${bpmValue()} BPM, key ${$('key').value}, target duration ${$('duration').value} seconds.`;}
+  function deliveryText(){return `${$('deliveryPrompt').value}\nManera: ${$('delivery').value}. Voice: ${$('voiceType').value}. Emotion: ${$('emotion').value}. Language: ${$('language').value}. ${$('noTalk').checked?'No talking, no intro, no outro, no bridge.':''}`;}
+  function attachEvents(){
+    document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+    $('micClose').addEventListener('click',()=>$('micDialog').close());
+    $('micRetry').addEventListener('click',()=>{$('micDialog').close();startRecorder(micFailureKind);});
+    $('micUpload').addEventListener('click',()=>{$('micDialog').close();$(micFailureKind==='voice'?'uploadVoice':'uploadTake').click();});
+    $('recordVoice').addEventListener('click',()=>startRecorder('voice'));
+    $('recordTake').addEventListener('click',()=>startRecorder('take'));
+    $('uploadVoice').addEventListener('change',async e=>{const f=e.target.files?.[0];if(f)try{await saveVoiceBlob(f,$('voiceName').value||f.name,'import');}catch(err){alertToast(err.message);}e.target.value='';});
+    $('uploadTake').addEventListener('change',async e=>{const f=e.target.files?.[0];if(f)try{await saveTakeBlob(f,f.name,Number($('takeOffset').value)||0);}catch(err){alertToast(err.message);}e.target.value='';});
+    $('importAi').addEventListener('change',async e=>{const f=e.target.files?.[0];if(f)try{await saveTakeBlob(f,f.name,0,'ai');alertToast('AI-трек импортирован. Включи его громкость в микшере, если хочешь добавить к аранжировке.');}catch(err){alertToast(err.message);}e.target.value='';});
+    $('saveProject').addEventListener('click',saveProject);$('saveProjectFromCreate').addEventListener('click',saveProject);$('saveProjectFromStudio').addEventListener('click',saveProject);
+    $('newProject').addEventListener('click',newProject);
+    $('exportProject').addEventListener('click',exportProject);
+    $('importProject').addEventListener('change',async e=>{if(e.target.files?.[0])await importProject(e.target.files[0]);e.target.value='';});
+    $('createDemo').addEventListener('click',()=>{drawMap();setTab('studio');startPlaying().catch(e=>alertToast(e.message));});
+    $('playBtn').addEventListener('click',()=>{startPlaying().catch(e=>alertToast(e.message));});
+    $('playMixer').addEventListener('click',()=>{startPlaying().catch(e=>alertToast(e.message));});
+    $('stopBtn').addEventListener('click',stopPlaying);
+    $('exportWav').addEventListener('click',exportWav);$('exportWavMixer').addEventListener('click',exportWav);
+    $('copyStyle').addEventListener('click',()=>copyText(styleText()));$('copyLyrics').addEventListener('click',()=>copyText($('lyrics').value));$('copyDelivery').addEventListener('click',()=>copyText(deliveryText()));
+    window.addEventListener('beforeunload',()=>{saveDraft();if(record)record.stream.getTracks().forEach(t=>t.stop());if(transport)stopPlaying();for(const url of activeUrlMap.values())URL.revokeObjectURL(url);});
+    window.addEventListener('hashchange',()=>{let hash=location.hash.slice(1);if(['create','voice','studio','mixer','projects','ai'].includes(hash))setTab(hash);});
+  }
+  async function init(){initFields();attachEvents();try{db=await initDatabase();}catch(e){console.error(e);alertToast('IndexedDB недоступна: сохранения и запись ограничены');}
+    let draft;try{draft=JSON.parse(localStorage.getItem(draftsKey)||'null');}catch{}apply({...savedDefault,...(draft||{}),mix:(draft&&draft.mix)||state.mix});updateGenres();refreshCounters();refreshMixer();refreshProjects();refreshVoices();refreshTakes();refreshAi();setTab(['create','voice','studio','mixer','projects','ai'].includes(location.hash.slice(1))?location.hash.slice(1):'create');
+    
+  }
+  init().catch(e=>{console.error(e);alertToast('Ошибка запуска: '+e.message);});
+})();
+
+</script>
+</body>
+</html>
