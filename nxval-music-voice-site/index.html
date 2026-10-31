@@ -89,7 +89,7 @@
  <div class="record-info" id="freeStatus" role="status" aria-live="polite">Бесплатный ACE-Step запускается на Hugging Face ZeroGPU, где есть лимит GPU-запусков. После исчерпания лимита можно бесплатно генерировать через сторонний сайт Treblo и импортировать готовое аудио обратно.</div>
  <div class="buttons-pair"><button id="copyStyleCreate" class="btn secondary" type="button">⎘ Скопировать стиль</button><button id="copyLyricsCreate" class="btn secondary" type="button">⎘ Скопировать текст</button></div>
  <a class="btn secondary link-button" href="https://treblo.com/" target="_blank" rel="noopener noreferrer">Открыть Treblo · бесплатный резерв ↗</a>
- <p class="muted">Treblo — отдельный сервис с собственным входом и условиями. В API NXVAL его бесплатная генерация не встроена. После скачивания песни импортируй файл в разделе AI.</p>
+ <p class="muted">Treblo — отдельный сервис с собственным входом и условиями. Его пользовательская версия бесплатная, API платный. Скопируй стиль и текст, создай песню в Treblo, затем импортируй её в разделе AI.</p>
  <button id="mainCreateMyVoice" class="btn secondary xl" type="button">♫ Создать трек моим голосом</button>
  <div class="hintline"><span>Собственный голос требует образца и доступного SoulX-Singer GPU. Генератор бесплатной песни может быть недоступен из-за очереди — результат обещаем только после получения аудио.</span></div>
  <button id="saveProjectFromCreate" class="btn secondary xl" type="button">▢ Сохранить проект</button>
@@ -463,7 +463,7 @@
     $('playMixer').addEventListener('click',()=>{startPlaying().catch(e=>alertToast(e.message));});
     $('stopBtn').addEventListener('click',stopPlaying);
     $('exportWav').addEventListener('click',exportWav);$('exportWavMixer').addEventListener('click',exportWav);
-    $('copyStyle').addEventListener('click',()=>copyText(styleText()));$('copyLyrics').addEventListener('click',()=>copyText($('lyrics').value));$('copyDelivery').addEventListener('click',()=>copyText(deliveryText()));$('copyStyleCreate').addEventListener('click',()=>copyText(styleText()));$('copyLyricsCreate').addEventListener('click',()=>copyText($('lyrics').value));
+    $('copyStyle').addEventListener('click',()=>copyText(styleText()));$('copyLyrics').addEventListener('click',()=>copyText($('lyrics').value));$('copyDelivery').addEventListener('click',()=>copyText(deliveryText()));$('copyStyleCreate').addEventListener('click',()=>copyText(styleText()));$('copyLyricsCreate').addEventListener('click',()=>copyText($('lyrics').value));document.addEventListener('nxval:ai-ready',e=>{const id=e.detail?.id;if(typeof id!=='string'||!id)return;state.aiId=id;saveDraft();refreshAi();});
     window.addEventListener('beforeunload',()=>{saveDraft();if(record)record.stream.getTracks().forEach(t=>t.stop());if(transport)stopPlaying();for(const url of activeUrlMap.values())URL.revokeObjectURL(url);});
     window.addEventListener('hashchange',()=>{let hash=location.hash.slice(1);if(['create','voice','studio','mixer','projects','ai'].includes(hash))setTab(hash);});
   }
@@ -529,7 +529,7 @@ async function voiceWav(blob){
 
 window.nxvalImportACE=async function(blob,name){
  const item={id:uuid(),name:name||'ACE Music · NXVAL',kind:'ai',createdAt:Date.now(),offset:0,mime:blob.type,blob};
- await put('takes',item);await refresh();$('vcSource').value=item.id;
+ await put('takes',item);await refresh();$('vcSource').value=item.id;document.dispatchEvent(new CustomEvent('nxval:ai-ready',{detail:{id:item.id}}));
  return item.id;
 };
 async function createBase(Client){
@@ -550,7 +550,7 @@ async function createBase(Client){
  const audio=data.slice(0,8).find(x=>x?.url||x?.path);
  if(!audio)throw Error('ACE-Step не смог сгенерировать песню. Используй ручной импорт готового трека');
  const blob=await receive(audio),item={id:uuid(),name:'AI-песня · '+($('projectName').value||'NXVAL'),createdAt:Date.now(),kind:'ai',blob,offset:0,mime:blob.type};
- await put('takes',item);await refresh();$('vcSource').value=item.id;return blob;
+ await put('takes',item);await refresh();$('vcSource').value=item.id;document.dispatchEvent(new CustomEvent('nxval:ai-ready',{detail:{id:item.id}}));return blob;
 }
 let freeBusy=false;
 window.nxvalGenerateFree=async function(){
@@ -590,7 +590,7 @@ async function run(create){
     pitch_shift:0,n_step:32,cfg:1,use_fp16:true,seed:42},'Преобразование тембра');
   const blob=await receive(data[0]),item={id:uuid(),name:'Мой голос · '+($('projectName').value||'NXVAL')+'.wav',
     kind:'ai_voice',createdAt:Date.now(),offset:0,mime:blob.type,blob};
-  await put('takes',item);outId=item.id;localStorage.setItem('nxvalVoiceLast',outId);
+  await put('takes',item);outId=item.id;localStorage.setItem('nxvalVoiceLast',outId);document.dispatchEvent(new CustomEvent('nxval:ai-ready',{detail:{id:item.id}}));
   if(outUrl)URL.revokeObjectURL(outUrl);outUrl=URL.createObjectURL(blob);
   $('vcPlayer').src=outUrl;$('vcDownload').href=outUrl;$('vcOutput').hidden=false;
   status('Готово: новый AI-вокал сохранён. Прослушай и добавь результат в микшер.');
