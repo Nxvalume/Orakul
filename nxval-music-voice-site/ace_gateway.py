@@ -98,7 +98,7 @@ class Handler(BaseHTTPRequestHandler):
                 if delivery.strip():
                     desc += "\nVocal delivery: " + delivery.strip()
                 model = body.get("model", "acemusic/acestep-v1.5-turbo")
-                if not isinstance(model, str) or not re.fullmatch(r"acemusic/[A-Za-z0-9._-]{3,70}", model):
+                if not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{1,99}", model):
                     self.send_json(400, {"error": "Некорректный идентификатор модели ACE Music"})
                     return
                 contents = "<prompt>" + desc + "</prompt><lyrics>" + lyrics.strip() + "</lyrics>"
