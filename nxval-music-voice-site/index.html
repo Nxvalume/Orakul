@@ -505,7 +505,7 @@ async function invoke(c,api,args,label){
  for await(const v of job){if(v.type==='data')result=v.data;
   if(v.type==='status'){const s=v.stage||v.data?.stage||'pending',p=v.position??v.data?.position;
    status(label+': '+(s==='pending'?'ожидание в очереди'+(Number.isInteger(p)?' №'+p:''):s==='generating'?'GPU обрабатывает':s==='complete'?'готово':'ожидание')+'…');
-   if(s==='error')throw Error('GPU-сервис вернул ошибку');}}
+   if(s==='error'){const reason=String(v.message||v.data?.message||v.data?.error||'').slice(0,240);throw Error('GPU-сервис вернул ошибку'+(reason?': '+reason:''));}}}
  job=null;if(!Array.isArray(result))throw Error('GPU-сервис не вернул результат');return result;
 }
 async function voiceWav(blob){
@@ -536,8 +536,8 @@ async function createBase(Client){
  const data=await invoke(c,'/generation_wrapper',{selected_model:'acestep-v15-xl-turbo',generation_mode:'custom',
   simple_query_input:'',simple_vocal_language:'ru',
   param_4:opts?.caption||$('stylePrompt').value,param_5:lyrics,param_6:Number($('bpm').value),
-  param_7:$('key').value,param_8:'4/4',param_9:'ru',
-  param_14:null,param_17:null,param_18:'',param_15:Number($('duration').value),param_47:null
+  param_7:$('key').value,param_8:'4',param_9:opts?.language||'ru',
+  param_14:null,param_17:null,param_18:null,param_15:Number($('duration').value),param_16:1,param_32:true,param_47:null
  },'Создание песни');
  const audio=data.slice(0,8).find(x=>x?.url||x?.path);
  if(!audio)throw Error('ACE-Step не смог сгенерировать песню. Используй ручной импорт готового трека');
