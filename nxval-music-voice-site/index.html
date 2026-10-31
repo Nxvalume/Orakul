@@ -82,9 +82,14 @@
  <p class="muted">Эта настройка включается в реальный запрос генератору вместе с языком, темпом и подачей. Сама по себе не гарантирует человеческий вокал — итог зависит от модели.</p>
  </div>
  <div class="action-stack">
+ <label for="freeModel" class="compact-label">МОДЕЛЬ БЕСПЛАТНОЙ ГЕНЕРАЦИИ</label>
+ <select id="freeModel"><option value="acestep-v15-xl-turbo">ACE-Step XL Turbo · максимум качества из доступных</option><option value="acestep-v15-turbo">ACE-Step Turbo · экономнее по GPU</option></select>
  <button id="mainCreateFree" class="btn primary xl" type="button">✦ Создать AI-песню бесплатно · ACE-Step</button>
  <button id="mainCreateSong" class="btn secondary xl" type="button">✦ Создать через ACE Music API</button>
- <div class="record-info" id="freeStatus" role="status" aria-live="polite">Бесплатный движок работает через очередь Hugging Face ZeroGPU. Ключ не требуется; при исчерпании квоты потребуется войти в Hugging Face или повторить попытку позже.</div>
+ <div class="record-info" id="freeStatus" role="status" aria-live="polite">Бесплатный ACE-Step запускается на Hugging Face ZeroGPU, где есть лимит GPU-запусков. После исчерпания лимита можно бесплатно генерировать через сторонний сайт Treblo и импортировать готовое аудио обратно.</div>
+ <div class="buttons-pair"><button id="copyStyleCreate" class="btn secondary" type="button">⎘ Скопировать стиль</button><button id="copyLyricsCreate" class="btn secondary" type="button">⎘ Скопировать текст</button></div>
+ <a class="btn secondary link-button" href="https://treblo.com/" target="_blank" rel="noopener noreferrer">Открыть Treblo · бесплатный резерв ↗</a>
+ <p class="muted">Treblo — отдельный сервис с собственным входом и условиями. В API NXVAL его бесплатная генерация не встроена. После скачивания песни импортируй файл в разделе AI.</p>
  <button id="mainCreateMyVoice" class="btn secondary xl" type="button">♫ Создать трек моим голосом</button>
  <div class="hintline"><span>Собственный голос требует образца и доступного SoulX-Singer GPU. Генератор бесплатной песни может быть недоступен из-за очереди — результат обещаем только после получения аудио.</span></div>
  <button id="saveProjectFromCreate" class="btn secondary xl" type="button">▢ Сохранить проект</button>
@@ -213,12 +218,12 @@
 'use strict';
 (() => {
   const $ = id => document.getElementById(id);
-  const ids = ['stylePrompt','lyrics','deliveryPrompt','bpm','key','bars','duration','noTalk','lineBars','delivery','voiceType','emotion','language','performanceMode','projectName','voiceName','takeOffset','masterVol'];
+  const ids = ['stylePrompt','lyrics','deliveryPrompt','bpm','key','bars','duration','noTalk','lineBars','delivery','voiceType','emotion','language','performanceMode','freeModel','projectName','voiceName','takeOffset','masterVol'];
   const savedDefault = {
     stylePrompt:'Energetic Russian underground hip-hop fused with dark phonk. Punchy natural swing, heavyweight 808, dry snare, sharp hi-hats, groovy cowbell riff, gritty piano and dramatic strings. The energy of a live studio rapper, ironic swagger. No intro, no bridge, no outro.',
     lyrics:'',
     deliveryPrompt:'Natural native Russian male rapper, clean comfortable human voice, vivid inflection, sharp punchlines, charismatic sarcastic groove. Flexible timing, lively cadence and clear words. No shouting, rasp, whispers, growling, robotic monotone or artificial pitch shift.',
-    bpm:124,key:'Fm',bars:'24',duration:'180',noTalk:true,lineBars:'1',performanceMode:'natural_rap',
+    bpm:124,key:'Fm',bars:'24',duration:'180',noTalk:true,lineBars:'1',performanceMode:'natural_rap',freeModel:'acestep-v15-xl-turbo',
     delivery:'Рэп / чёткий флоу',voiceType:'Мужской',emotion:'Уверенно / дерзко',language:'Русский',
     projectName:'Midnight Feelings',voiceName:'Мой голос',takeOffset:0,masterVol:85,
     genre:'Hip-Hop',mix:null,takeIds:[],aiId:null
@@ -458,7 +463,7 @@
     $('playMixer').addEventListener('click',()=>{startPlaying().catch(e=>alertToast(e.message));});
     $('stopBtn').addEventListener('click',stopPlaying);
     $('exportWav').addEventListener('click',exportWav);$('exportWavMixer').addEventListener('click',exportWav);
-    $('copyStyle').addEventListener('click',()=>copyText(styleText()));$('copyLyrics').addEventListener('click',()=>copyText($('lyrics').value));$('copyDelivery').addEventListener('click',()=>copyText(deliveryText()));
+    $('copyStyle').addEventListener('click',()=>copyText(styleText()));$('copyLyrics').addEventListener('click',()=>copyText($('lyrics').value));$('copyDelivery').addEventListener('click',()=>copyText(deliveryText()));$('copyStyleCreate').addEventListener('click',()=>copyText(styleText()));$('copyLyricsCreate').addEventListener('click',()=>copyText($('lyrics').value));
     window.addEventListener('beforeunload',()=>{saveDraft();if(record)record.stream.getTracks().forEach(t=>t.stop());if(transport)stopPlaying();for(const url of activeUrlMap.values())URL.revokeObjectURL(url);});
     window.addEventListener('hashchange',()=>{let hash=location.hash.slice(1);if(['create','voice','studio','mixer','projects','ai'].includes(hash))setTab(hash);});
   }
@@ -533,9 +538,12 @@ async function createBase(Client){
  const lyrics=opts?.lyrics||$('lyrics').value.trim();if(!lyrics)throw Error('Сначала введи текст песни в разделе «Создать»');
  const c=await Client.connect('ACE-Step/Ace-Step-v1.5',{events:['data','status']});
  status('Шаг 1: генерирую песню через ACE-Step…');
- const data=await invoke(c,'/generation_wrapper',{selected_model:'acestep-v15-xl-turbo',generation_mode:'custom',
+ const availableModels=['acestep-v15-xl-turbo','acestep-v15-turbo'];
+ const selected=availableModels.includes($('freeModel').value)?$('freeModel').value:availableModels[0];
+ const caption=[opts?.caption||$('stylePrompt').value,opts?.delivery?'Vocal delivery: '+opts.delivery:''].filter(Boolean).join('\n').slice(0,5200);
+ const data=await invoke(c,'/generation_wrapper',{selected_model:selected,generation_mode:'custom',
   simple_query_input:'',simple_vocal_language:'ru',
-  param_4:opts?.caption||$('stylePrompt').value,param_5:lyrics,param_6:Number($('bpm').value),
+  param_4:caption,param_5:lyrics,param_6:Number($('bpm').value),
   param_7:$('key').value,param_8:'4',param_9:opts?.language||'ru',
   param_14:null,param_17:null,param_18:null,param_15:Number($('duration').value),param_16:1,param_32:true,param_47:null
  },'Создание песни');
@@ -731,7 +739,7 @@ init();
      if(msg){msg.hidden=false;msg.textContent="Сначала вставь текст песни, затем нажми «Создать AI-трек».";}
      return;
    }
-   if(byId("aceKey")?.value?.trim()){byId("tab-ai")?.click();byId("aceGenerate")?.click();}else{window.nxvalGenerateFree?.();}
+   if(byId("aceKey")?.value?.trim()){byId("tab-ai")?.click();byId("aceGenerate")?.click();}else{goAI("aceKey");}
  });
  byId("mainCreateMyVoice")?.addEventListener("click",()=>{
    const lyrics=byId("lyrics")?.value?.trim();
