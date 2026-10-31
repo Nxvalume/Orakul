@@ -4,6 +4,7 @@ Receives a key only per request, never stores it. Fixed upstream and restricted 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 
@@ -13,7 +14,7 @@ MAX_INPUT = 180000
 MAX_RESPONSE = 32000000
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "NXVALMusic/2.1"
+    server_version = "NXVALMusic/3.0"
     def log_message(self, fmt, *args):
         # Disable logging of requests and content entirely; keys must not leak.
         pass
@@ -96,9 +97,13 @@ class Handler(BaseHTTPRequestHandler):
                 desc = caption.strip()
                 if delivery.strip():
                     desc += "\nVocal delivery: " + delivery.strip()
+                model = body.get("model", "acemusic/acestep-v1.5-turbo")
+                if not isinstance(model, str) or not re.fullmatch(r"acemusic/[A-Za-z0-9._-]{3,70}", model):
+                    self.send_json(400, {"error": "Некорректный идентификатор модели ACE Music"})
+                    return
                 contents = "<prompt>" + desc + "</prompt><lyrics>" + lyrics.strip() + "</lyrics>"
                 job = {
-                    "model": "acemusic/acestep-v1.5-turbo",
+                    "model": model,
                     "messages": [{"role":"user", "content":contents}],
                     "stream": False,
                     "thinking": True,
@@ -115,7 +120,7 @@ class Handler(BaseHTTPRequestHandler):
                 API_ROOT + path,
                 data=request_data,
                 headers={"Authorization": "Bearer " + key, "Accept": "application/json",
-                         "Content-Type":"application/json", "User-Agent":"NXVAL-Music-Voice/2.1"},
+                         "Content-Type":"application/json", "User-Agent":"NXVAL-Music-Voice/3.0"},
                 method="POST" if request_data is not None else "GET"
             )
             try:
