@@ -477,7 +477,7 @@
 const $=s=>document.getElementById(s),KEY='nxval-music-voice-draft-v1',DB='nxval-voice-studio-v1';
 let db=null,job=null,busy=false,outId='',outUrl='';
 const uuid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random();
-function status(t,error=false){$('vcStatus').textContent=t;$('vcStatus').classList.toggle('error',error);}
+function status(t,error=false){$('vcStatus').textContent=t;$('vcStatus').classList.toggle('error',error);if(typeof freeBusy!=='undefined'&&freeBusy){$('freeStatus').textContent=t;$('freeStatus').classList.toggle('error',error);}}
 function draft(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch{return {}}}
 function patch(s){localStorage.setItem(KEY,JSON.stringify({...draft(),...s}));}
 function connectDb(){return new Promise((ok,no)=>{const r=indexedDB.open(DB,1);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}
