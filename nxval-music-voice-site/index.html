@@ -18,7 +18,7 @@
 <body>
   <div class="shell">
     <header class="header">
-      <a class="brand" href="#create" aria-label="NXVAL Music, создать"><span class="brand-symbol">N.</span><span><strong>NXVAL</strong> <span class="brand-muted">MUSIC</span><small>VOICE STUDIO · V2</small></span></a>
+      <a class="brand" href="#create" aria-label="NXVAL Music, создать"><span class="brand-symbol">N.</span><span><strong>NXVAL</strong> <span class="brand-muted">MUSIC</span><small>VOICE STUDIO · V3</small></span></a>
       <span class="status"><span class="led"></span><span>FREE · LOCAL-FIRST</span></span>
     </header>
     <main>
@@ -71,10 +71,22 @@
           <textarea id="deliveryPrompt" class="longfield delivery-field" rows="9" placeholder="Тембр, дикция, смены флоу, ограничения, акценты..."></textarea>
           <div class="hintline"><span>Большое поле с изменяемой высотой. Настройки — подсказка модели, не гарантия.</span><span data-count="deliveryPrompt">0 симв.</span></div>
         </div>
-        <div class="action-stack">
- <button id="mainCreateSong" class="btn primary xl" type="button">✦ Создать AI-трек</button>
+        <div class="surface gap" style="margin-bottom:16px">
+ <label for="performanceMode">РЕАЛИЗМ ВОКАЛА / МАНЕРА</label>
+ <select id="performanceMode">
+   <option value="natural_rap">Живой рэп · натуральная читка, панчи, ритм</option>
+   <option value="natural_song">Живой вокал · певческая подача</option>
+   <option value="raw_voice">Максимум естественности · минимум обработки</option>
+   <option value="custom">Своя манера · только мои указания</option>
+ </select>
+ <p class="muted">Эта настройка включается в реальный запрос генератору вместе с языком, темпом и подачей. Сама по себе не гарантирует человеческий вокал — итог зависит от модели.</p>
+ </div>
+ <div class="action-stack">
+ <button id="mainCreateFree" class="btn primary xl" type="button">✦ Создать AI-песню бесплатно · ACE-Step</button>
+ <button id="mainCreateSong" class="btn secondary xl" type="button">✦ Создать через ACE Music API</button>
+ <div class="record-info" id="freeStatus" role="status" aria-live="polite">Бесплатный движок работает через очередь Hugging Face ZeroGPU. Ключ не требуется; при исчерпании квоты потребуется войти в Hugging Face или повторить попытку позже.</div>
  <button id="mainCreateMyVoice" class="btn secondary xl" type="button">♫ Создать трек моим голосом</button>
- <div class="hintline"><span>Полноценная песня с вокалом — через AI-движок. Ключ ACE Music вводится в настройках AI. Для своего голоса нужен записанный образец.</span></div>
+ <div class="hintline"><span>Собственный голос требует образца и доступного SoulX-Singer GPU. Генератор бесплатной песни может быть недоступен из-за очереди — результат обещаем только после получения аудио.</span></div>
  <button id="saveProjectFromCreate" class="btn secondary xl" type="button">▢ Сохранить проект</button>
  <button id="createDemo" class="btn secondary xl" type="button">◉ Создать демо-аранжировку (инструментал)</button>
 </div>
@@ -139,6 +151,9 @@
  <span class="kicker">ACE MUSIC API / НАСТРОЙКА КЛЮЧА</span>
  <h3>Создать трек <em>с API-ключом.</em></h3>
  <p class="muted">Ключ используется только для текущего запроса: мы не сохраняем его в браузере или проекте. Он отправляется через защищённый сервер NXVAL Music в ACE Music.</p>
+ <label for="aceModel">МОДЕЛЬ И КАЧЕСТВО</label>
+ <select id="aceModel"><option value="acemusic/acestep-v1.5-turbo">Стандартная модель · проверить доступные</option></select>
+ <p class="muted" id="aceModelInfo">Нажми «Проверить ключ» — студия покажет модели, доступные твоему ключу. Более тяжёлая модель может расходовать квоту быстрее.</p>
  <label for="aceKey">ТВОЙ API-КЛЮЧ</label>
  <input id="aceKey" autocomplete="off" type="password" spellcheck="false" placeholder="Вставь ключ ACE Music сюда">
  <div class="buttons-pair"><button class="btn secondary" type="button" id="aceToggle">Показать / скрыть</button><button class="btn secondary" type="button" id="aceReset">Очистить</button></div>
@@ -198,12 +213,12 @@
 'use strict';
 (() => {
   const $ = id => document.getElementById(id);
-  const ids = ['stylePrompt','lyrics','deliveryPrompt','bpm','key','bars','duration','noTalk','lineBars','delivery','voiceType','emotion','language','projectName','voiceName','takeOffset','masterVol'];
+  const ids = ['stylePrompt','lyrics','deliveryPrompt','bpm','key','bars','duration','noTalk','lineBars','delivery','voiceType','emotion','language','performanceMode','projectName','voiceName','takeOffset','masterVol'];
   const savedDefault = {
-    stylePrompt:'Energetic Russian underground hip-hop fused with dark phonk, 92 BPM, F minor. Punchy boom-bap kick and snare, groovy sliding 808, swung hi-hats, catchy cowbell riff, gritty piano stabs. No intro, no bridge, no outro.',
+    stylePrompt:'Energetic Russian underground hip-hop fused with dark phonk. Punchy natural swing, heavyweight 808, dry snare, sharp hi-hats, groovy cowbell riff, gritty piano and dramatic strings. The energy of a live studio rapper, ironic swagger. No intro, no bridge, no outro.',
     lyrics:'',
-    deliveryPrompt:'Natural adult male Russian rap voice. Loud, clean resonant chest voice, clear diction, expressive rhythm and sarcastic punchlines. No hoarseness, rasp, growling, whispering or robotic intonation.',
-    bpm:92,key:'Fm',bars:'24',duration:'180',noTalk:true,lineBars:'1',
+    deliveryPrompt:'Natural native Russian male rapper, clean comfortable human voice, vivid inflection, sharp punchlines, charismatic sarcastic groove. Flexible timing, lively cadence and clear words. No shouting, rasp, whispers, growling, robotic monotone or artificial pitch shift.',
+    bpm:124,key:'Fm',bars:'24',duration:'180',noTalk:true,lineBars:'1',performanceMode:'natural_rap',
     delivery:'Рэп / чёткий флоу',voiceType:'Мужской',emotion:'Уверенно / дерзко',language:'Русский',
     projectName:'Midnight Feelings',voiceName:'Мой голос',takeOffset:0,masterVol:85,
     genre:'Hip-Hop',mix:null,takeIds:[],aiId:null
@@ -514,12 +529,13 @@ window.nxvalImportACE=async function(blob,name){
 };
 async function createBase(Client){
  if(document.getElementById('aceKey')?.value.trim()){const audio=await window.nxvalGenerateACE();if(!audio)throw Error('ACE Music не вернул аудио');return audio;}
- const lyrics=$('lyrics').value.trim();if(!lyrics)throw Error('Сначала введи текст песни в разделе «Создать»');
+ const opts=window.nxvalQualityPayload?.();
+ const lyrics=opts?.lyrics||$('lyrics').value.trim();if(!lyrics)throw Error('Сначала введи текст песни в разделе «Создать»');
  const c=await Client.connect('ACE-Step/Ace-Step-v1.5',{events:['data','status']});
  status('Шаг 1: генерирую песню через ACE-Step…');
  const data=await invoke(c,'/generation_wrapper',{selected_model:'acestep-v15-xl-turbo',generation_mode:'custom',
   simple_query_input:'',simple_vocal_language:'ru',
-  param_4:$('stylePrompt').value,param_5:lyrics,param_6:Number($('bpm').value),
+  param_4:opts?.caption||$('stylePrompt').value,param_5:lyrics,param_6:Number($('bpm').value),
   param_7:$('key').value,param_8:'4/4',param_9:'ru',
   param_14:null,param_17:null,param_18:'',param_15:Number($('duration').value),param_47:null
  },'Создание песни');
@@ -528,6 +544,23 @@ async function createBase(Client){
  const blob=await receive(audio),item={id:uuid(),name:'AI-песня · '+($('projectName').value||'NXVAL'),createdAt:Date.now(),kind:'ai',blob,offset:0,mime:blob.type};
  await put('takes',item);await refresh();$('vcSource').value=item.id;return blob;
 }
+let freeBusy=false;
+window.nxvalGenerateFree=async function(){
+ if(freeBusy)return null;
+ if(!$('lyrics').value.trim()){$('freeStatus').textContent='Сначала вставь текст песни.';return null;}
+ freeBusy=true;$('mainCreateFree').disabled=true;
+ try{
+   $('freeStatus').textContent='Подключаю бесплатный ACE-Step. Очередь зависит от Hugging Face…';
+   const {Client}=await gradio();
+   const blob=await createBase(Client);
+   $('freeStatus').textContent='Песня получена и сохранена в проектах. Открой AI для прослушивания или микшер.';
+   location.hash='#ai';
+   return blob;
+ }catch(err){
+   $('freeStatus').textContent='Бесплатная генерация не завершилась: '+(err.message||err)+'. Открой ACE-Step во вкладке AI, если очередь/вход Hugging Face блокируют API.';
+   return null;
+ }finally{freeBusy=false;$('mainCreateFree').disabled=false;}
+};
 async function run(create){
  if(busy)return;
  if(!$('vcConsent').checked){status('Необходимо подтвердить согласие на отправку своего голоса во внешний сервис.',true);return;}
@@ -580,6 +613,37 @@ init();
 })();
 </script>
 <script>
+(function(){
+ 'use strict';
+ const el=id=>document.getElementById(id);
+ const styles={
+  natural_rap:'One authentic skilled human rapper in a natural speaking register, crisp native-language rhymes, flexible swing and charismatic sarcastic expression. He switches cadences naturally, accentuates punchlines with timing rather than loudness. No shout, no whisper, no growling, no rasp, no synthetic pitch or mechanical syllable timing.',
+  natural_song:'One genuine human lead singer, expressive realistic phrasing, smooth natural breath, emotionally believable articulation, subtle pitch variation. No artificial robotic phrasing, no autotune, no shouted adlibs.',
+  raw_voice:'Real human lead vocal, intimate dry studio recording, minimal effects, natural breathing, realistic dynamics, warm midrange tone, no computerized vocoder or artificial pitch manipulation.',
+  custom:''
+ };
+ window.nxvalQualityPayload=function(){
+  const raw=el('stylePrompt')?.value.trim()||'';
+  const delivery=el('deliveryPrompt')?.value.trim()||'';
+  const mode=el('performanceMode')?.value||'natural_rap';
+  const manual=el('delivery')?.value||'';
+  const voice=el('voiceType')?.value||'';
+  const emotion=el('emotion')?.value||'';
+  const language=el('language')?.value||'';
+  const langMap={'Русский':'ru','English':'en','Deutsch':'de','Français':'fr'};
+  const lang=langMap[language]||'ru';
+  const extra=[styles[mode]||'',mode==='natural_rap'?'Fully rhythmic spoken rap, not singing.':'',el('noTalk')?.checked?'No spoken skits, no intro, no bridge, no outro.':''];
+  return {
+   caption:[raw,'Genre: '+(document.querySelector('[data-genre].selected')?.dataset.genre||'hip-hop'),extra.filter(Boolean).join(' ')].filter(Boolean).join('\n').slice(0,4700),
+   delivery:[delivery,manual,voice,emotion,'Native vocal language: '+lang].filter(Boolean).join('. ').slice(0,3600),
+   lyrics:el('lyrics')?.value.trim()||'',
+   bpm:Number(el('bpm')?.value)||124,duration:Number(el('duration')?.value)||180,
+   language:lang,model:el('aceModel')?.value||'acemusic/acestep-v1.5-turbo'
+  };
+ };
+})();
+</script>
+<script>
 
 (function(){
  "use strict";
@@ -599,7 +663,7 @@ init();
    active=true;$("aceGenerate").disabled=true;$("aceResult").hidden=true;
    try{
      label("ACE Music генерирует песню. Запрос может выполняться несколько минут…");
-     const result=await request("/generate",{caption:$("stylePrompt").value||"",lyrics,delivery:$("deliveryPrompt").value||"",bpm:Number($("bpm").value),duration:Number($("duration").value),language:"ru"});
+     const result=await request("/generate",window.nxvalQualityPayload());
      const audio=result?.choices?.[0]?.message?.audio?.find(x=>x?.audio_url?.url)?.audio_url?.url;
      if(!audio||!audio.startsWith("data:audio/"))throw Error("API не вернул аудиофайл. Проверь квоту или попробуй снова.");
      const comma=audio.indexOf(","),head=audio.slice(0,comma);
@@ -627,7 +691,16 @@ init();
    try{
      const data=await request("/models",{});
      const models=(data?.data||[]).map(v=>v.id).filter(Boolean);
-     label(models.length?"Ключ действителен. Модель: "+models.join(", "):"API ответил, но список моделей пуст.");
+     const box=$("aceModel"),previous=box.value;
+     if(models.length){
+       box.replaceChildren();
+       const rank=m=>/xl.*sft/i.test(m)?0:/xl/i.test(m)?1:/turbo/i.test(m)?2:3;
+       models.sort((a,b)=>rank(a)-rank(b));
+       for(const m of models){const option=new Option(m+(rank(m)===0?' · качество XL SFT':rank(m)===1?' · XL':' · стандарт'),m);box.add(option);}
+       box.value=models.includes(previous)?previous:models[0];
+       $("aceModelInfo").textContent="Выбрана модель: "+box.value+". Более тяжёлые модели могут расходовать квоту быстрее.";
+     }
+     label(models.length?"Ключ действителен. Доступных моделей: "+models.length:"API ответил, но список моделей пуст.");
    }catch(err){label("Ошибка проверки: "+err.message,true);}
    finally{b.disabled=false;}
  });
@@ -648,6 +721,7 @@ init();
      if(el.matches("input,select,textarea"))el.focus({preventScroll:true});
    });
  }
+ byId("mainCreateFree")?.addEventListener("click",()=>{window.nxvalGenerateFree?.();});
  byId("mainCreateSong")?.addEventListener("click",()=>{
    const lyrics=byId("lyrics")?.value?.trim();
    if(!lyrics){
@@ -657,7 +731,7 @@ init();
      if(msg){msg.hidden=false;msg.textContent="Сначала вставь текст песни, затем нажми «Создать AI-трек».";}
      return;
    }
-   if(byId("aceKey")?.value?.trim()){byId("tab-ai")?.click();byId("aceGenerate")?.click();}else{goAI("aceKey");}
+   if(byId("aceKey")?.value?.trim()){byId("tab-ai")?.click();byId("aceGenerate")?.click();}else{window.nxvalGenerateFree?.();}
  });
  byId("mainCreateMyVoice")?.addEventListener("click",()=>{
    const lyrics=byId("lyrics")?.value?.trim();
