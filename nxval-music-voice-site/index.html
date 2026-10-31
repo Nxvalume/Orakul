@@ -129,6 +129,24 @@
           <a class="btn secondary link-button" target="_blank" rel="noopener noreferrer" href="https://acemusic.ai/playground/create">Открыть ACE Music ↗</a>
           <label class="btn secondary upload-label" for="importAi">↑ Импортировать готовый AI-трек<input type="file" id="importAi" accept="audio/*" hidden></label>
           <div id="aiResult" class="asset-list"><p class="empty">Импортированного AI-трека пока нет.</p></div>
+<section class="surface gap" style="margin-top:18px" id="voiceAiPanel">
+  <span class="kicker">08 / AI VOICE CLONING</span>
+  <h3>Создать трек <em>своим голосом.</em></h3>
+  <p class="muted">Нейросеть генерирует новый трек и преобразует вокал в твой тембр. Это не наложение аудиозаписи. Бесплатные GPU-сервисы могут ограничивать длительность, ставить в очередь и требовать вход.</p>
+  <label for="vcVoice">МОЙ ОБРАЗЕЦ ГОЛОСА</label><select id="vcVoice"><option value="">Загрузи голос во вкладке «Мой голос»</option></select>
+  <label for="vcSource">ГОТОВАЯ ПЕСНЯ ДЛЯ ЗАМЕНЫ ГОЛОСА</label><select id="vcSource"><option value="">Песня ещё не загружена</option></select>
+  <label class="btn secondary upload-label" for="vcUpload">↑ Загрузить AI-трек<input id="vcUpload" type="file" accept="audio/*" hidden></label>
+  <label class="check" style="align-items:flex-start;line-height:1.5"><input type="checkbox" id="vcConsent" style="margin-top:3px"> Подтверждаю, что голос мой или разрешён владельцем. Согласен отправить выбранный голос и песню в SoulX-Singer на Hugging Face для обработки; при генерации с нуля — также текст и стиль в ACE-Step. Это сторонние сервисы со своими правилами хранения данных.</label>
+  <button id="vcGenerate" class="btn primary xl" type="button">✦ Создать песню моим голосом</button>
+  <button id="vcRun" class="btn secondary xl" type="button">♫ Заменить голос в готовой песне</button>
+  <button id="vcStop" class="btn subtle" type="button" hidden>■ Отменить ожидание</button>
+  <div id="vcStatus" class="record-info" aria-live="polite">Выбери образец. Для нового трека введи текст и стиль в разделе «Создать».</div>
+  <div id="vcOutput" hidden class="asset">
+    <strong>Трек с твоим голосом</strong><audio controls id="vcPlayer" style="width:100%"></audio>
+    <div class="buttons-pair"><a id="vcDownload" download="nxval-voice.wav" class="btn primary">↓ Скачать</a><button id="vcMix" class="btn secondary" type="button">＋ В микшер</button></div>
+  </div>
+  <p class="muted">Если ZeroGPU не отвечает, <a href="https://huggingface.co/spaces/Soul-AILab/SoulX-Singer" target="_blank" rel="noopener noreferrer" style="color:#d8ff75">открой SoulX-Singer ↗</a>. Отдельный вариант: <a href="https://huggingface.co/spaces/ACE-Step/Ace-Step-v1.5" target="_blank" rel="noopener noreferrer" style="color:#d8ff75">ACE-Step ↗</a>. Точность совпадения голоса не гарантируется.</p>
+</section>
         </div>
       </section>
     </main>
@@ -418,6 +436,123 @@
   init().catch(e=>{console.error(e);alertToast('Ошибка запуска: '+e.message);});
 })();
 
+</script>
+<script>
+
+(function(){
+'use strict';
+const $=s=>document.getElementById(s),KEY='nxval-music-voice-draft-v1',DB='nxval-voice-studio-v1';
+let db=null,job=null,busy=false,outId='',outUrl='';
+const uuid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+''+Math.random();
+function status(t,error=false){$('vcStatus').textContent=t;$('vcStatus').classList.toggle('error',error);}
+function draft(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch{return {}}}
+function patch(s){localStorage.setItem(KEY,JSON.stringify({...draft(),...s}));}
+function connectDb(){return new Promise((ok,no)=>{const r=indexedDB.open(DB,1);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}
+function query(store,action,mode='readonly'){return new Promise((ok,no)=>{const t=db.transaction(store,mode),r=action(t.objectStore(store));r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error);});}
+const all=s=>query(s,x=>x.getAll()),get=(s,id)=>query(s,x=>x.get(id)),put=(s,item)=>query(s,x=>x.put(item),'readwrite');
+async function refresh(){
+ if(!db)return;
+ const voices=(await all('voices')).sort((a,b)=>b.createdAt-a.createdAt);
+ const tracks=(await all('takes')).filter(x=>['ai','ai_voice'].includes(x.kind)).sort((a,b)=>b.createdAt-a.createdAt);
+ const vs=$('vcVoice'),ts=$('vcSource'),lastV=vs.value,lastT=ts.value;
+ vs.replaceChildren(new Option(voices.length?'Выбери свой образец':'Нет сохранённых образцов',''));
+ for(const x of voices)vs.add(new Option(x.name,x.id));
+ vs.value=voices.some(x=>x.id===lastV)?lastV:(voices[0]?.id||'');
+ ts.replaceChildren(new Option(tracks.length?'Выбери песню':'Нет готовой песни',''));
+ for(const x of tracks)ts.add(new Option(x.name,x.id));
+ ts.value=tracks.some(x=>x.id===lastT)?lastT:(tracks.some(x=>x.id===draft().aiId)?draft().aiId:(tracks[0]?.id||''));
+}
+function mediaUrl(x){const v=typeof x==='string'?x:(x?.url||x?.path);if(!v)throw Error('Сервис не вернул аудиофайл');const u=new URL(v);
+ if(u.protocol!=='https:'||!(u.hostname.endsWith('.hf.space')||u.hostname==='huggingface.co'))throw Error('Некорректный адрес аудио');return u.href;
+}
+async function receive(x){const r=await fetch(mediaUrl(x));if(!r.ok)throw Error('Ошибка скачивания результата: HTTP '+r.status);const b=await r.blob();if(b.size<100||b.size>100e6)throw Error('Не удалось получить аудио');return b;}
+async function gradio(){try{return await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js');}catch{throw Error('Не удалось загрузить Gradio-клиент. Проверь доступ к сети.');}}
+async function invoke(c,api,args,label){
+ job=c.submit(api,args);let result=null;
+ for await(const v of job){if(v.type==='data')result=v.data;
+  if(v.type==='status'){const s=v.stage||v.data?.stage||'pending',p=v.position??v.data?.position;
+   status(label+': '+(s==='pending'?'ожидание в очереди'+(Number.isInteger(p)?' №'+p:''):s==='generating'?'GPU обрабатывает':s==='complete'?'готово':'ожидание')+'…');
+   if(s==='error')throw Error('GPU-сервис вернул ошибку');}}
+ job=null;if(!Array.isArray(result))throw Error('GPU-сервис не вернул результат');return result;
+}
+async function voiceWav(blob){
+ const AC=window.AudioContext||window.webkitAudioContext;
+ if(!AC)return blob;let ctx=new AC();
+ try{
+  const a=await ctx.decodeAudioData(await blob.arrayBuffer()),sr=22050,n=Math.min(sr*30,Math.ceil(a.duration*sr));
+  const offline=new OfflineAudioContext(1,n,sr),source=offline.createBufferSource();source.buffer=a;source.connect(offline.destination);source.start();
+  const rendered=await offline.startRendering(),pcm=rendered.getChannelData(0),arr=new ArrayBuffer(44+2*n),v=new DataView(arr);
+  function str(i,s){for(let j=0;j<s.length;j++)v.setUint8(i+j,s.charCodeAt(j));}
+  str(0,'RIFF');v.setUint32(4,36+2*n,true);str(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);str(36,'data');v.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++){const f=Math.max(-1,Math.min(1,pcm[i]));v.setInt16(44+i*2,f<0?f*32768:f*32767,true);}
+  return new Blob([arr],{type:'audio/wav'});
+ }catch{return blob;}finally{ctx.close().catch(()=>{});}
+}
+async function createBase(Client){
+ const lyrics=$('lyrics').value.trim();if(!lyrics)throw Error('Сначала введи текст песни в разделе «Создать»');
+ const c=await Client.connect('ACE-Step/Ace-Step-v1.5',{events:['data','status']});
+ status('Шаг 1: генерирую песню через ACE-Step…');
+ const data=await invoke(c,'/generation_wrapper',{selected_model:'acestep-v15-xl-turbo',generation_mode:'custom',
+  simple_query_input:'',simple_vocal_language:'ru',
+  param_4:$('stylePrompt').value,param_5:lyrics,param_6:Number($('bpm').value),
+  param_7:$('key').value,param_8:'4/4',param_9:'ru',
+  param_14:null,param_17:null,param_18:'',param_15:Number($('duration').value),param_47:null
+ },'Создание песни');
+ const audio=data.slice(0,8).find(x=>x?.url||x?.path);
+ if(!audio)throw Error('ACE-Step не смог сгенерировать песню. Используй ручной импорт готового трека');
+ const blob=await receive(audio),item={id:uuid(),name:'AI-песня · '+($('projectName').value||'NXVAL'),createdAt:Date.now(),kind:'ai',blob,offset:0,mime:blob.type};
+ await put('takes',item);await refresh();$('vcSource').value=item.id;return blob;
+}
+async function run(create){
+ if(busy)return;
+ if(!$('vcConsent').checked){status('Необходимо подтвердить согласие на отправку своего голоса во внешний сервис.',true);return;}
+ const id=$('vcVoice').value;
+ if(!id){status('Сначала загрузи образец в разделе «Мой голос».',true);return;}
+ const trackId=$('vcSource').value;
+ if(!create&&!trackId){status('Загрузи готовый AI-трек либо выбери создание с нуля.',true);return;}
+ busy=true;$('vcGenerate').disabled=true;$('vcRun').disabled=true;$('vcStop').hidden=false;$('vcOutput').hidden=true;
+ try{
+  const {Client,handle_file}=await gradio(),voice=await get('voices',id);
+  if(!voice?.blob)throw Error('Не найден выбранный образец');
+  const track=create?await createBase(Client):(await get('takes',trackId))?.blob;
+  if(!track||track.size>100e6)throw Error('Не найден трек или он больше 100 МБ');
+  status('Шаг 2: загружаю голос и песню для замены тембра…');
+  const c=await Client.connect('Soul-AILab/SoulX-Singer',{events:['data','status']});
+  await invoke(c,'/_run_svc_preprocess',{prompt_audio:handle_file(await voiceWav(voice.blob)),
+   target_audio:handle_file(track),prompt_vocal_sep:false,target_vocal_sep:true},'Подготовка аудио');
+  const data=await invoke(c,'/_run_svc_convert',{auto_shift:true,auto_mix_acc:true,
+    pitch_shift:0,n_step:32,cfg:1,use_fp16:true,seed:42},'Преобразование тембра');
+  const blob=await receive(data[0]),item={id:uuid(),name:'Мой голос · '+($('projectName').value||'NXVAL')+'.wav',
+    kind:'ai_voice',createdAt:Date.now(),offset:0,mime:blob.type,blob};
+  await put('takes',item);outId=item.id;localStorage.setItem('nxvalVoiceLast',outId);
+  if(outUrl)URL.revokeObjectURL(outUrl);outUrl=URL.createObjectURL(blob);
+  $('vcPlayer').src=outUrl;$('vcDownload').href=outUrl;$('vcOutput').hidden=false;
+  status('Готово: новый AI-вокал сохранён. Прослушай и добавь результат в микшер.');
+  await refresh();
+ }catch(e){status('Ошибка: '+(e.message||e)+'. Исходные файлы сохранены. ZeroGPU может быть перегружен или требовать вход.',true);}
+ finally{busy=false;job=null;$('vcGenerate').disabled=false;$('vcRun').disabled=false;$('vcStop').hidden=true;}
+}
+$('vcUpload').addEventListener('change',async e=>{
+ const file=e.target.files?.[0];e.target.value='';if(!file)return;
+ if(!file.type.startsWith('audio/')||file.size>90e6){status('Нужен аудиофайл до 90 МБ',true);return;}
+ try{const entry={id:uuid(),name:file.name,kind:'ai',blob:file,mime:file.type,offset:0,createdAt:Date.now()};
+  await put('takes',entry);await refresh();$('vcSource').value=entry.id;status('Песня загружена. Выбери образец и запусти замену голоса.');
+ }catch(err){status(err.message,true);}
+});
+$('vcGenerate').addEventListener('click',()=>run(true));$('vcRun').addEventListener('click',()=>run(false));
+$('vcStop').addEventListener('click',()=>{if(job?.cancel)job.cancel();status('Отмена отправлена. Очередь может завершить уже начатую задачу.');});
+$('vcMix').addEventListener('click',()=>{if(outId){patch({aiId:outId});location.hash='#mixer';location.reload();}});
+async function init(){
+ try{db=await connectDb();await refresh();
+  const id=localStorage.getItem('nxvalVoiceLast'),item=id?await get('takes',id):null;
+  if(item?.blob){outId=id;outUrl=URL.createObjectURL(item.blob);
+   $('vcPlayer').src=outUrl;$('vcDownload').href=outUrl;$('vcOutput').hidden=false;}
+  document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>refresh().catch(()=>{})));
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh().catch(()=>{});});
+ }catch(e){status('Хранилище недоступно: '+e.message,true);}
+}
+init();
+})();
 </script>
 </body>
 </html>
