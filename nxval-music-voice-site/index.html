@@ -657,7 +657,7 @@ init();
      if(msg){msg.hidden=false;msg.textContent="Сначала вставь текст песни, затем нажми «Создать AI-трек».";}
      return;
    }
-   goAI(byId("aceKey")?.value?.trim()?"aceGenerate":"aceKey");
+   if(byId("aceKey")?.value?.trim()){byId("tab-ai")?.click();byId("aceGenerate")?.click();}else{goAI("aceKey");}
  });
  byId("mainCreateMyVoice")?.addEventListener("click",()=>{
    const lyrics=byId("lyrics")?.value?.trim();
@@ -668,7 +668,7 @@ init();
      if(msg){msg.hidden=false;msg.textContent="Сначала вставь текст песни.";}
      return;
    }
-   goAI("vcVoice");
+   if(byId("vcVoice")?.value && byId("vcConsent")?.checked){byId("tab-ai")?.click();byId("vcGenerate")?.click();}else{goAI("vcVoice");}
  });
 })();
 </script>
