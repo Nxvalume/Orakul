@@ -71,7 +71,13 @@
           <textarea id="deliveryPrompt" class="longfield delivery-field" rows="9" placeholder="Тембр, дикция, смены флоу, ограничения, акценты..."></textarea>
           <div class="hintline"><span>Большое поле с изменяемой высотой. Настройки — подсказка модели, не гарантия.</span><span data-count="deliveryPrompt">0 симв.</span></div>
         </div>
-        <div class="action-stack"><button id="saveProjectFromCreate" class="btn primary xl" type="button">✦ Сохранить проект</button><button id="createDemo" class="btn secondary xl" type="button">◉ Создать демо-аранжировку</button></div>
+        <div class="action-stack">
+ <button id="mainCreateSong" class="btn primary xl" type="button">✦ Создать AI-трек</button>
+ <button id="mainCreateMyVoice" class="btn secondary xl" type="button">♫ Создать трек моим голосом</button>
+ <div class="hintline"><span>Полноценная песня с вокалом — через AI-движок. Ключ ACE Music вводится в настройках AI. Для своего голоса нужен записанный образец.</span></div>
+ <button id="saveProjectFromCreate" class="btn secondary xl" type="button">▢ Сохранить проект</button>
+ <button id="createDemo" class="btn secondary xl" type="button">◉ Создать демо-аранжировку (инструментал)</button>
+</div>
       </section>
       <section id="pane-voice" class="pane" aria-labelledby="tab-voice">
         <div class="section-top"><div><span class="kicker">03 / MY VOICE</span><h2>Мой <em>голос.</em></h2></div></div>
@@ -627,6 +633,43 @@ init();
  });
  $("aceGenerate").addEventListener("click",create);
  window.nxvalGenerateACE=create;
+})();
+</script>
+<script>
+(function(){
+ "use strict";
+ const byId=id=>document.getElementById(id);
+ function goAI(target){
+   byId("tab-ai")?.click();
+   window.requestAnimationFrame(()=>{
+     const el=byId(target);
+     if(!el)return;
+     el.scrollIntoView({block:"center",behavior:"smooth"});
+     if(el.matches("input,select,textarea"))el.focus({preventScroll:true});
+   });
+ }
+ byId("mainCreateSong")?.addEventListener("click",()=>{
+   const lyrics=byId("lyrics")?.value?.trim();
+   if(!lyrics){
+     byId("lyrics")?.focus();
+     byId("lyrics")?.scrollIntoView({block:"center",behavior:"smooth"});
+     const msg=byId("toast");
+     if(msg){msg.hidden=false;msg.textContent="Сначала вставь текст песни, затем нажми «Создать AI-трек».";}
+     return;
+   }
+   goAI(byId("aceKey")?.value?.trim()?"aceGenerate":"aceKey");
+ });
+ byId("mainCreateMyVoice")?.addEventListener("click",()=>{
+   const lyrics=byId("lyrics")?.value?.trim();
+   if(!lyrics){
+     byId("lyrics")?.focus();
+     byId("lyrics")?.scrollIntoView({block:"center",behavior:"smooth"});
+     const msg=byId("toast");
+     if(msg){msg.hidden=false;msg.textContent="Сначала вставь текст песни.";}
+     return;
+   }
+   goAI("vcVoice");
+ });
 })();
 </script>
 </body>
