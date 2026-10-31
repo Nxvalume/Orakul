@@ -129,6 +129,18 @@
           <a class="btn secondary link-button" target="_blank" rel="noopener noreferrer" href="https://acemusic.ai/playground/create">Открыть ACE Music ↗</a>
           <label class="btn secondary upload-label" for="importAi">↑ Импортировать готовый AI-трек<input type="file" id="importAi" accept="audio/*" hidden></label>
           <div id="aiResult" class="asset-list"><p class="empty">Импортированного AI-трека пока нет.</p></div>
+<div class="surface gap" id="aceApiPanel" style="margin-top:14px">
+ <span class="kicker">ACE MUSIC API / НАСТРОЙКА КЛЮЧА</span>
+ <h3>Создать трек <em>с API-ключом.</em></h3>
+ <p class="muted">Ключ используется только для текущего запроса: мы не сохраняем его в браузере или проекте. Он отправляется через защищённый сервер NXVAL Music в ACE Music.</p>
+ <label for="aceKey">ТВОЙ API-КЛЮЧ</label>
+ <input id="aceKey" autocomplete="off" type="password" spellcheck="false" placeholder="Вставь ключ ACE Music сюда">
+ <div class="buttons-pair"><button class="btn secondary" type="button" id="aceToggle">Показать / скрыть</button><button class="btn secondary" type="button" id="aceReset">Очистить</button></div>
+ <div class="buttons-pair"><button class="btn secondary" type="button" id="aceTest">Проверить ключ</button><button class="btn primary" type="button" id="aceGenerate">✦ Создать трек</button></div>
+ <div id="aceStatus" class="record-info" role="status" aria-live="polite">Укажи ключ. Без ключа остаётся доступен бесплатный ZeroGPU.</div>
+ <div id="aceResult" class="asset" hidden><strong>Результат ACE Music</strong><audio controls id="aceAudio" style="width:100%"></audio><a class="btn primary" id="aceDownload" download="NXVAL-ACE-Music.mp3">↓ Скачать трек</a></div>
+ <p class="muted"><a href="https://acemusic.ai/playground/api-key" target="_blank" rel="noopener noreferrer" style="color:#d8ff75">Получить API-ключ ↗</a>. Нажатие «Создать трек» передаёт текст и стиль в ACE Music для генерации.</p>
+</div>
 <section class="surface gap" style="margin-top:18px" id="voiceAiPanel">
   <span class="kicker">08 / AI VOICE CLONING</span>
   <h3>Создать трек <em>своим голосом.</em></h3>
@@ -488,7 +500,14 @@ async function voiceWav(blob){
   return new Blob([arr],{type:'audio/wav'});
  }catch{return blob;}finally{ctx.close().catch(()=>{});}
 }
+
+window.nxvalImportACE=async function(blob,name){
+ const item={id:uuid(),name:name||'ACE Music · NXVAL',kind:'ai',createdAt:Date.now(),offset:0,mime:blob.type,blob};
+ await put('takes',item);await refresh();$('vcSource').value=item.id;
+ return item.id;
+};
 async function createBase(Client){
+ if(document.getElementById('aceKey')?.value.trim()){const audio=await window.nxvalGenerateACE();if(!audio)throw Error('ACE Music не вернул аудио');return audio;}
  const lyrics=$('lyrics').value.trim();if(!lyrics)throw Error('Сначала введи текст песни в разделе «Создать»');
  const c=await Client.connect('ACE-Step/Ace-Step-v1.5',{events:['data','status']});
  status('Шаг 1: генерирую песню через ACE-Step…');
@@ -552,6 +571,62 @@ async function init(){
  }catch(e){status('Хранилище недоступно: '+e.message,true);}
 }
 init();
+})();
+</script>
+<script>
+
+(function(){
+ "use strict";
+ const $=id=>document.getElementById(id),PROXY="https://nxval-music-ace-gateway.onrender.com";
+ let active=false,downloadUrl=null;
+ function label(msg,bad=false){$("aceStatus").textContent=msg;$("aceStatus").classList.toggle("error",bad);}
+ async function request(path,payload){
+   const res=await fetch(PROXY+path,{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:$("aceKey").value.trim(),...payload})});
+   const data=await res.json().catch(()=>null);
+   if(!res.ok)throw Error(data?.error||"Ошибка подключения, HTTP "+res.status);
+   return data;
+ }
+ async function create(){
+   if(active)return;
+   if(!$("aceKey").value.trim()){label("Вставь ключ ACE Music.",true);return null;}
+   const lyrics=$("lyrics").value.trim();if(!lyrics){label("Вставь слова песни в разделе «Создать».",true);return null;}
+   active=true;$("aceGenerate").disabled=true;$("aceResult").hidden=true;
+   try{
+     label("ACE Music генерирует песню. Запрос может выполняться несколько минут…");
+     const result=await request("/generate",{caption:$("stylePrompt").value||"",lyrics,delivery:$("deliveryPrompt").value||"",bpm:Number($("bpm").value),duration:Number($("duration").value),language:"ru"});
+     const audio=result?.choices?.[0]?.message?.audio?.find(x=>x?.audio_url?.url)?.audio_url?.url;
+     if(!audio||!audio.startsWith("data:audio/"))throw Error("API не вернул аудиофайл. Проверь квоту или попробуй снова.");
+     const comma=audio.indexOf(","),head=audio.slice(0,comma);
+     if(comma<0||!head.includes(";base64"))throw Error("Неподдерживаемый формат аудио");
+     const raw=atob(audio.slice(comma+1)),bytes=new Uint8Array(raw.length);
+     for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+     const mime=head.slice(5).split(";")[0]||"audio/mpeg";
+     const blob=new Blob([bytes],{type:mime});
+     if(!blob.size)throw Error("Получен пустой файл");
+     if(downloadUrl)URL.revokeObjectURL(downloadUrl);
+     downloadUrl=URL.createObjectURL(blob);$("aceAudio").src=downloadUrl;$("aceDownload").href=downloadUrl;
+     $("aceDownload").download=mime.includes("wav")?"NXVAL-ACE-Music.wav":"NXVAL-ACE-Music.mp3";
+     $("aceResult").hidden=false;
+     await window.nxvalImportACE(blob,"ACE Music · "+($("projectName").value||"NXVAL"));
+     label("Песня создана. Скачай её или выбери в блоке замены голоса.");
+     return blob;
+   }catch(err){label("Ошибка генерации: "+err.message,true);return null;}
+   finally{active=false;$("aceGenerate").disabled=false;}
+ }
+ $("aceToggle").addEventListener("click",()=>{$("aceKey").type=$("aceKey").type==="password"?"text":"password";});
+ $("aceReset").addEventListener("click",()=>{$("aceKey").value="";label("Ключ очищен.");});
+ $("aceTest").addEventListener("click",async()=>{
+   if(!$("aceKey").value.trim()){label("Сначала вставь API-ключ.",true);return;}
+   const b=$("aceTest");b.disabled=true;label("Проверка ключа через ACE Music…");
+   try{
+     const data=await request("/models",{});
+     const models=(data?.data||[]).map(v=>v.id).filter(Boolean);
+     label(models.length?"Ключ действителен. Модель: "+models.join(", "):"API ответил, но список моделей пуст.");
+   }catch(err){label("Ошибка проверки: "+err.message,true);}
+   finally{b.disabled=false;}
+ });
+ $("aceGenerate").addEventListener("click",create);
+ window.nxvalGenerateACE=create;
 })();
 </script>
 </body>
